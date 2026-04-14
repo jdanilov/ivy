@@ -1,8 +1,8 @@
 # Ivy
 
-**Portable development harness for Claude Code.**
+**Simple portable development harness for Claude Code.**
        
-Allows managing a curated set of skills, scripts, tools, hooks, and MCP servers into any Clade Code project with one command. Uninstall cleanly. Update all connected projects by updating ivy.
+Manages a curated extendable set of skills, tools, fixtures, and MCP servers. Installs them into any Claude Code project with one command. Uninstalls cleanly. Update all connected projects by updating ivy.
 
 ![Ivy status view](docs/ivy-screenshot.png)
 
@@ -12,23 +12,34 @@ Ivy **symlinks** its `parts` into your project's `.claude/` directory. This mean
 
 - Updating ivy instantly updates all connected projects
 - No copied files to drift out of sync
-- Clean uninstall removes only what ivy added
+- Clean uninstallation removes only what ivy added
 - Manifest with SHA-256 hashes detects local modifications
 
 ## Parts
 
-| Part          | Type    | Model  | Description                                |
-|---------------|---------|--------|--------------------------------------------|
-| `/brainstorm` | skill   | opus   | Interactive planning — generate plan files |
-| `/dry`        | skill   | opus   | Code critic — review uncommitted changes   |
-| `/flow`       | skill   | sonnet | Research and visualize system flows        |
-| `/commit`     | skill   | sonnet | Structured git commits                     |
-| `/research`   | tool    | —      | Web research via Grok AI                   |
-| `/capture`    | tool    | —      | Screenshot capture via Playwright          |
-| `/cycle`      | tool    | —      | Developer-critic-fixer ralph loop          |
-| `safe-bash`   | fixture | —      | Block destructive bash commands            |
-| `sounds`      | fixture | —      | Sonar notification on Claude session end   |
-| `glm`         | mcp     | —      | GLM model proxy (z.ai)                     |
+Curated list of parts to start with:
+
+| Part          | Type    | Model  | Description                                       |
+|---------------|---------|--------|---------------------------------------------------|
+| `/brainstorm` | skill   | opus   | Interactive planning, generates plan files        |
+| `/dry`        | skill   | opus   | Code critic, review uncommitted changes           |
+| `/flow`       | skill   | sonnet | Research and visualize system flows               |
+| `/commit`     | skill   | sonnet | Structured git commits                            |
+| `/cycle`      | tool    | —      | Developer-critic-fixer ralph loop over plan files |
+| `/research`   | tool    | —      | Deep web research via Grok AI                     |
+| `/capture`    | tool    | —      | Screenshot capture via Playwright                 |
+| `safe-bash`   | fixture | —      | Block destructive bash commands                   |
+| `sounds`      | fixture | —      | Sonar notification on Claude session end          |
+| `glm`         | mcp     | —      | GLM model proxy (z.ai)                            |
+
+### Part types
+
+| Type        | Prefix | What it is                                                                |
+|-------------|--------|---------------------------------------------------------------------------|
+| **skill**   | `/`    | Single `skill.md` with model directive, invoked as `/name` in Claude Code |
+| **tool**    | `/`    | Skill with supporting scripts or runtime, invoked as `/name`              |
+| **fixture** | —      | Project configuration: hooks, scripts, assets (not a command)             |
+| **mcp**     | —      | MCP server entry injected into `.mcp.json`                                |
 
 ## Setup
 

@@ -43,7 +43,7 @@ export const PARTS: Part[] = [
   },
   {
     name: 'research',
-    type: 'skill',
+    type: 'tool',
     description: 'web research via Grok',
     default: true,
     files: [
@@ -56,7 +56,7 @@ export const PARTS: Part[] = [
   },
   {
     name: 'capture',
-    type: 'skill',
+    type: 'tool',
     description: 'screenshot capture',
     default: false,
     files: [
@@ -66,7 +66,7 @@ export const PARTS: Part[] = [
   },
   {
     name: 'cycle',
-    type: 'skill',
+    type: 'tool',
     description: 'develop ↔ critic ↔ fix loop',
     default: true,
     files: [
@@ -84,7 +84,7 @@ export const PARTS: Part[] = [
   },
   {
     name: 'safe-bash',
-    type: 'script',
+    type: 'fixture',
     description: 'block destructive commands',
     default: true,
     files: [
@@ -100,7 +100,7 @@ export const PARTS: Part[] = [
   },
   {
     name: 'sounds',
-    type: 'script',
+    type: 'fixture',
     description: 'sonar notification on session end',
     default: true,
     files: [

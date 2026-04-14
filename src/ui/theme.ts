@@ -57,14 +57,11 @@ export function statusSymbol(status: string): string {
 }
 
 export function typeLabel(part: Part): string {
-  if (part.type === 'mcp') return 'mcp';
-  if (part.type === 'script') return 'fixture';
-  if (part.files.length > 1) return 'tool';
-  return 'skill';
+  return part.type;
 }
 
 export function displayName(part: Part): string {
-  return part.type === 'skill' ? `/${part.name}` : part.name;
+  return part.type === 'skill' || part.type === 'tool' ? `/${part.name}` : part.name;
 }
 
 export function pluralize(count: number, singular: string, plural: string = singular + 's'): string {

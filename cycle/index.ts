@@ -180,7 +180,7 @@ function shouldSkip(role: AgentRole, startWith: AgentRole): boolean {
 }
 
 // Auto-run when executed directly (not imported)
-const isDirectRun = process.argv[1] && Bun.main === process.argv[1]
+const isDirectRun = import.meta.path === Bun.main
 if (isDirectRun) {
   const args = process.argv.slice(2)
   main(args[0]).catch((err) => {

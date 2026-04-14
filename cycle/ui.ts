@@ -153,7 +153,7 @@ export async function pickPlan(plansDir: string): Promise<string | null> {
     message: 'Pick a plan',
     options: entries.map((e) => {
       const time = relativeTime(now - e.mtime)
-      const status = e.done === e.total && e.total > 0 ? 'complete' : `${e.done}/${e.total} done`
+      const status = e.total === 0 ? 'no tasks' : e.done === e.total ? 'complete' : `${e.done}/${e.total} done`
       return {
         value: e.fullPath,
         label: e.name,

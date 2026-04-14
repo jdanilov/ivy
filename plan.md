@@ -177,7 +177,7 @@ Ivy
    ◉ /brainstorm  interactive planning (opus)
    ◌ /capture     screenshot capture
    ◉ /research    web research via Grok
-   ◉ /cycle       developer↔critic loop
+   ◉ /cycle       develop ↔ critic ↔ fix loop
    ◉ safe-bash    block destructive commands
    ◉ sounds       sonar notification on session end
    ◌ glm          GLM model proxy
@@ -223,7 +223,7 @@ Ivy
    ◉ /brainstorm  interactive planning (opus)
    ◌ /capture     screenshot capture
    ◉ /research    web research via Grok
-   ◉ /cycle       developer↔critic loop
+   ◉ /cycle       develop ↔ critic ↔ fix loop
    ◉ safe-bash    block destructive commands · no changes
    ◌ glm          GLM model proxy
 
@@ -541,12 +541,12 @@ When an MCP part is selected, ivy adds an entry to `.mcp.json`.
 - [x] Wire `ivy cycle` subcommand in main CLI
 
 ### Phase 6: GLM MCP server
-- [ ] Create minimal MCP server scaffold (mcps/glm/index.ts, server.ts)
-- [ ] Implement z.ai/GLM provider (mcps/glm/provider.ts)
-- [ ] Add think tool
-- [ ] Add write-code tool
-- [ ] Add review tool
-- [ ] Register glm as MCP part in registry
+- [x] Create minimal MCP server scaffold (mcps/glm/index.ts, server.ts)
+- [x] Implement z.ai/GLM provider (mcps/glm/provider.ts)
+- [x] Add think tool
+- [x] Add code tool
+- [x] Add review tool
+- [x] Register glm as MCP part in registry
 
 ### Phase 7: Polish
 - [ ] Create CLAUDE.md with project conventions

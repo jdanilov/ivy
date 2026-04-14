@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { scanProject } from '../core/scanner.js';
-import { I, colors, statusColor, statusSymbol, statusLabel, displayName } from '../ui/theme.js';
+import { I, colors, statusColor, statusSymbol, statusLabel, displayName, typeLabel } from '../ui/theme.js';
 
 function printHeader(targetDir: string): void {
   console.log('');
@@ -9,29 +9,30 @@ function printHeader(targetDir: string): void {
 
 function printStatusMatrix(states: import('../types.js').PartState[]): void {
   console.log('');
-  console.log(`${I}${'Part'.padEnd(14)}${'Status'.padEnd(14)}Files`);
-  console.log(`${I}${'─'.repeat(50)}`);
+  console.log(`${I}${'Part'.padEnd(14)}${'Type'.padEnd(10)}${'Status'.padEnd(14)}Files`);
+  console.log(`${I}${'─'.repeat(60)}`);
 
   for (const ps of states) {
     const col = statusColor(ps.status);
     const sym = statusSymbol(ps.status);
     const label = statusLabel(ps.status);
     const name = displayName(ps.part).padEnd(14);
+    const type = `${colors.dim}${typeLabel(ps.part).padEnd(10)}${colors.reset}`;
 
     const fileList = ps.part.files.map((f) => f.target);
     const statusText = `${sym} ${label}`;
     const statusPad = statusText.padEnd(12);
 
     if (ps.status === 'not-installed') {
-      console.log(`${I}${name}${col}${statusPad}${colors.reset}`);
+      console.log(`${I}${name}${type}${col}${statusPad}${colors.reset}`);
     } else if (fileList.length > 0) {
-      console.log(`${I}${name}${col}${statusPad}${colors.reset} ${fileList[0]}`);
-      const indent = ' '.repeat(I.length + 14 + 12 + 1);
+      console.log(`${I}${name}${type}${col}${statusPad}${colors.reset} ${fileList[0]}`);
+      const indent = ' '.repeat(I.length + 14 + 10 + 12 + 1);
       for (let i = 1; i < fileList.length; i++) {
         console.log(`${indent}${fileList[i]}`);
       }
     } else {
-      console.log(`${I}${name}${col}${statusPad}${colors.reset}`);
+      console.log(`${I}${name}${type}${col}${statusPad}${colors.reset}`);
     }
   }
 }

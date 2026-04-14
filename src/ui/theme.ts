@@ -56,6 +56,13 @@ export function statusSymbol(status: string): string {
   }
 }
 
+export function typeLabel(part: Part): string {
+  if (part.type === 'mcp') return 'mcp';
+  if (part.type === 'script') return 'fixture';
+  if (part.files.length > 1) return 'tool';
+  return 'skill';
+}
+
 export function displayName(part: Part): string {
   return part.type === 'skill' ? `/${part.name}` : part.name;
 }

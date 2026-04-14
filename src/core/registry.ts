@@ -6,21 +6,12 @@ export const IVY_ROOT = path.resolve(import.meta.dir, '..', '..');
 
 export const PARTS: Part[] = [
   {
-    name: 'commit',
+    name: 'brainstorm',
     type: 'skill',
-    description: 'structured git commits (sonnet)',
+    description: 'interactive planning (opus)',
     default: true,
     files: [
-      { source: 'parts/skills/commit/skill.md', target: '.claude/skills/commit/skill.md' },
-    ],
-  },
-  {
-    name: 'dry',
-    type: 'skill',
-    description: 'code critic review (opus)',
-    default: true,
-    files: [
-      { source: 'parts/skills/dry/skill.md', target: '.claude/skills/dry/skill.md' },
+      { source: 'parts/skills/brainstorm/skill.md', target: '.claude/skills/brainstorm/skill.md' },
     ],
   },
   {
@@ -33,22 +24,21 @@ export const PARTS: Part[] = [
     ],
   },
   {
-    name: 'brainstorm',
+    name: 'dry',
     type: 'skill',
-    description: 'interactive planning (opus)',
+    description: 'code critic review (opus)',
     default: true,
     files: [
-      { source: 'parts/skills/brainstorm/skill.md', target: '.claude/skills/brainstorm/skill.md' },
+      { source: 'parts/skills/dry/skill.md', target: '.claude/skills/dry/skill.md' },
     ],
   },
   {
-    name: 'capture',
+    name: 'commit',
     type: 'skill',
-    description: 'screenshot capture',
-    default: false,
+    description: 'structured git commits (sonnet)',
+    default: true,
     files: [
-      { source: 'parts/skills/capture/skill.md', target: '.claude/skills/capture/skill.md' },
-      { source: 'parts/skills/capture/scripts/capture.js', target: '.claude/skills/capture/scripts/capture.js' },
+      { source: 'parts/skills/commit/skill.md', target: '.claude/skills/commit/skill.md' },
     ],
   },
   {
@@ -65,9 +55,19 @@ export const PARTS: Part[] = [
     ],
   },
   {
+    name: 'capture',
+    type: 'skill',
+    description: 'screenshot capture',
+    default: false,
+    files: [
+      { source: 'parts/skills/capture/skill.md', target: '.claude/skills/capture/skill.md' },
+      { source: 'parts/skills/capture/scripts/capture.js', target: '.claude/skills/capture/scripts/capture.js' },
+    ],
+  },
+  {
     name: 'cycle',
     type: 'skill',
-    description: 'developer↔critic loop',
+    description: 'develop ↔ critic ↔ fix loop',
     default: true,
     files: [
       { source: 'parts/skills/cycle/skill.md', target: '.claude/skills/cycle/skill.md' },

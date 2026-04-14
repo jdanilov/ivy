@@ -6,7 +6,7 @@ import { linkPart, injectHooks, injectMcp } from '../core/linker.js';
 import { IVY_ROOT } from '../core/registry.js';
 import { checkEnvVars } from '../core/env.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
-import { I, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize } from '../ui/theme.js';
+import { I, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
 import { printPartResult, printHookInfo, formatEnvWarnings } from '../ui/format.js';
 
 export async function install(targetDir: string): Promise<void> {
@@ -41,14 +41,14 @@ export async function install(targetDir: string): Promise<void> {
 
   // Print status matrix
   console.log('');
-  console.log(`${I}${'Part'.padEnd(14)}Status`);
-  console.log(`${I}${'─'.repeat(36)}`);
+  console.log(`${I}${'Part'.padEnd(14)}${'Type'.padEnd(10)}Status`);
+  console.log(`${I}${'─'.repeat(42)}`);
 
   for (const ps of states) {
     const col = statusColor(ps.status);
     const sym = statusSymbol(ps.status);
     const label = statusLabel(ps.status);
-    console.log(`${I}${displayName(ps.part).padEnd(14)}${col}${sym} ${label}${colors.reset}`);
+    console.log(`${I}${displayName(ps.part).padEnd(14)}${colors.dim}${typeLabel(ps.part).padEnd(10)}${colors.reset}${col}${sym} ${label}${colors.reset}`);
   }
 
   console.log('');
@@ -159,7 +159,7 @@ export async function install(targetDir: string): Promise<void> {
   // Check env vars
   const installedParts = filteredNames
     .map((n) => states.find((s) => s.part.name === n)!.part);
-  const envWarnings = checkEnvVars(installedParts);
+  const envWarnings = await checkEnvVars(installedParts, resolvedDir);
   const envOutput = formatEnvWarnings(envWarnings);
   if (envOutput) {
     console.log(envOutput);

@@ -549,9 +549,9 @@ When an MCP part is selected, ivy adds an entry to `.mcp.json`.
 - [x] Register glm as MCP part in registry
 
 ### Phase 7: Polish
-- [ ] Create CLAUDE.md with project conventions
-- [ ] Create README.md with a screenshot, short project description, setup approach and what's included
-- [ ] Add LICENSE.md
+- [x] Create CLAUDE.md with project conventions
+- [x] Create README.md with screenshot, description, setup, and parts list
+- [x] Add MIT LICENSE
 - [x] Test install/uninstall/status on a clean project
 - [x] Test install on a project with existing .claude/
 - [x] Test conflict detection and resolution

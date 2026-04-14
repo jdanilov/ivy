@@ -3,6 +3,15 @@ import { mkdir, symlink, unlink, readdir, rmdir, readFile, lstat } from 'node:fs
 import type { Part, HookConfig, McpConfig, Manifest, ManifestPart } from '../types.js';
 import { hashFile } from './scanner.js';
 
+async function readJson<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    const content = await readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return fallback;
+  }
+}
+
 export async function linkPart(part: Part, targetDir: string, ivyRoot: string): Promise<ManifestPart> {
   const files: string[] = [];
   const hashes: Record<string, string> = {};
@@ -11,18 +20,15 @@ export async function linkPart(part: Part, targetDir: string, ivyRoot: string): 
     const sourcePath = path.join(ivyRoot, pf.source);
     const targetPath = path.join(targetDir, pf.target);
 
-    // Create parent directory
     await mkdir(path.dirname(targetPath), { recursive: true });
 
-    // Remove existing file/symlink if present
     try {
       await lstat(targetPath);
       await unlink(targetPath);
     } catch {
-      // doesn't exist, fine
+      // doesn't exist
     }
 
-    // Compute relative path from target location to source
     const relPath = path.relative(path.dirname(targetPath), sourcePath);
     await symlink(relPath, targetPath);
 
@@ -55,7 +61,6 @@ export async function unlinkPart(partName: string, manifest: Manifest, targetDir
       // already gone
     }
 
-    // Try to clean up empty parent directories up to .claude/
     let dir = path.dirname(targetPath);
     const claudeDir = path.join(targetDir, '.claude');
     while (dir !== claudeDir && dir.startsWith(claudeDir)) {
@@ -74,16 +79,11 @@ export async function unlinkPart(partName: string, manifest: Manifest, targetDir
   }
 }
 
+type HookEntry = { matcher: string; hooks: Array<{ type: string; command: string }> };
+
 export async function injectHooks(hooks: HookConfig[], targetDir: string): Promise<void> {
   const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
-  let settings: Record<string, any> = {};
-
-  try {
-    const content = await readFile(settingsPath, 'utf-8');
-    settings = JSON.parse(content);
-  } catch {
-    // file doesn't exist or invalid JSON
-  }
+  const settings = await readJson<Record<string, any>>(settingsPath, {});
 
   if (!settings.hooks) {
     settings.hooks = {};
@@ -95,13 +95,12 @@ export async function injectHooks(hooks: HookConfig[], targetDir: string): Promi
       settings.hooks[eventKey] = [];
     }
 
-    const hookEntry = {
+    const hookEntry: HookEntry = {
       matcher: hook.matcher,
       hooks: [{ type: 'command', command: hook.command }],
     };
 
-    // Avoid duplicates: check if this command is already present
-    const existing = settings.hooks[eventKey] as Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }>;
+    const existing = settings.hooks[eventKey] as HookEntry[];
     const alreadyExists = existing.some(
       (h) => h.matcher === hook.matcher && h.hooks?.some((hh) => hh.command === hook.command),
     );
@@ -117,13 +116,13 @@ export async function injectHooks(hooks: HookConfig[], targetDir: string): Promi
 
 export async function removeHooks(hooks: HookConfig[], targetDir: string): Promise<void> {
   const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
-  let settings: Record<string, any> = {};
+  let settings: Record<string, any>;
 
   try {
     const content = await readFile(settingsPath, 'utf-8');
     settings = JSON.parse(content);
   } catch {
-    return; // no settings file, nothing to remove
+    return;
   }
 
   if (!settings.hooks) return;
@@ -132,16 +131,14 @@ export async function removeHooks(hooks: HookConfig[], targetDir: string): Promi
     const eventKey = hook.event;
     if (!Array.isArray(settings.hooks[eventKey])) continue;
 
-    settings.hooks[eventKey] = (settings.hooks[eventKey] as Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }>)
+    settings.hooks[eventKey] = (settings.hooks[eventKey] as HookEntry[])
       .filter((h) => !(h.matcher === hook.matcher && h.hooks?.some((hh) => hh.command === hook.command)));
 
-    // Remove empty arrays
     if (settings.hooks[eventKey].length === 0) {
       delete settings.hooks[eventKey];
     }
   }
 
-  // Remove empty hooks object
   if (Object.keys(settings.hooks).length === 0) {
     delete settings.hooks;
   }
@@ -151,16 +148,10 @@ export async function removeHooks(hooks: HookConfig[], targetDir: string): Promi
 
 export async function injectMcp(mcp: McpConfig, targetDir: string): Promise<void> {
   const mcpPath = path.join(targetDir, '.mcp.json');
-  let mcpConfig: Record<string, any> = { mcpServers: {} };
+  const mcpConfig = await readJson<Record<string, any>>(mcpPath, { mcpServers: {} });
 
-  try {
-    const content = await readFile(mcpPath, 'utf-8');
-    mcpConfig = JSON.parse(content);
-    if (!mcpConfig.mcpServers) {
-      mcpConfig.mcpServers = {};
-    }
-  } catch {
-    // file doesn't exist or invalid JSON
+  if (!mcpConfig.mcpServers) {
+    mcpConfig.mcpServers = {};
   }
 
   mcpConfig.mcpServers[mcp.serverName] = mcp.config;
@@ -176,7 +167,7 @@ export async function removeMcp(serverName: string, targetDir: string): Promise<
     const content = await readFile(mcpPath, 'utf-8');
     mcpConfig = JSON.parse(content);
   } catch {
-    return; // no mcp file, nothing to remove
+    return;
   }
 
   if (mcpConfig.mcpServers) {

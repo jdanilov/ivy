@@ -1,16 +1,13 @@
 import path from 'node:path';
 import { scanProject } from '../core/scanner.js';
-import { colors, statusColor, statusSymbol, statusLabel, displayName } from '../ui/theme.js';
-import type { PartState } from '../types.js';
-
-const I = '   '; // 3-space indent to match @clack/prompts gutter
+import { I, colors, statusColor, statusSymbol, statusLabel, displayName } from '../ui/theme.js';
 
 function printHeader(targetDir: string): void {
   console.log('');
   console.log(`${I}${colors.dim}Target${colors.reset}   ${targetDir}`);
 }
 
-function printStatusMatrix(states: PartState[]): void {
+function printStatusMatrix(states: import('../types.js').PartState[]): void {
   console.log('');
   console.log(`${I}${'Part'.padEnd(14)}${'Status'.padEnd(14)}Files`);
   console.log(`${I}${'─'.repeat(50)}`);

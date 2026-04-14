@@ -550,6 +550,8 @@ When an MCP part is selected, ivy adds an entry to `.mcp.json`.
 
 ### Phase 7: Polish
 - [ ] Create CLAUDE.md with project conventions
+- [ ] Create README.md with a screenshot, short project description, setup approach and what's included
+- [ ] Add LICENSE.md
 - [x] Test install/uninstall/status on a clean project
 - [x] Test install on a project with existing .claude/
 - [x] Test conflict detection and resolution

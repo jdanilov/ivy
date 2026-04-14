@@ -1,3 +1,8 @@
+import type { Part } from '../types.js';
+
+// 3-space indent to match @clack/prompts gutter (│)
+export const I = '   ';
+
 export const colors = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -51,10 +56,12 @@ export function statusSymbol(status: string): string {
   }
 }
 
-import type { Part } from '../types.js';
-
 export function displayName(part: Part): string {
   return part.type === 'skill' ? `/${part.name}` : part.name;
+}
+
+export function pluralize(count: number, singular: string, plural: string = singular + 's'): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 export function statusLabel(status: string): string {

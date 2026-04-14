@@ -4,11 +4,10 @@ import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
 import { linkPart, injectHooks, injectMcp } from '../core/linker.js';
 import { IVY_ROOT } from '../core/registry.js';
-import { checkEnvVars, formatEnvWarnings } from '../core/env.js';
+import { checkEnvVars } from '../core/env.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
-import { colors, symbols, statusColor, statusSymbol, statusLabel, displayName } from '../ui/theme.js';
-
-const I = '   '; // 3-space indent to match @clack/prompts gutter
+import { I, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize } from '../ui/theme.js';
+import { printPartResult, printHookInfo, formatEnvWarnings } from '../ui/format.js';
 
 export async function install(targetDir: string): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
@@ -98,7 +97,7 @@ export async function install(targetDir: string): Promise<void> {
   }
 
   console.log('');
-  console.log(`${I}Installing ${filteredNames.length} ${filteredNames.length === 1 ? 'part' : 'parts'}...`);
+  console.log(`${I}Installing ${pluralize(filteredNames.length, 'part')}...`);
   console.log('');
 
   // Read or create manifest
@@ -117,7 +116,6 @@ export async function install(targetDir: string): Promise<void> {
 
   let newCount = 0;
   let updateCount = 0;
-  const pad = ' '.repeat(I.length + 2 + 14); // indent + "✓ " + name pad
 
   for (const name of filteredNames) {
     const ps = states.find((s) => s.part.name === name)!;
@@ -146,25 +144,12 @@ export async function install(targetDir: string): Promise<void> {
       newCount++;
     }
 
-    // Print success line
-    const fileList = part.files.map((f) => f.target);
+    // Print result
     const suffix = wasInstalled ? ` ${colors.dim}(updated)${colors.reset}` : '';
+    printPartResult(part, { suffix });
 
-    const dname = displayName(part);
-    if (fileList.length > 0) {
-      console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(14)}${fileList[0]}${suffix}`);
-      for (let i = 1; i < fileList.length; i++) {
-        console.log(`${pad}${fileList[i]}`);
-      }
-    } else if (part.mcp) {
-      console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(14)}.mcp.json → ${part.mcp.serverName} server added${suffix}`);
-    } else {
-      console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname}${suffix}`);
-    }
-
-    // Print hook info
     if (part.hooks) {
-      console.log(`${pad}.claude/settings.local.json → hook added`);
+      printHookInfo();
     }
   }
 
@@ -187,7 +172,7 @@ export async function install(targetDir: string): Promise<void> {
   } else if (updateCount > 0) {
     console.log(`${I}${colors.bold}Done.${colors.reset} ${updateCount} updated.`);
   } else {
-    console.log(`${I}${colors.bold}Done.${colors.reset} ${newCount} ${newCount === 1 ? 'part' : 'parts'} installed.`);
+    console.log(`${I}${colors.bold}Done.${colors.reset} ${pluralize(newCount, 'part')} installed.`);
   }
   console.log('');
 }

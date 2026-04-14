@@ -4,10 +4,8 @@ import { readManifest, writeManifest, MANIFEST_PATH } from '../core/manifest.js'
 import { scanProject } from '../core/scanner.js';
 import { unlinkPart, removeHooks, removeMcp } from '../core/linker.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
-import { colors, symbols, statusColor, statusSymbol, displayName } from '../ui/theme.js';
-import type { PartState } from '../types.js';
-
-const I = '   '; // 3-space indent to match @clack/prompts gutter
+import { I, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
+import { printPartResult } from '../ui/format.js';
 
 export async function uninstall(targetDir: string): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
@@ -63,7 +61,7 @@ export async function uninstall(targetDir: string): Promise<void> {
   console.log('');
 
   // Select parts to uninstall
-  const selectedNames = await selectParts(installedStates, 'uninstall');
+  let selectedNames = await selectParts(installedStates, 'uninstall');
 
   if (selectedNames.length === 0) {
     console.log('');
@@ -72,7 +70,7 @@ export async function uninstall(targetDir: string): Promise<void> {
     return;
   }
 
-  // Warn about modified parts
+  // Filter out modified parts if user declines
   const modifiedSelected = selectedNames.filter((name) => {
     const ps = installedStates.find((s) => s.part.name === name);
     return ps && ps.status === 'modified';
@@ -81,28 +79,20 @@ export async function uninstall(targetDir: string): Promise<void> {
   if (modifiedSelected.length > 0) {
     const ok = await confirmModified(modifiedSelected);
     if (!ok) {
-      const remaining = selectedNames.filter((n) => !modifiedSelected.includes(n));
-      if (remaining.length === 0) {
-        console.log('');
-        console.log(`${I}${colors.dim}Nothing to uninstall.${colors.reset}`);
-        console.log('');
-        return;
-      }
-      return doUninstall(remaining, installedStates, manifest, resolvedDir);
+      selectedNames = selectedNames.filter((n) => !modifiedSelected.includes(n));
     }
   }
 
-  await doUninstall(selectedNames, installedStates, manifest, resolvedDir);
-}
+  if (selectedNames.length === 0) {
+    console.log('');
+    console.log(`${I}${colors.dim}Nothing to uninstall.${colors.reset}`);
+    console.log('');
+    return;
+  }
 
-async function doUninstall(
-  selectedNames: string[],
-  installedStates: PartState[],
-  manifest: NonNullable<Awaited<ReturnType<typeof readManifest>>>,
-  resolvedDir: string,
-): Promise<void> {
+  // Perform uninstall
   console.log('');
-  console.log(`${I}Uninstalling ${selectedNames.length} ${selectedNames.length === 1 ? 'part' : 'parts'}...`);
+  console.log(`${I}Uninstalling ${pluralize(selectedNames.length, 'part')}...`);
   console.log('');
 
   for (const name of selectedNames) {
@@ -121,15 +111,7 @@ async function doUninstall(
 
     delete manifest.parts[name];
 
-    const fileList = part.files.map((f) => f.target);
-    const dname = displayName(part);
-    if (fileList.length > 0) {
-      console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(14)}removed ${fileList.join(', ')}`);
-    } else if (part.mcp) {
-      console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(14)}removed from .mcp.json`);
-    } else {
-      console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(14)}removed`);
-    }
+    printPartResult(part, { verb: 'removed' });
   }
 
   // Write or delete manifest
@@ -146,7 +128,7 @@ async function doUninstall(
   }
 
   console.log('');
-  const removedStr = `${selectedNames.length} ${selectedNames.length === 1 ? 'part' : 'parts'} removed`;
+  const removedStr = `${pluralize(selectedNames.length, 'part')} removed`;
   if (remainingCount > 0) {
     console.log(`${I}${colors.bold}Done.${colors.reset} ${removedStr}. ${remainingCount} remaining.`);
   } else {

@@ -1,8 +1,11 @@
 # Ivy
 
-**Simple portable development harness for Claude Code.**
-       
-Manages a curated extendable set of skills, tools, fixtures, and MCP servers. Installs them into any Claude Code project with one command. Uninstalls cleanly. Update all connected projects by updating ivy.
+**Portable development harness compatible with Claude Code.**
+
+- Ivy manages an extendable set of Claude Code skills, tools, fixtures, MCPs and best practices for fast and reliable AI-driven agentic development.
+- Run `bun start` to install Ivy into any project run with Claude Code.
+- Update all connected projects by updating Ivy centrally.
+- Uninstalls cleanly.
 
 ![Ivy status view](docs/ivy-screenshot.png)
 
@@ -10,28 +13,28 @@ Manages a curated extendable set of skills, tools, fixtures, and MCP servers. In
 
 Ivy **symlinks** its `parts` into your project's `.claude/` directory. This means:
 
-- Updating ivy instantly updates all connected projects
+- Updating Ivy instantly updates all connected projects
 - No copied files to drift out of sync
-- Clean uninstallation removes only what ivy added
+- Clean uninstallation removes only what Ivy added
 - Manifest with SHA-256 hashes detects local modifications
 
 ## Parts
 
 Curated list of parts to start with:
 
-| Part          | Type    | Model  | Description                                       |
-|---------------|---------|--------|---------------------------------------------------|
-| `/brainstorm` | skill   | opus   | Interactive planning, generates plan files        |
-| `/critic`     | skill   | opus   | Code critic, review uncommitted changes           |
-| `/fork-critic`| tool    | sonnet | Forked critic — fresh-context review, pick findings |
-| `/flow`       | skill   | sonnet | Research and visualize system flows               |
-| `/commit`     | skill   | sonnet | Structured git commits                            |
-| `/cycle`      | tool    | —      | Developer-critic-fixer ralph loop over plan files |
-| `/research`   | tool    | —      | Deep web research via Grok AI                     |
-| `/capture`    | tool    | —      | Screenshot capture via Playwright                 |
-| `safe-bash`   | fixture | —      | Block destructive bash commands                   |
-| `sounds`      | fixture | —      | Sound notification on Claude session end          |
-| `glm`         | mcp     | —      | GLM model proxy (z.ai)                            |
+| Part           | Type     | Model   | Description                                         |
+|----------------|----------|---------|-----------------------------------------------------|
+| `/brainstorm`  | skill    | opus    | Interactive planning, generates plan files          |
+| `/critic`      | tool     | opus    | Fresh-context critic — ranked findings, pick what to fix |
+| `/critic-self` | skill    | opus    | Inline critic — review in current context           |
+| `/flow`        | skill    | sonnet  | Research and visualize system flows                 |
+| `/commit`      | skill    | sonnet  | Structured git commits                              |
+| `/cycle`       | tool     | —       | Developer-critic-fixer ralph loop over plan files   |
+| `/research`    | tool     | —       | Deep web research via Grok AI                       |
+| `/capture`     | tool     | —       | Screenshot capture via Playwright                   |
+| `safe-bash`    | fixture  | —       | Block destructive bash commands                     |
+| `sounds`       | fixture  | —       | Sound notification on Claude session end            |
+| `glm`          | mcp      | —       | GLM model proxy (z.ai)                              |
 
 ### Part types
 
@@ -56,7 +59,7 @@ bun install
 
 ```bash
 # Interactive mode — pick command and project
-bun src/cli.ts
+bun start
 
 # Direct commands
 bun src/cli.ts install /path/to/project

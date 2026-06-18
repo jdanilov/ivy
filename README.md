@@ -29,7 +29,7 @@ Curated list of parts to start with:
 | `/research`   | tool    | —      | Deep web research via Grok AI                     |
 | `/capture`    | tool    | —      | Screenshot capture via Playwright                 |
 | `safe-bash`   | fixture | —      | Block destructive bash commands                   |
-| `sounds`      | fixture | —      | Sonar notification on Claude session end          |
+| `sounds`      | fixture | —      | Sound notification on Claude session end          |
 | `glm`         | mcp     | —      | GLM model proxy (z.ai)                            |
 
 ### Part types

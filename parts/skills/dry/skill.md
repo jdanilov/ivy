@@ -1,7 +1,7 @@
 ---
 name: dry
 model: opus
-description: ⭕ Code critic — review uncommitted changes
+description: ❧ Code critic — review uncommitted changes
 ---
 
 # Code Critic
@@ -22,6 +22,7 @@ $ARGUMENTS
 - Does new code duplicate patterns that already exist and should be reused?
 - Should old code be removed or refactored given these changes?
 - Does new code complicate what was working simply before?
+- Does this code have happy-path bias?
 
 **Code Quality Principles**
 - **DRY**: Repeated logic that should be extracted?
@@ -38,16 +39,30 @@ $ARGUMENTS
 Provide a numbered list of findings:
 
 ```
-1. ⛔ [file:line] Major issue
+1. ■ Major issue
+[file:line]
+
 Problem explanation. Suggested fix (if one can be provided quickly for simple issues).
 
-2. ⚠️ [file:line] Minor issue
+---
+
+2. ● Minor issue
+[file:line]
+
 Problem & suggested fix.
 
-3. 💡 [file:line] Suggestion
+---
+
+3. ◇ Suggestion
+[file:line]
+
 Problem & suggested fix.
 
-4. 🧪 [file:line] Needs testing
+---
+
+4. △ Needs testing
+[file:line]
+
 What to test.
 ```
 

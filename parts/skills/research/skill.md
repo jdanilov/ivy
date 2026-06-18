@@ -1,6 +1,6 @@
 ---
 name: research
-description: ⭕ Comprehensive up-to-date web research via Grok AI. Use for fact-checked research with citations from multiple sources.
+description: ❧ Comprehensive up-to-date web research via Grok AI. Use for fact-checked research with citations from multiple sources.
 ---
 
 # Research

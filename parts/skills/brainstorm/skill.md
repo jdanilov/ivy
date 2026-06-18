@@ -1,7 +1,7 @@
 ---
 name: brainstorm
 model: opus
-description: ⭕ Interactively brainstorm and plan a task, resolving ambiguity before generating an implementation plan
+description: ❧ Interactively brainstorm and plan a task, resolving ambiguity before generating an implementation plan
 ---
 
 # Brainstorm

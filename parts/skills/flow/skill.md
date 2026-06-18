@@ -1,10 +1,10 @@
 ---
 name: flow
 model: sonnet
-description: ⭕ Research and visualize system flows with diagrams
+description: ❧ Research and visualize system flows with diagrams
 ---
 
-# 🤿 Research and visualize system flow
+# Research and visualize system flow
 
 Research the specified topic and provide a visual, diagram-driven explanation.
 

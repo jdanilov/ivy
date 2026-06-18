@@ -1,10 +1,10 @@
 ---
 name: commit
 model: sonnet
-description: ⭕ Structured git commits with sea-themed emojis
+description: ❧ Structured git commits with sea-themed emojis
 ---
 
-# ⭕ Commit changes [auto-approve]
+# ❧ Commit changes [auto-approve]
 
 1. Review uncommitted changes and prepare one or more GIT commits.
 2. Follow format structure below for every commit message. Output all commit messages.

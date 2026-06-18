@@ -24,12 +24,22 @@ export const PARTS: Part[] = [
     ],
   },
   {
-    name: 'dry',
+    name: 'critic',
     type: 'skill',
     description: 'code critic review (opus)',
     default: true,
     files: [
-      { source: 'parts/skills/dry/skill.md', target: '.claude/skills/dry/skill.md' },
+      { source: 'parts/skills/critic/skill.md', target: '.claude/skills/critic/skill.md' },
+    ],
+  },
+  {
+    name: 'fork-critic',
+    type: 'tool',
+    description: 'forked critic — fresh-context review with selectable findings',
+    default: true,
+    files: [
+      { source: 'parts/skills/fork-critic/skill.md', target: '.claude/skills/fork-critic/skill.md' },
+      { source: 'parts/skills/fork-critic/scripts/fork-critic.ts', target: '.claude/skills/fork-critic/scripts/fork-critic.ts' },
     ],
   },
   {

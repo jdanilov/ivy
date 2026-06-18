@@ -45,7 +45,8 @@ Target project after install:
 |---------------|---------|--------|---------|-----------------------------------|
 | `/brainstorm` | skill   | opus   | on      | Interactive planning, plan files  |
 | `/flow`       | skill   | sonnet | on      | System flow diagrams              |
-| `/dry`        | skill   | opus   | on      | Code critic review                |
+| `/critic`     | skill   | opus   | on      | Code critic review                |
+| `/fork-critic`| tool    | sonnet | on      | Fresh-context review, pick findings |
 | `/commit`     | skill   | sonnet | on      | Structured git commits            |
 | `/research`   | tool    | —      | on      | Web research via Grok AI          |
 | `/capture`    | tool    | —      | off     | Screenshot capture via Playwright |

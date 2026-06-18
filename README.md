@@ -22,7 +22,8 @@ Curated list of parts to start with:
 | Part          | Type    | Model  | Description                                       |
 |---------------|---------|--------|---------------------------------------------------|
 | `/brainstorm` | skill   | opus   | Interactive planning, generates plan files        |
-| `/dry`        | skill   | opus   | Code critic, review uncommitted changes           |
+| `/critic`     | skill   | opus   | Code critic, review uncommitted changes           |
+| `/fork-critic`| tool    | sonnet | Forked critic — fresh-context review, pick findings |
 | `/flow`       | skill   | sonnet | Research and visualize system flows               |
 | `/commit`     | skill   | sonnet | Structured git commits                            |
 | `/cycle`      | tool    | —      | Developer-critic-fixer ralph loop over plan files |

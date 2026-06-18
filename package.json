@@ -9,8 +9,10 @@
     "start": "bun src/cli.ts"
   },
   "dependencies": {
+    "@ai-sdk/xai": "^3.0.88",
     "@clack/prompts": "^0.9.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "ai": "^6.0.175",
     "zod": "^4.3.6"
   },
   "devDependencies": {

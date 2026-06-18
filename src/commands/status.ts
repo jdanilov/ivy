@@ -17,7 +17,8 @@ function printStatusMatrix(states: import('../types.js').PartState[]): void {
     const sym = statusSymbol(ps.status);
     const label = statusLabel(ps.status);
     const name = displayName(ps.part).padEnd(14);
-    const type = `${colors.dim}${typeLabel(ps.part).padEnd(10)}${colors.reset}`;
+    const typeColor = ps.part.type === 'agent' ? colors.yellow : colors.dim;
+    const type = `${typeColor}${typeLabel(ps.part).padEnd(10)}${colors.reset}`;
 
     const fileList = ps.part.files.map((f) => f.target);
     const statusText = `${sym} ${label}`;

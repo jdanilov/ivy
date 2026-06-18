@@ -24,22 +24,12 @@ export const PARTS: Part[] = [
     ],
   },
   {
-    name: 'critic',
-    type: 'tool',
-    description: 'code critic — fresh-context review with selectable findings (opus)',
+    name: 'Critic',
+    type: 'agent',
+    description: 'code critic — fresh-context sub-agent review (opus)',
     default: true,
     files: [
-      { source: 'parts/skills/critic/skill.md', target: '.claude/skills/critic/skill.md' },
-      { source: 'parts/skills/critic/scripts/fork-critic.ts', target: '.claude/skills/critic/scripts/fork-critic.ts' },
-    ],
-  },
-  {
-    name: 'critic-self',
-    type: 'skill',
-    description: 'code critic (inline) — review in current context (opus)',
-    default: false,
-    files: [
-      { source: 'parts/skills/critic-self/skill.md', target: '.claude/skills/critic-self/skill.md' },
+      { source: 'parts/agents/Critic.md', target: '.claude/agents/Critic.md' },
     ],
   },
   {

@@ -61,7 +61,9 @@ export function typeLabel(part: Part): string {
 }
 
 export function displayName(part: Part): string {
-  return part.type === 'skill' || part.type === 'tool' ? `/${part.name}` : part.name;
+  if (part.type === 'skill' || part.type === 'tool') return `/${part.name}`;
+  if (part.type === 'agent') return `@${part.name}`;
+  return part.name;
 }
 
 export function pluralize(count: number, singular: string, plural: string = singular + 's'): string {

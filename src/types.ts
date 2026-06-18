@@ -24,7 +24,7 @@ export interface McpConfig {
   };
 }
 
-export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
+export type PartType = 'skill' | 'tool' | 'agent' | 'fixture' | 'mcp';
 
 export interface Part {
   name: string;

@@ -1,65 +1,58 @@
 ---
 name: critic
 model: opus
-description: ❧ Code critic — review uncommitted changes
+description: ❧ Forked critic — fresh-context code review with selectable findings
 ---
 
-# Code Critic
+# Fork Critic
 
-Act as a solution critic and code refactoring engineer. Review uncommitted changes against the existing codebase.
+Launch a **separate Claude instance** to review uncommitted changes, then rank and present findings to pick which ones to implement.
 
-$ARGUMENTS
+Additional instructions from the user (if any): $ARGUMENTS
 
-## Context
 
-!`git diff`
-!`git diff --cached`
+## Step 1 — Run the forked critic
 
-## Review Checklist
-
-**Integration with Existing Code**
-- Does new code break existing functionality?
-- Does new code duplicate patterns that already exist and should be reused?
-- Should old code be removed or refactored given these changes?
-- Does new code complicate what was working simply before?
-- Does this code have happy-path bias?
-
-**Code Quality Principles**
-- **DRY**: Repeated logic that should be extracted?
-- **KISS**: Over-engineered or unnecessarily complex?
-- **Performance**: Inefficient operations, missing memoization and caching, redundant computations?
-- **Separation of Concerns**: Mixed responsibilities, tight coupling?
-
-**Correctness & Testing**
-- Logic errors, edge cases, type safety issues?
-- Is the code properly tested? Does it need unit or e2e tests?
-
-## Output Format
-
-Provide a numbered list of findings:
-
-```
-1. ■ Major issue — file:line
-
-Problem explanation. Suggested fix (if one can be provided quickly for simple issues).
-
----
-
-2. ● Minor issue — file:line
-
-Problem & suggested fix.
-
----
-
-3. ◇ Suggestion — file:line
-
-Problem & suggested fix.
-
----
-
-4. △ Needs testing — file:line
-
-What to test.
+```bash
+bun .claude/skills/critic/scripts/fork-critic.ts "$ARGUMENTS"
 ```
 
-If code is clean, simply acknowledge it.
+Read the JSON output. Each finding has: `severity`, `file`, `line`, `title`, `body`.
+
+
+## Step 2 — Present findings
+
+If the array is empty, tell the user the code is clean and stop.
+
+Otherwise, format each finding as a numbered list for the user:
+
+```
+Forked critic found N issues:
+
+1. ■ Major title — file:line
+   body (first 2 lines)
+
+2. ● Minor title — file:line
+   body (first 2 lines)
+
+3. ◇ Suggestion title — file:line
+   body (first 2 lines)
+
+4. △ Testing title — file:line
+   body (first 2 lines)
+```
+
+Then ask the user:
+
+> Which findings should I implement? (enter numbers like 1,3,4 — or "all" / "none")
+
+## Step 3 — Implement selected findings
+
+For each selected finding, implement the fix described in `body`. Work through them one at a time. After each fix, briefly confirm what you did.
+
+Skip any finding the user did not select.
+
+## Rules
+
+- If the script fails, show the error and stop — do not attempt to review code yourself (that defeats the purpose of fresh context)
+- Do NOT add your own findings — only implement what the forked critic found

@@ -88,6 +88,8 @@ async function gitDiff(args: string[]): Promise<string> {
 // --- Run claude -p ---
 
 async function runCritic(prompt: string): Promise<string> {
+  const { CLAUDECODE: _, ...env } = process.env
+
   const proc = spawn({
     cmd: [
       'claude', '-p',
@@ -97,6 +99,7 @@ async function runCritic(prompt: string): Promise<string> {
       '--permission-mode', 'plan',
     ],
     cwd: PROJECT_ROOT,
+    env,
     stdin: new Response(prompt),
     stdout: 'pipe',
     stderr: 'pipe',

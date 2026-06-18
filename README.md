@@ -22,37 +22,37 @@ Ivy **symlinks** its `parts` into your project's `.claude/` directory. This mean
 
 Curated list of parts to start with:
 
-| Part           | Type     | Model   | Description                                         |
-|----------------|----------|---------|-----------------------------------------------------|
-| `/brainstorm`  | skill    | opus    | Interactive planning, generates plan files          |
-| `/critic`      | tool     | opus    | Fresh-context critic — ranked findings, pick what to fix |
-| `/critic-self` | skill    | opus    | Inline critic — review in current context           |
-| `/flow`        | skill    | sonnet  | Research and visualize system flows                 |
-| `/commit`      | skill    | sonnet  | Structured git commits                              |
-| `/cycle`       | tool     | —       | Developer-critic-fixer ralph loop over plan files   |
-| `/research`    | tool     | —       | Deep web research via Grok AI                       |
-| `/capture`     | tool     | —       | Screenshot capture via Playwright                   |
-| `safe-bash`    | fixture  | —       | Block destructive bash commands                     |
-| `sounds`       | fixture  | —       | Sound notification on Claude session end            |
-| `glm`          | mcp      | —       | GLM model proxy (z.ai)                              |
+| Part          | Type     | Model   | Description                                         |
+|---------------|----------|---------|-----------------------------------------------------|
+| `@Critic`     | agent    | opus    | Sub-agent that reviews uncommitted changes          |
+| `/brainstorm` | skill    | opus    | Interactive planning, generates plan files          |
+| `/cycle`      | tool     | —       | Developer-critic-fixer ralph loop over plan files   |
+| `/research`   | tool     | —       | Deep web research via Grok AI                       |
+| `/flow`       | skill    | sonnet  | Research and visualize system flows                 |
+| `/commit`     | skill    | sonnet  | Structured git commits                              |
+| `/capture`    | tool     | —       | Screenshot capture via Playwright                   |
+| `safe-bash`   | fixture  | —       | Block destructive bash commands                     |
+| `sounds`      | fixture  | —       | Sound notification on Claude session end            |
+| `glm`         | mcp      | —       | GLM model proxy (z.ai)                              |
 
 ### Part types
 
-| Type        | Prefix | What it is                                                                |
-|-------------|--------|---------------------------------------------------------------------------|
-| **skill**   | `/`    | Single `skill.md` with model directive, invoked as `/name` in Claude Code |
-| **tool**    | `/`    | Skill with supporting scripts or runtime, invoked as `/name`              |
-| **fixture** | —      | Project configuration: hooks, scripts, assets (not a command)             |
-| **mcp**     | —      | MCP server entry injected into `.mcp.json`                                |
+| Type        | Prefix | What it is                                                                        |
+|-------------|--------|-----------------------------------------------------------------------------------|
+| **agent**   | `@`    | Sub-agent with its own context, tools, and model — invoked as `@name`             |
+| **skill**   | `/`    | Prompt template with model directive — invoked as `/name` in Claude Code          |
+| **tool**    | `/`    | Skill with supporting scripts or runtime — invoked as `/name`                     |
+| **fixture** | —      | Project configuration: hooks, scripts, assets (not a command)                     |
+| **mcp**     | —      | MCP server entry injected into `.mcp.json`                                        |
+
+The key difference between agents and skills: a **skill** runs inside your current session (sharing context), while an **agent** runs in its own isolated context window. Use agents for work where a fresh perspective matters — code review, research, audits.
 
 ## Setup
 
 **Prerequisites**: [Bun](https://bun.sh) runtime.
 
 ```bash
-git clone git@github.com:jdanilov/ivy.git
-cd ivy
-bun install
+git clone git@github.com:jdanilov/ivy.git && cd ivy && bun install
 ```
 
 ## Usage
@@ -62,55 +62,72 @@ bun install
 bun start
 
 # Direct commands
-bun src/cli.ts install /path/to/project
+bun src/cli.ts install /path/to/project         # Adds / removes / reviews parts
 bun src/cli.ts uninstall /path/to/project
 bun src/cli.ts status /path/to/project
 bun src/cli.ts cycle /path/to/project           # Runs cycle ralph loop
 ```
 
-## Workflow: brainstorm + cycle
+## Development workflow
 
-The `/brainstorm` and `/cycle` parts work together as a plan-and-execute workflow:
+Ivy is built around a tight **code → review → commit** loop:
 
-1. **Plan** — inside Claude Code, run `/brainstorm add dark mode support`. Opus asks clarifying questions, then generates a plan file at `docs/plans/dark-mode-support.md` with tasks and acceptance criteria.
+### Day-to-day coding
 
-2. **Execute** — in your terminal, run cycle from the project directory:
-   ```bash
-   bun .claude/skills/cycle/index.ts dark-mode-support
-   ```
-   Cycle picks up the plan and runs an autonomous loop: Developer implements tasks, Critic reviews changes, Fixer addresses findings, Committer creates structured commits. Repeats until all tasks are done.
+Work with Claude Code normally. Use `/brainstorm` to plan before starting anything non-trivial — it asks clarifying questions and produces a plan file with tasks and acceptance criteria in `docs/plans/`.
 
-3. **Iterate** — if the Developer needs input, it adds "Ask User" items to the plan. Cycle pauses and prompts you for answers before continuing.
+When you've made meaningful changes (a feature, a fix, a refactor), run the critic before committing:
 
-## Creating a new skill
+```
+@Critic
+```
 
-1. Create `parts/skills/<name>/skill.md`:
-   ```markdown
-   ---
-   name: my-skill
-   model: sonnet
-   description: What this skill does
-   ---
+Claude delegates to the `@Critic` sub-agent, which opens its own fresh context window, collects the git diff, and reviews the changes independently — without the bias of having written the code. It returns ranked findings:
 
-   # My Skill
+- **■ major** — bugs, security issues, data loss risk
+- **● minor** — code quality problems
+- **◇ suggestion** — improvements worth considering
+- **△ testing** — missing coverage
 
-   Your prompt here. $ARGUMENTS contains what the user typed after /my-skill.
-   ```
+Pick which findings to address, fix them, then commit:
 
-2. Register in `src/core/registry.ts`:
-   ```typescript
-   {
-     name: 'my-skill',
-     type: 'skill',
-     description: 'what it does (model)',
-     default: true,
-     files: [
-       { source: 'parts/skills/my-skill/skill.md', target: '.claude/skills/my-skill/skill.md' },
-     ],
-   },
-   ```
+```
+/commit
+```
 
-3. Run `ivy install` on your project to symlink the new skill.
+### Autonomous loop with cycle
+
+For larger tasks, use the full `cycle` loop instead of coding manually. After brainstorming produces a plan:
+
+```bash
+bun src/cli.ts cycle dark-mode-support
+```
+
+Cycle runs autonomously: Developer implements tasks → Critic reviews changes → Fixer addresses findings → Committer creates structured commits. Repeats until all tasks are complete. If the Developer needs input, it adds "Ask User" items to the plan and cycle pauses for your answer.
+
+### Research
+
+Use `/research` for fact-checked, cited research via Grok AI before making architectural decisions:
+
+```
+/research best approach for rate limiting a Node.js API
+```
+
+Results are saved to `docs/research/` for reference.
+
+## Adding a new part
+
+**Skill** (prompt template):
+
+1. Create `parts/skills/<name>/skill.md` with YAML frontmatter (`name`, `model`, `description`) and your prompt. Use `$ARGUMENTS` for user input.
+2. Register in `src/core/registry.ts` with `type: 'skill'`.
+
+**Agent** (isolated sub-agent):
+
+1. Create `parts/agents/<name>.md` with frontmatter (`name`, `description`, `tools`, `model`) and the system prompt.
+2. Register in `src/core/registry.ts` with `type: 'agent'`, targeting `.claude/agents/<name>.md`.
+
+Then run `ivy install` on your project to symlink it in.
 
 ## Environment variables
 

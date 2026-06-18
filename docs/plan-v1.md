@@ -32,8 +32,11 @@ Target project after install:
 
 ## Part Types
 
+> **Note**: This table is from the original plan. Agents (`@name`) have since been added as a new part type — see README.md for the current list.
+
 | Type        | Prefix | What it is                                                 |
 |-------------|--------|------------------------------------------------------------|
+| **agent**   | `@`    | Sub-agent with own context, tools, and model               |
 | **skill**   | `/`    | Single `skill.md` with model directive, invoked as `/name` |
 | **tool**    | `/`    | Skill with supporting scripts/runtime, invoked as `/name`  |
 | **fixture** | —      | Project configuration: hooks, scripts, assets              |
@@ -43,10 +46,9 @@ Target project after install:
 
 | Part          | Type    | Model  | Default | Description                       |
 |---------------|---------|--------|---------|-----------------------------------|
+| `@Critic`     | agent   | opus   | on      | Sub-agent code review               |
 | `/brainstorm` | skill   | opus   | on      | Interactive planning, plan files  |
 | `/flow`       | skill   | sonnet | on      | System flow diagrams              |
-| `/critic`     | skill   | opus   | on      | Code critic review                |
-| `/fork-critic`| tool    | sonnet | on      | Fresh-context review, pick findings |
 | `/commit`     | skill   | sonnet | on      | Structured git commits            |
 | `/research`   | tool    | —      | on      | Web research via Grok AI          |
 | `/capture`    | tool    | —      | off     | Screenshot capture via Playwright |
@@ -158,7 +160,7 @@ mcps/glm/
 - **`unwrap()`**: wraps @clack/prompts results, throws CancelError on cancel
 - **`readJson()` helper**: in linker.ts, collapses repeated JSON read/parse/default pattern
 - **Shared formatters**: `ui/format.ts` for `printPartResult`, `printHookInfo`, `formatEnvWarnings` — used by both install and uninstall
-- **Display names**: skills and tools prefixed with `/` (e.g. `/commit`), fixtures and mcps use bare names
+- **Display names**: agents prefixed with `@` (e.g. `@Critic`), skills/tools with `/` (e.g. `/commit`), fixtures/mcps use bare names
 - **Env var checking**: reads both `process.env` and target project's `.env` file (async `loadDotEnv()`)
 - **MCP server**: uses `@modelcontextprotocol/sdk` low-level `Server` class (stdio transport, JSON-RPC)
 

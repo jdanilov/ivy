@@ -24,6 +24,15 @@ export const PARTS: Part[] = [
     ],
   },
   {
+    name: 'critic',
+    type: 'skill',
+    description: 'run @Critic and present findings for selective implementation (opus)',
+    default: true,
+    files: [
+      { source: 'parts/skills/critic/skill.md', target: '.claude/skills/critic/skill.md' },
+    ],
+  },
+  {
     name: 'Critic',
     type: 'agent',
     description: 'code critic — fresh-context sub-agent review (opus)',

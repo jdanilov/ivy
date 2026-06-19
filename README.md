@@ -1,17 +1,36 @@
 # ♻ Ivy
 
-**Portable development harness compatible with Claude Code.**
+**Minimalistic portable agent harness for Claude Code.**
 
-- Ivy manages an extendable set of skills, tools, fixtures, MCPs and best practices for fast and practical SDLC with Claude Code.
+- Ivy manages an extendable set of `skills`, `tools`, `hooks`, `MCPs` for fast and practical SDLC with Claude Code.
 - Run `bun start` to install Ivy into any project run with Claude Code.
 - Update all connected projects by updating Ivy centrally.
 - Uninstalls cleanly.
 
 ![Ivy status view](docs/ivy-screenshot.png)
 
-## How it works
+## Setup
 
-Run `bun start`, enter a path to your project and pick which parts to install.  Ivy **symlinks** its `parts` into your project's `.claude/` directory. This means:
+**Prerequisites**: [Bun](https://bun.sh) or [NodeJS](https://nodejs.org/) runtime.
+
+```bash
+git clone git@github.com:jdanilov/ivy.git && cd ivy && bun install
+```
+
+Then:
+
+```bash
+# Interactive mode — pick command and project
+bun start
+
+# Direct commands
+bun src/cli.ts install /path/to/project         # Manage installed parts
+bun src/cli.ts uninstall /path/to/project
+bun src/cli.ts status /path/to/project
+bun src/cli.ts cycle /path/to/project           # Runs cycle ralph loop
+```
+
+Enter a path to your project and pick which parts to install.  Ivy **symlinks** its `parts` into your project's `.claude/` directory. This means:
 
 - Updating Ivy instantly updates all connected projects
 - No copied files to drift out of sync
@@ -22,20 +41,20 @@ Run `bun start`, enter a path to your project and pick which parts to install.  
 
 Ivy is extendable, and comes with a curated list of parts to start with:
 
-| Part             | Type     | Model  | Description                                                              |
-|------------------|----------|--------|--------------------------------------------------------------------------|
-| `/brainstorm`    | skill    | opus   | Generates plan files interactively                                       |
-| `/cycle`         | tool     | —      | Developer-critic-fixer Ralph loop over brainstormed plans                |
-| `/critic`        | skill    | opus   | Launches @Critic and works through findings                              |
-| `@Critic`        | agent    | opus   | Sub-agent that reviews uncommitted changes                               |
-| `/commit`        | skill    | sonnet | Launches @Commit to commit changes                                       |
-| `@Commit`        | agent    | sonnet | Sub-agent that creates structured git commits                            |
-| `/research`      | tool     | grok   | Deep web research via Grok AI to replace Googling                        |
-| `/flow`          | skill    | sonnet | Explains and visualizes system flows                                     |
-| `/capture`       | tool     | —      | Screenshot capture via Playwright                                        |
-| `hook-safe-bash` | fixture  | —      | Block destructive bash commands in `--dangerously-skip-permissions` mode |
-| `hook-sounds`    | fixture  | —      | Sound notification on Claude session end                                 |
-| `glm`            | mcp      | —      | GLM model proxy (z.ai)                                                   |
+| Part             | Type     | Model  | Description                                               |
+|------------------|----------|--------|-----------------------------------------------------------|
+| `/brainstorm`    | skill    | opus   | Generates plan files interactively                        |
+| `/cycle`         | tool     | —      | Developer-critic-fixer Ralph loop over brainstormed plans |
+| `/critic`        | skill    | opus   | Launches @Critic and works through findings               |
+| `@Critic`        | agent    | opus   | Sub-agent that reviews uncommitted changes                |
+| `/commit`        | skill    | sonnet | Launches @Commit to commit changes                        |
+| `@Commit`        | agent    | sonnet | Sub-agent that creates structured git commits             |
+| `/research`      | tool     | grok   | Deep web research via Grok AI to replace Googling         |
+| `/flow`          | skill    | sonnet | Explains and visualizes system flows                      |
+| `/capture`       | tool     | —      | Screenshot capture via Playwright                         |
+| `hook-safe-bash` | fixture  | —      | Block destructive bash commands                           |
+| `hook-sounds`    | fixture  | —      | Sound notification on Claude session end                  |
+| `glm`            | mcp      | —      | GLM model proxy (z.ai)                                    |
 
 ### Part types
 
@@ -49,28 +68,7 @@ Ivy is extendable, and comes with a curated list of parts to start with:
 
 **Agents** runs in its own isolated context window and are used to work where a fresh perspective matters — code review, research, audits.
 
-## Setup
-
-**Prerequisites**: [Bun](https://bun.sh) runtime.
-
-```bash
-git clone git@github.com:jdanilov/ivy.git && cd ivy && bun install
-```
-
-Then run:
-
-```bash
-# Interactive mode — pick command and project
-bun start
-
-# Direct commands
-bun src/cli.ts install /path/to/project         # Adds / removes / reviews parts
-bun src/cli.ts uninstall /path/to/project
-bun src/cli.ts status /path/to/project
-bun src/cli.ts cycle /path/to/project           # Runs cycle ralph loop
-```
-
-## Development workflow
+## How to Use
 
 Ivy is built around **code → review → commit** loop:
 
@@ -94,14 +92,14 @@ Cycle runs autonomously: Developer implements tasks → Critic reviews changes �
 
 ## Extending Ivy
 
-**Skill** (prompt template):
+**Adding Skills**:
 
 1. Create `parts/skills/<name>/skill.md` with YAML frontmatter (`name`, `model`, `description`) and your prompt. Use `$ARGUMENTS` for user input.
 2. Register in `src/core/registry.ts` with `type: 'skill'`.
 
-**Agent** (isolated sub-agent):
+**Adding Agent**:
 
-1. Create `parts/agents/<name>.md` with frontmatter (`name`, `description`, `tools`, `model`) and the system prompt.
+1. Create `parts/agents/<name>.md` with frontmatter (`name`, `model`, `description`) and the system prompt.
 2. Register in `src/core/registry.ts` with `type: 'agent'`, targeting `.claude/agents/<name>.md`.
 
 Then run `ivy install` on your project to symlink it in.

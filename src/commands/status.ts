@@ -9,14 +9,14 @@ function printHeader(targetDir: string): void {
 
 function printStatusMatrix(states: import('../types.js').PartState[]): void {
   console.log('');
-  console.log(`${I}${'Part'.padEnd(14)}${'Type'.padEnd(10)}${'Status'.padEnd(14)}Files`);
-  console.log(`${I}${'─'.repeat(60)}`);
+  console.log(`${I}${'Part'.padEnd(16)}${'Type'.padEnd(10)}${'Status'.padEnd(14)}Files`);
+  console.log(`${I}${'─'.repeat(62)}`);
 
   for (const ps of states) {
     const col = statusColor(ps.status);
     const sym = statusSymbol(ps.status);
     const label = statusLabel(ps.status);
-    const name = displayName(ps.part).padEnd(14);
+    const name = displayName(ps.part).padEnd(16);
     const typeColor = ps.part.type === 'agent' ? colors.yellow : colors.dim;
     const type = `${typeColor}${typeLabel(ps.part).padEnd(10)}${colors.reset}`;
 
@@ -28,7 +28,7 @@ function printStatusMatrix(states: import('../types.js').PartState[]): void {
       console.log(`${I}${name}${type}${col}${statusPad}${colors.reset}`);
     } else if (fileList.length > 0) {
       console.log(`${I}${name}${type}${col}${statusPad}${colors.reset} ${fileList[0]}`);
-      const indent = ' '.repeat(I.length + 14 + 10 + 12 + 1);
+      const indent = ' '.repeat(I.length + 16 + 10 + 12 + 1);
       for (let i = 1; i < fileList.length; i++) {
         console.log(`${indent}${fileList[i]}`);
       }

@@ -1,8 +1,18 @@
 import path from 'node:path';
-import type { Part } from '../types.js';
+import type { Part, PartFile } from '../types.js';
 
 // Resolve IVY_ROOT from this file's location: src/core/ -> project root
 export const IVY_ROOT = path.resolve(import.meta.dir, '..', '..');
+
+/** Derive { source, target } from just a source path.
+ *  parts/X  → .claude/X
+ *  cycle/X  → .claude/skills/cycle/X
+ */
+function src(source: string): PartFile {
+  if (source.startsWith('parts/')) return { source, target: '.claude/' + source.slice('parts/'.length) };
+  if (source.startsWith('cycle/')) return { source, target: '.claude/skills/cycle/' + source.slice('cycle/'.length) };
+  throw new Error(`Cannot derive target for source: ${source}`);
+}
 
 export const PARTS: Part[] = [
   {
@@ -11,7 +21,7 @@ export const PARTS: Part[] = [
     description: 'interactive planning (opus)',
     default: true,
     files: [
-      { source: 'parts/skills/brainstorm/skill.md', target: '.claude/skills/brainstorm/skill.md' },
+      src('parts/skills/brainstorm/skill.md'),
     ],
   },
   {
@@ -20,7 +30,7 @@ export const PARTS: Part[] = [
     description: 'system flow diagrams (sonnet)',
     default: true,
     files: [
-      { source: 'parts/skills/flow/skill.md', target: '.claude/skills/flow/skill.md' },
+      src('parts/skills/flow/skill.md'),
     ],
   },
   {
@@ -29,7 +39,7 @@ export const PARTS: Part[] = [
     description: 'run @Critic and present findings for selective implementation (opus)',
     default: true,
     files: [
-      { source: 'parts/skills/critic/skill.md', target: '.claude/skills/critic/skill.md' },
+      src('parts/skills/critic/skill.md'),
     ],
   },
   {
@@ -38,7 +48,7 @@ export const PARTS: Part[] = [
     description: 'code critic — fresh-context sub-agent review (opus)',
     default: true,
     files: [
-      { source: 'parts/agents/Critic.md', target: '.claude/agents/Critic.md' },
+      src('parts/agents/Critic.md'),
     ],
   },
   {
@@ -47,7 +57,16 @@ export const PARTS: Part[] = [
     description: 'structured git commits (sonnet)',
     default: true,
     files: [
-      { source: 'parts/skills/commit/skill.md', target: '.claude/skills/commit/skill.md' },
+      src('parts/skills/commit/skill.md'),
+    ],
+  },
+  {
+    name: 'Commit',
+    type: 'agent',
+    description: 'structured git commits — fresh-context sub-agent (sonnet)',
+    default: true,
+    files: [
+      src('parts/agents/Commit.md'),
     ],
   },
   {
@@ -56,8 +75,8 @@ export const PARTS: Part[] = [
     description: 'web research via Grok',
     default: true,
     files: [
-      { source: 'parts/skills/research/skill.md', target: '.claude/skills/research/skill.md' },
-      { source: 'parts/skills/research/scripts/research.ts', target: '.claude/skills/research/scripts/research.ts' },
+      src('parts/skills/research/skill.md'),
+      src('parts/skills/research/scripts/research.ts'),
     ],
     envVars: [
       { name: 'XAI_API_KEY', description: 'Grok AI API key', url: 'https://console.x.ai' },
@@ -69,8 +88,8 @@ export const PARTS: Part[] = [
     description: 'screenshot capture',
     default: false,
     files: [
-      { source: 'parts/skills/capture/skill.md', target: '.claude/skills/capture/skill.md' },
-      { source: 'parts/skills/capture/scripts/capture.js', target: '.claude/skills/capture/scripts/capture.js' },
+      src('parts/skills/capture/skill.md'),
+      src('parts/skills/capture/scripts/capture.js'),
     ],
   },
   {
@@ -79,25 +98,25 @@ export const PARTS: Part[] = [
     description: 'develop ↔ critic ↔ fix loop',
     default: true,
     files: [
-      { source: 'parts/skills/cycle/skill.md', target: '.claude/skills/cycle/skill.md' },
-      { source: 'cycle/index.ts', target: '.claude/skills/cycle/index.ts' },
-      { source: 'cycle/runner.ts', target: '.claude/skills/cycle/runner.ts' },
-      { source: 'cycle/plan.ts', target: '.claude/skills/cycle/plan.ts' },
-      { source: 'cycle/formatter.ts', target: '.claude/skills/cycle/formatter.ts' },
-      { source: 'cycle/ui.ts', target: '.claude/skills/cycle/ui.ts' },
-      { source: 'cycle/theme.ts', target: '.claude/skills/cycle/theme.ts' },
-      { source: 'cycle/prompts/developer.md', target: '.claude/skills/cycle/prompts/developer.md' },
-      { source: 'cycle/prompts/critic.md', target: '.claude/skills/cycle/prompts/critic.md' },
-      { source: 'cycle/prompts/fixer.md', target: '.claude/skills/cycle/prompts/fixer.md' },
+      src('parts/skills/cycle/skill.md'),
+      src('cycle/index.ts'),
+      src('cycle/runner.ts'),
+      src('cycle/plan.ts'),
+      src('cycle/formatter.ts'),
+      src('cycle/ui.ts'),
+      src('cycle/theme.ts'),
+      src('cycle/prompts/developer.md'),
+      src('cycle/prompts/critic.md'),
+      src('cycle/prompts/fixer.md'),
     ],
   },
   {
-    name: 'safe-bash',
+    name: 'hook-safe-bash',
     type: 'fixture',
     description: 'block destructive commands',
     default: true,
     files: [
-      { source: 'parts/scripts/safe-bash.sh', target: '.claude/scripts/safe-bash.sh' },
+      src('parts/scripts/safe-bash.sh'),
     ],
     hooks: [
       {
@@ -108,12 +127,12 @@ export const PARTS: Part[] = [
     ],
   },
   {
-    name: 'sounds',
+    name: 'hook-sounds',
     type: 'fixture',
     description: 'sonar notification on session end',
     default: true,
     files: [
-      { source: 'parts/sounds/sonar-deep.mp3', target: '.claude/sounds/sonar-deep.mp3' },
+      src('parts/sounds/sonar-deep.mp3'),
     ],
     hooks: [
       {

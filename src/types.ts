@@ -1,6 +1,6 @@
 export interface PartFile {
   source: string;   // relative to ivy project root (e.g., "parts/skills/commit/skill.md")
-  target: string;   // relative to target project root (e.g., ".claude/skills/commit/skill.md")
+  target: string;   // relative to target project root (derived from source at load time)
 }
 
 export interface EnvVar {

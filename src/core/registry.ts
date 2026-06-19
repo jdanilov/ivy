@@ -132,7 +132,3 @@ export const PARTS: Part[] = [
     ],
   },
 ];
-
-export function getPartByName(name: string): Part | undefined {
-  return PARTS.find((p) => p.name === name);
-}

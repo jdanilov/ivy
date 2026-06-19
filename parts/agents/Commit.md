@@ -41,21 +41,21 @@ Additional instructions (if any): $ARGUMENTS
 
 3. **Changes List** (optional for simple changes): Bullet points describing WHAT was changed in which files
 
-## Commit Types & Emojis (Sea Theme)
+## Commit Types & Emojis
 
-- 🐠 feat: New feature or functionality
-- 🦀 fix: Bug fix or error correction
-- 🪼 refactor: Code restructuring without changing functionality
-- 🐙 test: Adding or updating tests
-- 🪝 text: Changing user-facing text, wording, content
-- 🪸 style: UI/CSS changes, formatting, missing semicolons
-- 🌀 chore: Build process, dependencies, tooling, agentic workflow changes
-- 🦪 docs: Documentation changes only
-- 🦈 perf: Performance improvements
-- 🐋 release: Version releases or deployment related
-- 🫧 merge: Merge commits
-- 🌊 revert: Reverting previous commits
-- ⛵ wip: Work in progress (incomplete changes)
+- ✨ feat: New feature or functionality
+- 🐛 fix: Bug fix or error correction
+- ♻️ refactor: Code restructuring without changing functionality
+- 🧪 test: Adding or updating tests
+- 💬 text: Changing user-facing text, wording, content
+- 🎨 style: UI/CSS changes, formatting, missing semicolons
+- 🏗️ chore: Build process, dependencies, tooling, agentic workflow changes
+- 📖 docs: Documentation changes only
+- ⚡️ perf: Performance improvements
+- 🔖 release: Version releases or deployment related
+- 🔀 merge: Merge commits
+- ⏪ revert: Reverting previous commits
+- 🚧 wip: Work in progress (incomplete changes)
 
 ## Guidelines
 

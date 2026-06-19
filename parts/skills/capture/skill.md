@@ -1,6 +1,6 @@
 ---
 name: capture
-description: ❧ Screenshot capture tool. Takes full page or element-specific screenshots using Playwright.
+description: ♻ Screenshot capture tool. Takes full page or element-specific screenshots using Playwright.
 ---
 
 # Capture

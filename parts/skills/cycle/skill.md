@@ -1,6 +1,6 @@
 ---
 name: cycle
-description: ❧ Developer-Critic loop — autonomous iterative development via plan files
+description: ♻ Developer-Critic loop — autonomous iterative development via plan files
 ---
 
 # Cycle

@@ -73,6 +73,18 @@ Severity guide:
 
 If no issues found, say so clearly with a brief justification.
 
+## Step 4 — Suggest best approach (for major and minor findings)
+
+Where appropriate, e.g. ■ or ● finding, include a **Better:** suggestion that shows the idiomatic fix. Look at how the existing codebase already solves similar problems and reference that pattern:
+
+```
+2) **● N+1 query in getUsers** — services/user.ts:45
+Loops over users to fetch roles individually.
+**Better:** Use a JOIN — same pattern as `OrderService.getWithItems()` at services/order.ts:88.
+```
+
+This transforms the review from "here's what's wrong" to "here's what's wrong and here's how this codebase already handles it."
+
 ## Rules
 
 - Do not modify any files — your role is review only

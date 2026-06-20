@@ -25,12 +25,12 @@ export const PARTS: Part[] = [
     ],
   },
   {
-    name: 'flow',
+    name: 'explain',
     type: 'skill',
-    description: 'system flow diagrams (sonnet)',
+    description: 'visual code explanations and flow diagrams (sonnet)',
     default: true,
     files: [
-      src('parts/skills/flow/skill.md'),
+      src('parts/skills/explain/skill.md'),
     ],
   },
   {

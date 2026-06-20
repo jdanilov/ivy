@@ -36,12 +36,12 @@ Files in `parts/` get **symlinked** into the target `.claude/` directory. Code i
 
 ### Part types
 
-| Type | Display | Description |
-|------|---------|-------------|
-| skill | `/name` | Single skill.md with model directive |
-| tool | `/name` | Skill + supporting scripts/runtime |
-| fixture | `name` | Scripts/hooks/assets, no slash prefix |
-| mcp | `name` | MCP server entry in .mcp.json |
+| Type    | Display  | Description                           |
+|---------|----------|---------------------------------------|
+| skill   | `/name`  | Single skill.md with model directive  |
+| tool    | `/name`  | Skill + supporting scripts/runtime    |
+| fixture | `name`   | Scripts/hooks/assets, no slash prefix |
+| mcp     | `name`   | MCP server entry in .mcp.json         |
 
 ### Installation flow
 

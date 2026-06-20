@@ -1,4 +1,5 @@
 import type { Part } from '../types.js';
+import { PARTS } from '../core/registry.js';
 
 // 3-space indent to match @clack/prompts gutter (│)
 export const I = '   ';
@@ -62,9 +63,11 @@ export function typeLabel(part: Part): string {
 
 export function displayName(part: Part): string {
   if (part.type === 'skill' || part.type === 'tool') return `/${part.name}`;
-  if (part.type === 'agent') return `@${part.name}`;
   return part.name;
 }
+
+// Column width for part display names, derived from registry + 2 padding
+export const NAME_COL = Math.max(...PARTS.map((p) => displayName(p).length)) + 2;
 
 export function pluralize(count: number, singular: string, plural: string = singular + 's'): string {
   return `${count} ${count === 1 ? singular : plural}`;

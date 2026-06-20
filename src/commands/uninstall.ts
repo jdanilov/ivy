@@ -4,7 +4,7 @@ import { readManifest, writeManifest, MANIFEST_PATH } from '../core/manifest.js'
 import { scanProject } from '../core/scanner.js';
 import { unlinkPart, removeHooks, removeMcp } from '../core/linker.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
-import { I, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
+import { I, NAME_COL, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
 import { printPartResult } from '../ui/format.js';
 
 export async function uninstall(targetDir: string): Promise<void> {
@@ -38,7 +38,7 @@ export async function uninstall(targetDir: string): Promise<void> {
   // Print installed parts
   console.log('');
   console.log(`${I}${colors.dim}Installed parts:${colors.reset}`);
-  const pad = ' '.repeat(I.length + 2 + 14);
+  const pad = ' '.repeat(I.length + 2 + NAME_COL);
 
   for (const ps of installedStates) {
     const col = statusColor(ps.status);
@@ -47,12 +47,12 @@ export async function uninstall(targetDir: string): Promise<void> {
     const modifiedHint = ps.status === 'modified' ? ` ${colors.dim}· modified${colors.reset}` : '';
 
     if (fileList.length > 0) {
-      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(14)}${fileList[0]}${modifiedHint}`);
+      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(NAME_COL)}${fileList[0]}${modifiedHint}`);
       for (let i = 1; i < fileList.length; i++) {
         console.log(`${pad}${fileList[i]}`);
       }
     } else if (ps.part.mcp) {
-      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(14)}.mcp.json → ${ps.part.mcp.serverName}${modifiedHint}`);
+      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(NAME_COL)}.mcp.json → ${ps.part.mcp.serverName}${modifiedHint}`);
     } else {
       console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part)}${modifiedHint}`);
     }

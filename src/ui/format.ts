@@ -1,7 +1,7 @@
 import type { Part, EnvWarning } from '../types.js';
-import { I, colors, symbols, displayName } from './theme.js';
+import { I, NAME_COL, colors, symbols, displayName } from './theme.js';
 
-const PAD = ' '.repeat(I.length + 2 + 16); // indent + "✓ " + name column
+const PAD = ' '.repeat(I.length + 2 + NAME_COL); // indent + "✓ " + name column
 
 /**
  * Print a part's result line with file list, MCP info, or plain name.
@@ -17,12 +17,12 @@ export function printPartResult(
   const verb = opts.verb ? `${opts.verb} ` : '';
 
   if (fileList.length > 0) {
-    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(16)}${verb}${fileList[0]}${suffix}`);
+    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(NAME_COL)}${verb}${fileList[0]}${suffix}`);
     for (let i = 1; i < fileList.length; i++) {
       console.log(`${PAD}${fileList[i]}`);
     }
   } else if (part.mcp) {
-    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(16)}${verb}.mcp.json → ${part.mcp.serverName}${suffix}`);
+    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(NAME_COL)}${verb}.mcp.json → ${part.mcp.serverName}${suffix}`);
   } else {
     console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname}${suffix}`);
   }

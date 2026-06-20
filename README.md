@@ -45,10 +45,8 @@ Ivy is extendable, and comes with a curated list of parts to start with:
 |------------------|----------|--------|-----------------------------------------------------------|
 | `/brainstorm`    | skill    | opus   | Generates plan files interactively                        |
 | `/cycle`         | tool     | —      | Developer-critic-fixer Ralph loop over brainstormed plans |
-| `/critic`        | skill    | opus   | Launches @Critic and works through findings               |
-| `@Critic`        | agent    | opus   | Sub-agent that reviews uncommitted changes                |
-| `/commit`        | skill    | sonnet | Launches @Commit to commit changes                        |
-| `@Commit`        | agent    | sonnet | Sub-agent that creates structured git commits             |
+| `/critic`        | skill    | opus   | Reviews uncommitted changes and works through findings    |
+| `/commit`        | skill    | sonnet | Structured git commits                                    |
 | `/research`      | tool     | grok   | Deep web research via Grok AI to replace Googling         |
 | `/flow`          | skill    | sonnet | Explains and visualizes system flows                      |
 | `/capture`       | tool     | —      | Screenshot capture via Playwright                         |
@@ -60,13 +58,10 @@ Ivy is extendable, and comes with a curated list of parts to start with:
 
 | Type        | Prefix | What it is                                                                        |
 |-------------|--------|-----------------------------------------------------------------------------------|
-| **agent**   | `@`    | Sub-agent with its own context, tools, and model — invoked as `@name`             |
 | **skill**   | `/`    | Prompt template with model directive — invoked as `/name` in Claude Code          |
 | **tool**    | `/`    | Skill with supporting scripts or runtime — invoked as `/name`                     |
 | **fixture** | —      | Project configuration: hooks, scripts, assets (not a command)                     |
 | **mcp**     | —      | MCP server entry injected into `.mcp.json`                                        |
-
-**Agents** runs in its own isolated context window and are used to work where a fresh perspective matters — code review, research, audits.
 
 ## How to Use
 
@@ -96,11 +91,6 @@ Cycle runs autonomously: Developer implements tasks → Critic reviews changes �
 
 1. Create `parts/skills/<name>/skill.md` with YAML frontmatter (`name`, `model`, `description`) and your prompt. Use `$ARGUMENTS` for user input.
 2. Register in `src/core/registry.ts` with `type: 'skill'`.
-
-**Adding Agent**:
-
-1. Create `parts/agents/<name>.md` with frontmatter (`name`, `model`, `description`) and the system prompt.
-2. Register in `src/core/registry.ts` with `type: 'agent'`, targeting `.claude/agents/<name>.md`.
 
 Then run `ivy install` on your project to symlink it in.
 

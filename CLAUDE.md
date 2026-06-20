@@ -21,7 +21,7 @@ src/           CLI source (entry: src/cli.ts)
 └── types.ts   Shared type definitions
 
 parts/         Installable content (symlinked into target projects)
-├── agents/    Sub-agents with own context and model
+├── agents/    Agent prompt files (bundled into skill parts)
 ├── skills/    Claude Code skills with model: frontmatter
 ├── scripts/   Hook scripts (safe-bash)
 └── sounds/    Audio assets
@@ -38,7 +38,6 @@ Files in `parts/` get **symlinked** into the target `.claude/` directory. Code i
 
 | Type | Display | Description |
 |------|---------|-------------|
-| agent | `@name` | Sub-agent with own context, tools, and model |
 | skill | `/name` | Single skill.md with model directive |
 | tool | `/name` | Skill + supporting scripts/runtime |
 | fixture | `name` | Scripts/hooks/assets, no slash prefix |
@@ -65,7 +64,7 @@ Files in `parts/` get **symlinked** into the target `.claude/` directory. Code i
 
 ### Patterns
 
-- **Display names**: agents prefixed with `@` (e.g. `@Critic`), skills with `/` (e.g. `/commit`), fixtures/mcp use bare names
+- **Display names**: skills prefixed with `/` (e.g. `/commit`), fixtures/mcp use bare names
 - **Shared formatting**: `ui/format.ts` for `printPartResult`, `formatEnvWarnings`
 - **Cancel handling**: prompts throw `CancelError`, caught in `cli.ts`
 - **JSON file I/O**: `readJson()` helper in `linker.ts` for read-parse-or-default pattern

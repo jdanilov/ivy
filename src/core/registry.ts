@@ -36,18 +36,10 @@ export const PARTS: Part[] = [
   {
     name: 'critic',
     type: 'skill',
-    description: 'run @Critic and present findings for selective implementation (opus)',
+    description: 'reviews uncommitted changes and works through findings (opus)',
     default: true,
     files: [
       src('parts/skills/critic/skill.md'),
-    ],
-  },
-  {
-    name: 'Critic',
-    type: 'agent',
-    description: 'code critic — fresh-context sub-agent review (opus)',
-    default: true,
-    files: [
       src('parts/agents/Critic.md'),
     ],
   },
@@ -58,14 +50,6 @@ export const PARTS: Part[] = [
     default: true,
     files: [
       src('parts/skills/commit/skill.md'),
-    ],
-  },
-  {
-    name: 'Commit',
-    type: 'agent',
-    description: 'structured git commits — fresh-context sub-agent (sonnet)',
-    default: true,
-    files: [
       src('parts/agents/Commit.md'),
     ],
   },

@@ -43,6 +43,8 @@ Additional instructions (if any): $ARGUMENTS
 
 ## Commit Types & Emojis
 
+Always start commit message with one of these emojis:
+
 - ✨ feat: New feature or functionality
 - 🐛 fix: Bug fix or error correction
 - ♻️ refactor: Code restructuring without changing functionality

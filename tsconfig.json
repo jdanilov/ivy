@@ -15,5 +15,5 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["src/**/*.ts", "cycle/**/*.ts", "mcps/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

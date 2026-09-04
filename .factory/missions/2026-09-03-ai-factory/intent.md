@@ -88,6 +88,9 @@ Ivy evolves into the Factory: a harness around Claude Code that tracks missions 
 | Compaction    | autoCompactWindow near 300k in the orchestrator preset. PreCompact hook injects mission focus.        |
 | Caffeinate    | Inside `hook-factory`, keyed on mission binding. Global caffeinate part dropped.                      |
 | Docs format   | `docs-format` fixture referenced by every agent prompt. intent.md is for humans, the rest for agents.  |
+| Home dir      | `~/.factory`. Droid is dropped. First run refuses to init while Droid files (`auth.v2.key`, `droids/`) are present and tells the human to move them. |
+| Design        | `docs/design.md` is the design language for the TUI and CLI output, extracted from the Droid Mission Control screenshots: dark ground, one orange accent, dim labels and bright values, glyph status column, inverted selected row, relative timestamps, verb-aligned tool log, key bar. |
+| This mission  | Covers build order 1 and 2 plus the function-hook spike and the design doc. Mission Control and memory are follow-up missions. |
 | Terminology   | `docs/terminology.md` in the Factory and a template part for projects, linked from agents.md.        |
 | Memory        | `mem` MCP on Mnemosyne over note files. Integral to the Factory. Minimal design below.               |
 | Research      | Grok primary plus a keyless YouTube transcript MCP.                                                   |
@@ -218,8 +221,8 @@ Stay in igs: nudge, support, analytics, doc-id-drift, release-audit, touch-file-
 
 ## Context
 
-- Factory (the company) Missions talk: orchestrator, serial workers, two validators, contract before code, handoffs, Mission Control. Transcript and screenshots in `docs/`.
-- Graph engineering: chain, diamond, branch, loop. Weight test: does a step need the previous result. Transcript in `docs/`.
+- Factory (the company) Missions talk: orchestrator, serial workers, two validators, contract before code, handoffs, Mission Control. Transcript and screenshots in the mission folder.
+- Graph engineering: chain, diamond, branch, loop. Weight test: does a step need the previous result. Transcript in the mission folder.
 - Function hooks: present and gated in Claude Code 2.1.257 with `$.ui`, `$.model`, `$.http`, `$.store`, `$.fs`, `$.clock`, `$.session` and tool registration. Public proposal filed 2026-09-03. API may change.
 - Warp tab configs: TOML, open as a tab in the active window by URI, params, no group API.
 - Claude Code 2.1.257 verified: PreCompact, SubagentStart, SubagentStop, PermissionRequest, notification types, MCP_TOOL_TIMEOUT, autoCompactWindow. Sub-agents have no question tool.
@@ -233,7 +236,7 @@ Stay in igs: nudge, support, analytics, doc-id-drift, release-audit, touch-file-
 - Recovery pass output format and what `resume` does per step.
 - Findings ranking heuristics for blast radius, effort and confidence.
 - Handoff template and the loose rule for skipping it.
-- Memory and Inbox visibility from the phone via Remote Control.
+- Memory and Inbox visibility from the phone via Remote Control. Global settings currently deny `SendMessage` and disable Remote Control, both must be lifted per preset.
 
 ## Review log 2026-09-04
 
@@ -250,3 +253,4 @@ Folded from the intent review.
 - Memory kept as integral with a minimal file-first design.
 - Roles set per workflow, `quick` workflow added. Hard budgets rejected.
 - Added DX section. Gate became a plugin tool racing the session prompt against the Inbox. Blocking `factory gate` call dropped. `suggestions.md` renamed `retro.md`.
+- 2026-09-05 grill: `~/.factory` kept, Droid dropped. Design language doc added. Scope set to build order 1-2 plus hook spike. Dropped parts deleted in this mission.

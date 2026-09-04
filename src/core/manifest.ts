@@ -1,22 +1,41 @@
 import path from 'node:path';
+import { unlink } from 'node:fs/promises';
 import type { Manifest } from '../types.js';
 
-export const MANIFEST_PATH = '.claude/.ivy-manifest.json';
+export const MANIFEST_PATH = '.claude/.factory-manifest.json';
+const LEGACY_MANIFEST_PATH = '.claude/.ivy-manifest.json';
 
 export async function readManifest(targetDir: string): Promise<Manifest | null> {
-  const fullPath = path.join(targetDir, MANIFEST_PATH);
-  const file = Bun.file(fullPath);
-  if (!(await file.exists())) {
-    return null;
+  for (const rel of [MANIFEST_PATH, LEGACY_MANIFEST_PATH]) {
+    const file = Bun.file(path.join(targetDir, rel));
+    if (!(await file.exists())) continue;
+    try {
+      const manifest = (await file.json()) as Manifest & { ivy?: string };
+      if (!manifest.factory && manifest.ivy) manifest.factory = manifest.ivy;
+      delete manifest.ivy;
+      return manifest;
+    } catch {
+      return null;
+    }
   }
-  try {
-    return (await file.json()) as Manifest;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
+/** Writes the current manifest and drops the legacy one, so an ivy install renames on first write. */
 export async function writeManifest(targetDir: string, manifest: Manifest): Promise<void> {
-  const fullPath = path.join(targetDir, MANIFEST_PATH);
-  await Bun.write(fullPath, JSON.stringify(manifest, null, 2) + '\n');
+  await Bun.write(path.join(targetDir, MANIFEST_PATH), JSON.stringify(manifest, null, 2) + '\n');
+  await drop(targetDir, LEGACY_MANIFEST_PATH);
+}
+
+export async function deleteManifest(targetDir: string): Promise<void> {
+  await drop(targetDir, MANIFEST_PATH);
+  await drop(targetDir, LEGACY_MANIFEST_PATH);
+}
+
+async function drop(targetDir: string, rel: string): Promise<void> {
+  try {
+    await unlink(path.join(targetDir, rel));
+  } catch {
+    // already gone
+  }
 }

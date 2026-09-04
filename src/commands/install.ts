@@ -3,10 +3,10 @@ import { access } from 'node:fs/promises';
 import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
 import { linkPart, injectHooks, injectMcp } from '../core/linker.js';
-import { IVY_ROOT } from '../core/registry.js';
+import { FACTORY_ROOT } from '../core/registry.js';
 import { checkEnvVars } from '../core/env.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
-import { I, NAME_COL, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
+import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
 import { printPartResult, printHookInfo, formatEnvWarnings } from '../ui/format.js';
 
 export async function install(targetDir: string): Promise<void> {
@@ -41,14 +41,14 @@ export async function install(targetDir: string): Promise<void> {
 
   // Print status matrix
   console.log('');
-  console.log(`${I}${'Part'.padEnd(NAME_COL)}${'Type'.padEnd(10)}Status`);
+  console.log(`${I}${'Part'.padEnd(nameCol())}${'Type'.padEnd(10)}Status`);
   console.log(`${I}${'─'.repeat(42)}`);
 
   for (const ps of states) {
     const col = statusColor(ps.status);
     const sym = statusSymbol(ps.status);
     const label = statusLabel(ps.status);
-    console.log(`${I}${displayName(ps.part).padEnd(NAME_COL)}${colors.dim}${typeLabel(ps.part).padEnd(10)}${colors.reset}${col}${sym} ${label}${colors.reset}`);
+    console.log(`${I}${displayName(ps.part).padEnd(nameCol())}${colors.dim}${typeLabel(ps.part).padEnd(10)}${colors.reset}${col}${sym} ${label}${colors.reset}`);
   }
 
   console.log('');
@@ -105,7 +105,7 @@ export async function install(targetDir: string): Promise<void> {
   if (!manifest) {
     manifest = {
       version: 1,
-      ivy: IVY_ROOT,
+      factory: FACTORY_ROOT,
       installedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       parts: {},
@@ -123,7 +123,7 @@ export async function install(targetDir: string): Promise<void> {
     const wasInstalled = ps.status === 'installed' || ps.status === 'modified';
 
     // Link files (create symlinks)
-    const manifestPart = await linkPart(part, resolvedDir, IVY_ROOT);
+    const manifestPart = await linkPart(part, resolvedDir, FACTORY_ROOT);
 
     // Inject hooks if part has them
     if (part.hooks) {

@@ -1,0 +1,5 @@
+type: skill
+description: visual code explanations and flow diagrams (sonnet)
+default: true
+files:
+  - source: skill.md

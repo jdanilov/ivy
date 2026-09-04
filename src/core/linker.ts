@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { mkdir, symlink, unlink, readdir, rmdir, readFile, lstat } from 'node:fs/promises';
-import type { Part, HookConfig, McpConfig, Manifest, ManifestPart } from '../types.js';
+import { mkdir, symlink, unlink, readdir, readlink, rmdir, readFile, lstat } from 'node:fs/promises';
+import type { Part, HookConfig, McpConfig, ManifestPart } from '../types.js';
 import { hashFile } from './scanner.js';
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
@@ -12,12 +12,12 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
   }
 }
 
-export async function linkPart(part: Part, targetDir: string, ivyRoot: string): Promise<ManifestPart> {
+export async function linkPart(part: Part, targetDir: string, factoryRoot: string): Promise<ManifestPart> {
   const files: string[] = [];
   const hashes: Record<string, string> = {};
 
   for (const pf of part.files) {
-    const sourcePath = path.join(ivyRoot, pf.source);
+    const sourcePath = path.join(factoryRoot, pf.source);
     const targetPath = path.join(targetDir, pf.target);
 
     await mkdir(path.dirname(targetPath), { recursive: true });
@@ -49,17 +49,36 @@ export async function linkPart(part: Part, targetDir: string, ivyRoot: string): 
   return entry;
 }
 
-export async function unlinkPart(partName: string, manifest: Manifest, targetDir: string): Promise<void> {
-  const entry = manifest.parts[partName];
-  if (!entry) return;
+/** A target we may remove: a symlink into the Factory whose source still exists. */
+async function isFactoryLink(targetPath: string, factoryRoot: string): Promise<boolean> {
+  try {
+    if (!(await lstat(targetPath)).isSymbolicLink()) return false;
+    const dest = path.resolve(path.dirname(targetPath), await readlink(targetPath));
+    return dest.startsWith(factoryRoot + path.sep) && (await Bun.file(dest).exists());
+  } catch {
+    return false;
+  }
+}
+
+/** Removes the part's symlinks. Anything the Factory cannot claim is reported as left behind. */
+export async function unlinkPart(
+  entry: ManifestPart,
+  targetDir: string,
+  factoryRoot: string,
+): Promise<{ removed: string[]; left: string[] }> {
+  const removed: string[] = [];
+  const left: string[] = [];
 
   for (const file of entry.files) {
     const targetPath = path.join(targetDir, file);
-    try {
-      await unlink(targetPath);
-    } catch {
-      // already gone
+
+    if (!(await isFactoryLink(targetPath, factoryRoot))) {
+      if (await lstat(targetPath).catch(() => null)) left.push(file);
+      continue;
     }
+
+    await unlink(targetPath);
+    removed.push(file);
 
     let dir = path.dirname(targetPath);
     const claudeDir = path.join(targetDir, '.claude');
@@ -77,6 +96,8 @@ export async function unlinkPart(partName: string, manifest: Manifest, targetDir
       }
     }
   }
+
+  return { removed, left };
 }
 
 type HookEntry = { matcher: string; hooks: Array<{ type: string; command: string }> };

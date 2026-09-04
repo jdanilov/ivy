@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { unlink } from 'node:fs/promises';
-import { readManifest, writeManifest, MANIFEST_PATH } from '../core/manifest.js';
+import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
 import { unlinkPart, removeHooks, removeMcp } from '../core/linker.js';
+import { FACTORY_ROOT } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
-import { I, NAME_COL, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
+import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
 import { printPartResult } from '../ui/format.js';
 
 export async function uninstall(targetDir: string): Promise<void> {
@@ -14,7 +14,7 @@ export async function uninstall(targetDir: string): Promise<void> {
   const manifest = await readManifest(resolvedDir);
   if (!manifest || Object.keys(manifest.parts).length === 0) {
     console.log('');
-    console.log(`${I}${colors.dim}No ivy parts installed.${colors.reset}`);
+    console.log(`${I}${colors.dim}No parts installed.${colors.reset}`);
     console.log('');
     return;
   }
@@ -30,7 +30,7 @@ export async function uninstall(targetDir: string): Promise<void> {
 
   if (installedStates.length === 0) {
     console.log('');
-    console.log(`${I}${colors.dim}No ivy parts installed.${colors.reset}`);
+    console.log(`${I}${colors.dim}No parts installed.${colors.reset}`);
     console.log('');
     return;
   }
@@ -38,7 +38,7 @@ export async function uninstall(targetDir: string): Promise<void> {
   // Print installed parts
   console.log('');
   console.log(`${I}${colors.dim}Installed parts:${colors.reset}`);
-  const pad = ' '.repeat(I.length + 2 + NAME_COL);
+  const pad = ' '.repeat(I.length + 2 + nameCol());
 
   for (const ps of installedStates) {
     const col = statusColor(ps.status);
@@ -47,12 +47,12 @@ export async function uninstall(targetDir: string): Promise<void> {
     const modifiedHint = ps.status === 'modified' ? ` ${colors.dim}· modified${colors.reset}` : '';
 
     if (fileList.length > 0) {
-      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(NAME_COL)}${fileList[0]}${modifiedHint}`);
+      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(nameCol())}${fileList[0]}${modifiedHint}`);
       for (let i = 1; i < fileList.length; i++) {
         console.log(`${pad}${fileList[i]}`);
       }
     } else if (ps.part.mcp) {
-      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(NAME_COL)}.mcp.json → ${ps.part.mcp.serverName}${modifiedHint}`);
+      console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part).padEnd(nameCol())}.mcp.json → ${ps.part.mcp.serverName}${modifiedHint}`);
     } else {
       console.log(`${I}${col}${sym}${colors.reset} ${displayName(ps.part)}${modifiedHint}`);
     }
@@ -99,7 +99,8 @@ export async function uninstall(targetDir: string): Promise<void> {
     const ps = installedStates.find((s) => s.part.name === name)!;
     const part = ps.part;
 
-    await unlinkPart(name, manifest, resolvedDir);
+    const entry = manifest.parts[name];
+    if (entry) await unlinkPart(entry, resolvedDir, FACTORY_ROOT);
 
     if (part.hooks) {
       await removeHooks(part.hooks, resolvedDir);
@@ -117,11 +118,7 @@ export async function uninstall(targetDir: string): Promise<void> {
   // Write or delete manifest
   const remainingCount = Object.keys(manifest.parts).length;
   if (remainingCount === 0) {
-    try {
-      await unlink(path.join(resolvedDir, MANIFEST_PATH));
-    } catch {
-      // already gone
-    }
+    await deleteManifest(resolvedDir);
   } else {
     manifest.updatedAt = new Date().toISOString();
     await writeManifest(resolvedDir, manifest);

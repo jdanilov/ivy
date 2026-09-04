@@ -1,5 +1,4 @@
 import type { Part } from '../types.js';
-import { PARTS } from '../core/registry.js';
 
 // 3-space indent to match @clack/prompts gutter (│)
 export const I = '   ';
@@ -66,8 +65,16 @@ export function displayName(part: Part): string {
   return part.name;
 }
 
-// Column width for part display names, derived from registry + 2 padding
-export const NAME_COL = Math.max(...PARTS.map((p) => displayName(p).length)) + 2;
+// Column width for part display names, set once from the loaded parts
+let nameColWidth = 16;
+
+export function setNameCol(parts: Part[]): void {
+  if (parts.length > 0) nameColWidth = Math.max(...parts.map((p) => displayName(p).length)) + 2;
+}
+
+export function nameCol(): number {
+  return nameColWidth;
+}
 
 export function pluralize(count: number, singular: string, plural: string = singular + 's'): string {
   return `${count} ${count === 1 ? singular : plural}`;

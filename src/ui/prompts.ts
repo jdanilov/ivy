@@ -18,7 +18,7 @@ function unwrap<T>(result: T | symbol): T {
   return result as T;
 }
 
-type Command = 'install' | 'uninstall' | 'status' | 'cycle';
+type Command = 'install' | 'uninstall' | 'status' | 'update';
 
 export async function pickCommand(): Promise<Command> {
   return unwrap(await p.select({
@@ -27,7 +27,7 @@ export async function pickCommand(): Promise<Command> {
       { value: 'install' as Command, label: 'Install', hint: 'add parts to a project' },
       { value: 'uninstall' as Command, label: 'Uninstall', hint: 'remove parts from a project' },
       { value: 'status' as Command, label: 'Status', hint: 'show what\'s installed' },
-      { value: 'cycle' as Command, label: 'Cycle', hint: 'run developer-critic loop' },
+      { value: 'update' as Command, label: 'Update', hint: 'relink installed parts' },
     ],
   }));
 }
@@ -114,7 +114,7 @@ export async function selectParts(
 
 export async function confirmOverwrite(filePath: string): Promise<boolean> {
   return unwrap(await p.confirm({
-    message: `${colors.yellow}⚠${colors.reset} Conflict: ${filePath} exists but was not installed by Ivy. Overwrite?`,
+    message: `${colors.yellow}⚠${colors.reset} Conflict: ${filePath} exists but was not installed by the Factory. Overwrite?`,
     initialValue: false,
   }));
 }

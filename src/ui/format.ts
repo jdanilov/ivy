@@ -1,7 +1,10 @@
 import type { Part, EnvWarning } from '../types.js';
-import { I, NAME_COL, colors, symbols, displayName } from './theme.js';
+import { I, nameCol, colors, symbols, displayName } from './theme.js';
 
-const PAD = ' '.repeat(I.length + 2 + NAME_COL); // indent + "✓ " + name column
+// indent + "✓ " + name column
+function pad(): string {
+  return ' '.repeat(I.length + 2 + nameCol());
+}
 
 /**
  * Print a part's result line with file list, MCP info, or plain name.
@@ -17,12 +20,12 @@ export function printPartResult(
   const verb = opts.verb ? `${opts.verb} ` : '';
 
   if (fileList.length > 0) {
-    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(NAME_COL)}${verb}${fileList[0]}${suffix}`);
+    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(nameCol())}${verb}${fileList[0]}${suffix}`);
     for (let i = 1; i < fileList.length; i++) {
-      console.log(`${PAD}${fileList[i]}`);
+      console.log(`${pad()}${fileList[i]}`);
     }
   } else if (part.mcp) {
-    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(NAME_COL)}${verb}.mcp.json → ${part.mcp.serverName}${suffix}`);
+    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(nameCol())}${verb}.mcp.json → ${part.mcp.serverName}${suffix}`);
   } else {
     console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname}${suffix}`);
   }
@@ -32,7 +35,7 @@ export function printPartResult(
  * Print hook injection info line (indented under the part result).
  */
 export function printHookInfo(): void {
-  console.log(`${PAD}.claude/settings.local.json → hook added`);
+  console.log(`${pad()}.claude/settings.local.json → hook added`);
 }
 
 /**

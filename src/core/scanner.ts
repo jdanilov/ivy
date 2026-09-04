@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { lstat } from 'node:fs/promises';
 import type { PartState, PartStatus } from '../types.js';
-import { PARTS, IVY_ROOT } from './registry.js';
+import { loadParts, FACTORY_ROOT } from './registry.js';
 import { readManifest } from './manifest.js';
 
 export async function hashFile(filePath: string): Promise<string> {
@@ -17,9 +17,10 @@ export async function hashFile(filePath: string): Promise<string> {
 
 export async function scanProject(targetDir: string): Promise<PartState[]> {
   const manifest = await readManifest(targetDir);
+  const parts = await loadParts();
   const states: PartState[] = [];
 
-  for (const part of PARTS) {
+  for (const part of parts) {
     const fileStates: PartState['files'] = {};
     let allExist = true;
     let anyExists = false;
@@ -29,7 +30,7 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
 
     for (const pf of part.files) {
       const targetPath = path.join(targetDir, pf.target);
-      const sourcePath = path.join(IVY_ROOT, pf.source);
+      const sourcePath = path.join(FACTORY_ROOT, pf.source);
 
       let exists = false;
       let isSymlink = false;

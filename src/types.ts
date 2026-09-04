@@ -1,6 +1,6 @@
 export interface PartFile {
-  source: string;   // relative to ivy project root (e.g., "parts/skills/commit/skill.md")
-  target: string;   // relative to target project root (derived from source at load time)
+  source: string;   // relative to the Factory root (e.g., "parts/commit/skill.md")
+  target: string;   // relative to the target project root
 }
 
 export interface EnvVar {
@@ -47,7 +47,7 @@ export interface PartState {
 
 export interface Manifest {
   version: number;
-  ivy: string;             // path to ivy installation
+  factory: string;         // path to the Factory installation
   installedAt: string;
   updatedAt: string;
   parts: Record<string, ManifestPart>;

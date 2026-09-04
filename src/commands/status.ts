@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { scanProject } from '../core/scanner.js';
-import { I, NAME_COL, colors, statusColor, statusSymbol, statusLabel, displayName, typeLabel } from '../ui/theme.js';
+import { I, nameCol, colors, statusColor, statusSymbol, statusLabel, displayName, typeLabel } from '../ui/theme.js';
 
 function printHeader(targetDir: string): void {
   console.log('');
@@ -9,14 +9,14 @@ function printHeader(targetDir: string): void {
 
 function printStatusMatrix(states: import('../types.js').PartState[]): void {
   console.log('');
-  console.log(`${I}${'Part'.padEnd(NAME_COL)}${'Type'.padEnd(10)}${'Status'.padEnd(14)}Files`);
+  console.log(`${I}${'Part'.padEnd(nameCol())}${'Type'.padEnd(10)}${'Status'.padEnd(14)}Files`);
   console.log(`${I}${'─'.repeat(62)}`);
 
   for (const ps of states) {
     const col = statusColor(ps.status);
     const sym = statusSymbol(ps.status);
     const label = statusLabel(ps.status);
-    const name = displayName(ps.part).padEnd(NAME_COL);
+    const name = displayName(ps.part).padEnd(nameCol());
     const typeColor = colors.dim;
     const type = `${typeColor}${typeLabel(ps.part).padEnd(10)}${colors.reset}`;
 
@@ -28,7 +28,7 @@ function printStatusMatrix(states: import('../types.js').PartState[]): void {
       console.log(`${I}${name}${type}${col}${statusPad}${colors.reset}`);
     } else if (fileList.length > 0) {
       console.log(`${I}${name}${type}${col}${statusPad}${colors.reset} ${fileList[0]}`);
-      const indent = ' '.repeat(I.length + NAME_COL + 10 + 12 + 1);
+      const indent = ' '.repeat(I.length + nameCol() + 10 + 12 + 1);
       for (let i = 1; i < fileList.length; i++) {
         console.log(`${indent}${fileList[i]}`);
       }

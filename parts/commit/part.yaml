@@ -1,0 +1,6 @@
+type: skill
+description: structured git commits (sonnet)
+default: true
+files:
+  - source: skill.md
+  - source: agents/Commit.md

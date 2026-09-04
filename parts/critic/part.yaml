@@ -1,0 +1,6 @@
+type: skill
+description: reviews uncommitted changes and works through findings (opus)
+default: true
+files:
+  - source: skill.md
+  - source: agents/Critic.md

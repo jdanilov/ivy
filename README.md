@@ -1,107 +1,64 @@
-# ♻ Ivy
+# ♻ Factory
 
 **Minimalistic portable agent harness for Claude Code.**
 
-- Ivy manages an extendable set of `skills`, `tools`, `hooks`, `MCPs` for fast and practical SDLC with Claude Code.
-- Run `bun start` to install Ivy into any project run with Claude Code.
-- Update all connected projects by updating Ivy centrally.
-- Uninstalls cleanly.
+- Factory manages an extendable set of `skills`, `tools`, `hooks` and `MCPs` for a fast, practical SDLC with Claude Code.
+- One command installs them into any project, one updates, one removes.
+- Parts are symlinked, so updating the Factory updates every connected project.
 
-![Ivy status view](docs/ivy-screenshot.png)
+![Factory status view](docs/factory-screenshot.png)
 
 ## Setup
 
-**Prerequisites**: [Bun](https://bun.sh) or [NodeJS](https://nodejs.org/) runtime.
+**Prerequisites**: [Bun](https://bun.sh).
 
 ```bash
-git clone git@github.com:jdanilov/ivy.git && cd ivy && bun install
+git clone git@github.com:jdanilov/ivy.git factory && cd factory && bun install
 ```
-
-Then:
 
 ```bash
-# Interactive mode — pick command and project
-bun start
+bun start                                     # interactive: pick a command and a project
 
-# Direct commands
-bun src/cli.ts install /path/to/project         # Manage installed parts
-bun src/cli.ts uninstall /path/to/project
-bun src/cli.ts status /path/to/project
-bun src/cli.ts cycle /path/to/project           # Runs cycle ralph loop
+bun src/cli.ts install   /path/to/project     # pick parts to install
+bun src/cli.ts update    /path/to/project     # relink installed parts, drop retired ones
+bun src/cli.ts status    /path/to/project     # what is installed
+bun src/cli.ts uninstall /path/to/project     # pick parts to remove
 ```
 
-Enter a path to your project and pick which parts to install.  Ivy **symlinks** its `parts` into your project's `.claude/` directory. This means:
-
-- Updating Ivy instantly updates all connected projects
-- No copied files to drift out of sync
-- Clean uninstallation removes only what Ivy added
-- Manifest with SHA-256 hashes detects local modifications
+Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256 hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent projects live in `~/.factory/projects`.
 
 ## Parts
 
-Ivy is extendable, and comes with a curated list of parts to start with:
+| Part             | Type    | Model  | Description                                            |
+|------------------|---------|--------|--------------------------------------------------------|
+| `/critic`        | skill   | opus   | Reviews uncommitted changes and works through findings |
+| `/commit`        | skill   | sonnet | Structured git commits                                 |
+| `/explain`       | skill   | sonnet | Explains and visualizes system flows                   |
+| `/research`      | tool    | grok   | Cited web research via Grok, saved to `docs/research/` |
+| `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                       |
 
-| Part             | Type     | Model  | Description                                               |
-|------------------|----------|--------|-----------------------------------------------------------|
-| `/brainstorm`    | skill    | opus   | Generates plan files interactively                        |
-| `/cycle`         | tool     | —      | Developer-critic-fixer Ralph loop over brainstormed plans |
-| `/critic`        | skill    | opus   | Reviews uncommitted changes and works through findings    |
-| `/commit`        | skill    | sonnet | Structured git commits                                    |
-| `/research`      | tool     | grok   | Deep web research via Grok AI to replace Googling         |
-| `/flow`          | skill    | sonnet | Explains and visualizes system flows                      |
-| `/capture`       | tool     | —      | Screenshot capture via Playwright                         |
-| `hook-safe-bash` | fixture  | —      | Block destructive bash commands                           |
-| `hook-sounds`    | fixture  | —      | Sound notification on Claude session end                  |
-| `glm`            | mcp      | —      | GLM model proxy (z.ai)                                    |
+| Type        | Prefix | What it is                                                       |
+|-------------|--------|-------------------------------------------------------------------|
+| **skill**   | `/`    | Prompt with a model directive — invoked as `/name` in Claude Code |
+| **tool**    | `/`    | Skill with supporting scripts or runtime                          |
+| **fixture** | —      | Project configuration: hooks, scripts, assets                     |
+| **mcp**     | —      | MCP server entry injected into `.mcp.json`                        |
 
-### Part types
+## Adding a part
 
-| Type        | Prefix | What it is                                                                        |
-|-------------|--------|-----------------------------------------------------------------------------------|
-| **skill**   | `/`    | Prompt template with model directive — invoked as `/name` in Claude Code          |
-| **tool**    | `/`    | Skill with supporting scripts or runtime — invoked as `/name`                     |
-| **fixture** | —      | Project configuration: hooks, scripts, assets (not a command)                     |
-| **mcp**     | —      | MCP server entry injected into `.mcp.json`                                        |
+1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`, `mcp`, `envVars`).
+2. Put the files it installs beside it — `skill.md`, `agents/<Agent>.md`, `scripts/…`.
+3. Run `bun src/cli.ts install <project>`.
 
-## How to Use
-
-Ivy is built around **code → review → commit** loop:
-
-### Day-to-day coding
-
-- Use `/brainstorm` to plan before starting anything non-trivial — it asks clarifying questions and produces a plan file with tasks and acceptance criteria in `docs/plans/`.
-- Use `/critic` before committing or when you've made meaningful changes (a feature, a fix, a refactor).
-- Use `/commit` to make structured.
-
-### Autonomous loop with cycle
-
-- For larger tasks, use the full `/cycle` loop instead of coding manually.
-- After brainstorming produces a plan, run `bun src/cli.ts cycle dark-mode-support`
-
-Cycle runs autonomously: Developer implements tasks → Critic reviews changes → Fixer addresses findings → Committer creates structured commits. Repeats until all tasks are complete. If the Developer needs input, it adds "Ask User" items to the plan and cycle pauses for your answer.
-
-### Research
-
-- Use `/research <question>` for fact-checked, cited research via Grok AI before making architectural decisions. Results are saved to `docs/research/` for reference.
-- Use `/flow <feature>` to explain a data flow for a feature, bug, sub-system.
-
-## Extending Ivy
-
-**Adding Skills**:
-
-1. Create `parts/skills/<name>/skill.md` with YAML frontmatter (`name`, `model`, `description`) and your prompt. Use `$ARGUMENTS` for user input.
-2. Register in `src/core/registry.ts` with `type: 'skill'`.
-
-Then run `ivy install` on your project to symlink it in.
+See `CLAUDE.md` for the target rules and `docs/terminology.md` for the names.
 
 ## Environment variables
 
-Some parts require API keys. Ivy checks both `process.env` and the target project's `.env` file.
+Checked against `process.env` and the target project's `.env`.
 
-| Part        | Variable      | Where to get             |
-|-------------|---------------|--------------------------|
-| `/research` | `XAI_API_KEY` | https://console.x.ai     |
-| `glm`       | `GLM_API_KEY` | https://open.bigmodel.cn |
+| Part        | Variable      | Where to get         |
+|-------------|---------------|----------------------|
+| `/research` | `XAI_API_KEY` | https://console.x.ai |
 
 ## License
 

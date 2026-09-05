@@ -60,7 +60,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `/mission`       | skill   | fable  | Orchestrator's manual: workflow, steps, gates, triage, close  |
 | `/verify`        | skill   | sonnet | Verifier over the diff, the `verify` recipe and the contract  |
 | `/validate`      | skill   | opus   | Validator drives the running system, evidence per assertion   |
-| `/retro`         | skill   | opus   | Sweeps closed missions' `retro.md`, one actionable item at a time |
+| `/retro`         | skill   | opus   | Sweeps closed missions' `retro.md` into one table the human answers   |
 | `/commit`        | skill   | sonnet | Structured git commits                                        |
 | `/explain`       | skill   | sonnet | Explains and visualizes system flows                          |
 | `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`        |

@@ -1,13 +1,13 @@
 ---
 name: retro
 model: opus
-description: ♻ Sweep closed missions' retro.md, one actionable item at a time
+description: ♻ Sweep closed missions' retro.md into one table the human answers in one go
 ---
 
 # Retro
 
-The feedback loop only closes if someone digests the retros and asks one thing at a time. That is
-you. This is a conversation with pruning side effects, not a Mission.
+The feedback loop only closes if someone digests the retros and puts them to the human as one
+answerable table. That is you. This is a conversation with pruning side effects, not a Mission.
 
 Refuse to run when `git status --porcelain` shows anything dirty outside `.factory/`: you commit at
 the end, and a sweep mixed into unrelated work cannot be reverted on its own. Name the paths.
@@ -21,24 +21,26 @@ actionable, leave them for the prune at the end.
 
 Order the collected items cheapest-with-widest-effect first, across all missions at once.
 
-## 2. One item at a time
+## 2. One table, one answer
 
-Plain text, no table, nothing batched:
+Present every collected item in one table, then stop:
 
-```
-<the line>
-<mission>
-recommend: <apply now|stub|roadmap|drop>, <reason in one line>
-```
+| # | Item        | Mission   | Recommend                   | Why                |
+|---|-------------|-----------|-----------------------------|--------------------|
+| 1 | <the line>  | <mission> | apply now/stub/roadmap/drop | <reason, one line> |
 
-Then stop and let the human answer. Their answer wins over your recommendation.
+The human answers the whole table in one go: `as recommended`, or per number, `1 apply now, 2 drop,
+3 stub`. Their answer wins over your recommendation. Go item by item only when they ask you to.
 
 | Answer      | You do                                                                            |
 |-------------|------------------------------------------------------------------------------------|
-| `apply now` | spawn `@Worker` with the item as the whole step, this checkout, no Mission spec. It commits. |
+| `apply now` | held back for the batch below                                                      |
 | `stub`      | `factory mission new <slug> --stub --title "<line>"`, then write the line into the stub's `intent.md` under `## Why` |
 | `roadmap`   | append `- [ ] <line> (<mission>)` to `docs/roadmap.md`                             |
 | `drop`      | nothing                                                                            |
+
+Every `apply now` item goes to one `@Worker` as a numbered batch, this checkout, no Mission spec.
+It commits. Never one Worker per item.
 
 Every answer prunes the line from its `retro.md`, including `drop`. A table row goes as a whole
 row. A heading left with no content under it goes too.

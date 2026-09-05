@@ -2,6 +2,7 @@
 recipes:
   verify:
     - bun x tsc --noEmit
+    - bun scripts/test.ts
     - bun src/cli.ts status /opt/ed/ivy
   e2e:
     - scripts/e2e.sh

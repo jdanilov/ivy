@@ -28,6 +28,7 @@ src/           CLI source (entry: src/cli.ts)
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
+scripts/test.ts In-process: the same walk plus worktree pairs, one line per case
 scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, uninstall --yes
 .factory/factory.yaml   the project's own recipes: verify, e2e
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
@@ -175,6 +176,8 @@ factory handoff save <step>            # reads the handoff from stdin
 - `bun src/cli.ts install|update|uninstall <path>` — the full flow
 - `bun src/cli.ts mission new smoke --workflow chore` in a throwaway git repo, then walk it with
   `step start|done`, `gate open|answer` and `mission close` — the mission flow end to end
+- `bun scripts/test.ts` — the whole walk in one process, one line per case
+- `bash scripts/e2e.sh` — the same ground as a black box, through the CLI
 - `bun x tsc --noEmit` — typecheck
 
 ### What not to do

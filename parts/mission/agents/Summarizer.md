@@ -28,8 +28,8 @@ Docs you write follow `.claude/docs-format.md`. Names come from `docs/terminolog
 
 Feedback from the agents to the human. Not a status report, the Mission folder already is one.
 
-| Section     | Content                                                             |
-|-------------|---------------------------------------------------------------------|
+| Section     | Content                                                              |
+|-------------|----------------------------------------------------------------------|
 | Worked      | What cut attention or wall clock, worth keeping                      |
 | Cost        | Where tokens or rounds went and what they bought                     |
 | Tools       | Missing, broken or noisy tooling, one line each, from the handoffs   |

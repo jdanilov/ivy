@@ -22,11 +22,11 @@ blocked with that question. Never guess a port and never launch a server behind 
 
 ## 2. Pick the driver
 
-| Condition                                   | Driver                                             |
-|---------------------------------------------|-----------------------------------------------------|
-| `factory.yaml` names a bridge under `e2e`   | that bridge, exactly as written                     |
-| otherwise                                    | the `browse` skill, lab session for anything public |
-| CLI or library, no UI                        | the CLI itself in a temp checkout                   |
+| Condition                                 | Driver                                               |
+|-------------------------------------------|------------------------------------------------------|
+| `factory.yaml` names a bridge under `e2e` | that bridge, exactly as written                      |
+| otherwise                                 | the `browse` skill, lab session for anything public  |
+| CLI or library, no UI                     | the CLI itself in a temp checkout                    |
 
 Costly and irreversible actions (pay, publish, delete, send) get one `mcp__factory__ask` listing
 them before the first one, never a silent proceed.

@@ -78,3 +78,4 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 - A-R1-6 | verify | `code-format` part: fixture, default true, `.claude/code-format.md` under 12 lines, snippet under `## Important Files`; installed on ivy and igs | read, `status` | R1
 - A-R1-7 | verify | archify init adds `.claude/skills/archify/` to `.gitignore` when the path is not already ignored | temp repo tracking `.claude`, `git check-ignore` | R1
 - A-R1-8 | verify | `update.ts` has one apply sequence, `AGENTS.md` documents `--skip` on `update` only, `docs/roadmap.md` carries the two Mission Control lines | read | R1
+- A-R1-9 | validate | roadmap snippet is a backtick reference, not an `@` include; after `update` ivy and igs `AGENTS.md` each carry exactly one Roadmap line, the backtick one, and the three `@` lines are terminology, docs-format, code-format | `grep -c Roadmap`, read | R1

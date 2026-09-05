@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "accept",
+  "step": "condense",
   "round": 2,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/refit",
@@ -40,8 +40,9 @@
       "endedAt": "2026-09-05T21:18:01.361Z"
     },
     "accept": {
-      "status": "running",
-      "startedAt": "2026-09-05T21:18:01.418Z"
+      "status": "done",
+      "startedAt": "2026-09-05T21:18:01.418Z",
+      "endedAt": "2026-09-05T21:24:48.956Z"
     },
     "verify": {
       "status": "skipped",
@@ -49,7 +50,13 @@
       "reason": "round 2 is CLI behaviour only, Validator covers A-R2-1..3"
     },
     "validate": {
-      "status": "pending"
+      "status": "done",
+      "startedAt": "2026-09-05T21:24:48.851Z",
+      "endedAt": "2026-09-05T21:24:48.904Z"
+    },
+    "condense": {
+      "status": "running",
+      "startedAt": "2026-09-05T21:24:49.009Z"
     }
   },
   "deviations": [
@@ -60,5 +67,5 @@
     }
   ],
   "created": "2026-09-05T18:04:36.435Z",
-  "updated": "2026-09-05T21:18:01.471Z"
+  "updated": "2026-09-05T21:24:49.009Z"
 }

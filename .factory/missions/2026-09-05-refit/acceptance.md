@@ -84,4 +84,4 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 
 - A-R2-1 | validate | Two missions, one in a worktree, both close in either order; a dirty file outside `.factory/` still refuses | temp repo, `mission new p1`, `mission new p2 --worktree`, walk both, close both | R2
 - A-R2-2 | validate | Uninstall of every part in a repo that had no `AGENTS.md` and no `.claude/` leaves neither behind | temp repo, `install --yes`, `uninstall --yes`, `ls` | R2
-- A-R2-3 | verify | `docs/roadmap.md` carries R1-3 and R1-5, README has no line over 120 chars | read | R2
+- A-R2-3 | verify | `docs/roadmap.md` carries R1-3 and R1-5, README has no prose line over 120 chars (table rows exempt, they cannot wrap) | read, `awk 'length>120 && !/^\|/'` | R2

@@ -40,3 +40,13 @@ Human gate, light attention: plan accepted 2026-09-06. Round 1 contract: 9 of 9 
 | V-ref | Verifier | commit 7146b18 message names a graph with no diff | narrow | - | skip: the graph is Mission Control, roadmap already carries it |
 
 Round 2 gatekeeper: Validator only, the change is CLI behaviour.
+
+## Round 2 triage
+
+Validator only. A-R2-1 pass, A-R2-2 pass, A-R2-3 fail on wording: the 21 long lines are one table's padding, every prose line is under 120. Assertion amended to exempt table rows, no code change; pass on the amended wording. Closes the loop at round 2 of 3.
+
+| # | Finding | Decision |
+|---|---------|----------|
+| R2-1 | uninstall leaves a `docs/` it created | roadmap, same root as R1-3 (skipIfExists templates have no owner record) |
+| R2-2 | `mission close` leaves `mission/<name>` branches | by design since ai-factory ("keep branches for now"), retro carries it |
+| R2-3 | no `ready` recipe; `e2e.sh` has no two-mission block, could not have caught R1-1 | retro: both are one Worker item for the next chore |

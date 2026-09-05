@@ -17,8 +17,8 @@ bun .claude/skills/research/scripts/research.ts "query" --x   # also search X/Tw
 
 ## Tools
 
-- `web_search` — always enabled, searches the web
-- `x_search` — enabled with `--x` flag, searches X/Twitter posts and discussions
+- `web_search`, always enabled, searches the web
+- `x_search`, enabled with the `--x` flag, searches X/Twitter posts and discussions
 
 ## Output
 

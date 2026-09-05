@@ -30,7 +30,9 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
 
 ### Key principle
 
-Files under `parts/<name>/` get **symlinked** into the target `.claude/`. Updating the Factory updates every connected project.
+Files under `parts/<name>/` get **symlinked** into the target `.claude/`. Updating the Factory updates every connected project. A file marked `skipIfExists` is copied in as a template only when the project has nothing there.
+
+Roles ship as parts: `/mission` carries the Orchestrator's manual plus `Worker`, `Investigator` and `Summarizer`; `/verify` carries `Verifier`; `/validate` carries `Validator`. Every agent prompt points at `.claude/docs-format.md` and uses `docs/terminology.md` names. The `mission` skill stays under 120 lines, every other prompt under 80.
 
 ### part.yaml
 
@@ -40,14 +42,19 @@ description: one line
 default: true        # preselected in the install menu
 files:
   - source: skill.md         # relative to the part folder
-  - source: agents/Critic.md
+  - source: agents/Verifier.md
+  - source: terminology.md   # a template
+    target: docs/terminology.md
+    skipIfExists: true       # seed it once, then it belongs to the project
 hooks:               # optional, merged into .claude/settings.local.json
   - { event: PreToolUse, matcher: Bash, command: ... }   # matcher omitted where the event takes none
+settings:            # optional, merged into .claude/settings.json: lists union, scalars overwrite
+  permissions: { allow: [...] }
 mcp:                 # optional, written to .mcp.json
 envVars:             # optional, checked against process.env and the project .env
 ```
 
-Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else → `.claude/skills/<name>/X`. Fixtures and mcp parts give each file an explicit `target`.
+Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else → `.claude/skills/<name>/X`. Fixtures and mcp parts give each file an explicit `target`, which may sit outside `.claude`.
 
 ### Part types
 
@@ -63,11 +70,11 @@ Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`,
 1. Validate target is a git repo
 2. Scan `.claude/` for existing parts (manifest + file hashes)
 3. Show status matrix, present multiselect
-4. Create symlinks, inject hooks into settings.local.json, inject MCP into .mcp.json
+4. Create symlinks, inject hooks into settings.local.json, settings into settings.json, MCP into .mcp.json
 5. Write `.claude/.factory-manifest.json` with SHA-256 hashes (an old `.ivy-manifest.json` is read once, then replaced)
 6. Check env vars (process.env + target's .env file)
 
-`update <project>` is the non-interactive version: relink installed parts, unlink parts the registry dropped, rewrite hooks and manifest. It never removes a target that is not a live symlink into the Factory.
+`update <project>` is the non-interactive version: relink installed parts, install parts the registry added as `default`, unlink parts and files the registry dropped, rewrite hooks, settings and manifest. It only ever removes a symlink pointing into the Factory.
 
 ### Two command families
 

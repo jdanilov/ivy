@@ -39,7 +39,8 @@ async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<v
   switch (cmd) {
     case 'install': {
       const { install } = await import('./commands/install.js');
-      return install(targetDir, flags.yes === true);
+      const parts = str(flags, 'parts');
+      return install(targetDir, flags.yes === true, parts ? parts.split(',') : []);
     }
     case 'uninstall': {
       const { uninstall } = await import('./commands/uninstall.js');

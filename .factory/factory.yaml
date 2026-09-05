@@ -5,4 +5,7 @@ recipes:
     - bun scripts/test.ts
     - bun src/cli.ts status /opt/ed/ivy
   e2e:
-    - scripts/e2e.sh
+    ready:
+      - bun src/cli.ts status .
+    run:
+      - bash scripts/e2e.sh

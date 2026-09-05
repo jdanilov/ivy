@@ -25,14 +25,19 @@ export async function readWorkflowFile(file: string): Promise<Workflow> {
   return validate(parseWorkflow(name, raw, file));
 }
 
-/** Project command lists (`verify`, `e2e`, `deliver`) kept beside the workflows. */
+/**
+ * Project command lists (`verify`, `e2e`, `deliver`) kept beside the workflows. A recipe may nest,
+ * and a nested one reads back under its dotted path: `e2e: { ready: [...] }` is `e2e.ready`.
+ */
 export async function loadRecipes(projectDir: string): Promise<Record<string, string[]>> {
   const config = await readFactoryConfig(projectDir);
   if (!isRecord(config.recipes)) return {};
   const recipes: Record<string, string[]> = {};
-  for (const [name, value] of Object.entries(config.recipes)) {
-    recipes[name] = Array.isArray(value) ? value.map(String) : [String(value)];
-  }
+  const add = (name: string, value: unknown): void => {
+    if (isRecord(value)) for (const [key, nested] of Object.entries(value)) add(`${name}.${key}`, nested);
+    else recipes[name] = Array.isArray(value) ? value.map(String) : [String(value)];
+  };
+  for (const [name, value] of Object.entries(config.recipes)) add(name, value);
   return recipes;
 }
 

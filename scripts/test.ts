@@ -9,7 +9,10 @@ import { tmpdir } from 'node:os';
 // Resolved, because a relative symlink computed through /var would not point where it says.
 const TMP = await realpath(await mkdtemp(path.join(tmpdir(), 'factory-test-')));
 process.env.HOME = path.join(TMP, 'home');
-await mkdir(process.env.HOME, { recursive: true });
+await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
+// The config is read once and cached, so it lands before anything resolves a part. `codegraph` as
+// the bare command keeps the codegraph case off the network.
+await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
 
 const { install } = await import('../src/commands/install.js');
 const { update } = await import('../src/commands/update.js');
@@ -137,6 +140,20 @@ await check('--keep-branch keeps it', async () => {
 
 await check('two worktree missions close a then b', () => worktreePair(['a', 'b']));
 await check('two worktree missions close b then a', () => worktreePair(['b', 'a']));
+
+await check('install --parts takes exactly the named parts', async () => {
+  const dir = await repo('parts');
+  const refused = await install(dir, false, ['nope']).then(() => null, (e: Error) => e);
+  ok(refused?.name === 'Refusal', 'an unknown part did not refuse');
+
+  await install(dir, false, ['codegraph']);
+  const names = Object.keys((await readManifest(dir))!.parts);
+  ok(names.join(',') === 'codegraph', `expected codegraph alone, got ${names.join(',') || 'nothing'}`);
+  ok((await Bun.file(path.join(dir, '.mcp.json')).text()).includes('"codegraph"'), 'no mcp server entry');
+
+  await uninstall(dir, true);
+  ok(!(await exists(path.join(dir, '.claude/scripts/codegraph-gate.sh'))), 'the gate script was left behind');
+});
 
 await check('uninstall --yes leaves nothing behind', async () => {
   await uninstall(main, true);

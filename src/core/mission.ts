@@ -26,7 +26,8 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
   const proc = Bun.spawn(['git', ...args], { cwd, stdout: 'pipe', stderr: 'pipe' });
   const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   if ((await proc.exited) !== 0) throw new Refusal(`git ${args.join(' ')}: ${(err.trim() || out.trim()).split('\n')[0]}`);
-  return out.trim();
+  // Only the trailing newline goes: porcelain lines carry their status in the leading two columns.
+  return out.trimEnd();
 }
 
 async function gitOk(cwd: string, ...args: string[]): Promise<boolean> {

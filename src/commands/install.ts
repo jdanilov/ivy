@@ -6,11 +6,12 @@ import { linkPart, injectHooks, injectMcp, injectSettings, writeSnippet } from '
 import { resolvePart, runInit } from '../core/recipes.js';
 import { FACTORY_ROOT, withRequires } from '../core/registry.js';
 import { checkEnvVars } from '../core/env.js';
+import { Refusal } from '../core/mission.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
 import { printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
 
-export async function install(targetDir: string, yes = false): Promise<void> {
+export async function install(targetDir: string, yes = false, only: string[] = []): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 
   // Validate git repo
@@ -54,11 +55,18 @@ export async function install(targetDir: string, yes = false): Promise<void> {
 
   console.log('');
 
-  // Select parts. `--yes` answers nobody's question: the defaults plus what is already installed,
-  // and a part whose target holds a file of the project's own is left alone.
-  const selectedNames = yes
-    ? states.filter((s) => s.status !== 'conflict' && (s.part.default || s.status === 'installed' || s.status === 'modified')).map((s) => s.part.name)
-    : await selectParts(states, 'install');
+  // Select parts. `--parts a,b` names them outright; `--yes` answers nobody's question: the defaults
+  // plus what is already installed, and a part whose target holds a file of the project's own is
+  // left alone. Either way nothing is asked, so neither confirm below runs.
+  const unknown = only.filter((n) => !states.some((s) => s.part.name === n));
+  if (unknown.length > 0) throw new Refusal(`no such part: ${unknown.join(', ')}`);
+  const asked = only.length === 0 && !yes;
+
+  const selectedNames = only.length > 0
+    ? only
+    : yes
+      ? states.filter((s) => s.status !== 'conflict' && (s.part.default || s.status === 'installed' || s.status === 'modified')).map((s) => s.part.name)
+      : await selectParts(states, 'install');
 
   // A part without what it requires is broken, so the requirement comes along unasked.
   const { names: withDeps, added } = withRequires(states.map((s) => s.part), selectedNames);
@@ -70,7 +78,7 @@ export async function install(targetDir: string, yes = false): Promise<void> {
   // Filter out conflicts that user doesn't want to overwrite
   let filteredNames = [...withDeps];
 
-  for (const name of yes ? [] : withDeps) {
+  for (const name of asked ? withDeps : []) {
     const ps = states.find((s) => s.part.name === name);
     if (ps && ps.status === 'conflict') {
       const conflictFiles = ps.part.files
@@ -93,7 +101,7 @@ export async function install(targetDir: string, yes = false): Promise<void> {
     return ps && ps.status === 'modified';
   });
 
-  if (modifiedSelected.length > 0 && !yes) {
+  if (modifiedSelected.length > 0 && asked) {
     const ok = await confirmModified(modifiedSelected);
     if (!ok) {
       filteredNames = filteredNames.filter((n) => !modifiedSelected.includes(n));

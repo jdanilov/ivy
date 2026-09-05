@@ -30,7 +30,8 @@ src/           CLI source (entry: src/cli.ts)
 parts/<name>/  One folder per part: part.yaml plus the files it installs
 scripts/test.ts In-process: the same walk plus worktree pairs, one line per case
 scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, uninstall --yes
-.factory/factory.yaml   the project's own recipes: verify, e2e
+.factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run — a nested
+               recipe reads back under its dotted path
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
 ~/.factory/    Home dir: projects list, config.yaml (var overrides), events/<session>.jsonl,
@@ -106,8 +107,9 @@ unlink continues.
 
 `install | uninstall | status | update [project]` act on a project and fall back to the picker.
 `install` and `uninstall` take `--yes`: the defaults plus what is already installed, no menu, no
-confirm. `update` alone takes `--skip a,b`, which records the part in the manifest, so the project
-keeps its own copy for good.
+confirm. `install` also takes `--parts a,b`: exactly those parts plus their `requires`, no menu, no
+confirm, and an unknown name is a refusal. `update` alone takes `--skip a,b`, which records the part
+in the manifest, so the project keeps its own copy for good.
 
 `update` is the non-interactive install: relink, add parts the registry marks `default`, drop parts
 and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever removes a

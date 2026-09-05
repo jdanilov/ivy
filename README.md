@@ -34,6 +34,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | Command                                        | Purpose                                                                    |
 |------------------------------------------------|----------------------------------------------------------------------------|
 | `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
+| `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm     |
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
 | `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
 | `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |

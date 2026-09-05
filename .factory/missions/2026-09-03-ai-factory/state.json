@@ -1,6 +1,6 @@
 {
   "workflow": "story",
-  "step": "implement",
+  "step": "accept",
   "created": "2026-09-03",
   "title": "AI Factory v1: missions, workflows, parts refresh, Mission Control",
   "attention": "light",
@@ -38,6 +38,11 @@
       "endedAt": "2026-09-05"
     },
     "implement": {
+      "status": "done",
+      "startedAt": "2026-09-05",
+      "endedAt": "2026-09-05"
+    },
+    "accept": {
       "status": "running",
       "startedAt": "2026-09-05"
     }

@@ -16,7 +16,7 @@ export async function step(sub: string, args: string[], flags: Flags, cwd: strin
 
   switch (sub) {
     case 'start':
-      start(state, workflow, name, flags);
+      start(state, workflow, name);
       break;
     case 'done':
       done(state, workflow, name);
@@ -44,15 +44,7 @@ function known(workflow: Workflow, name: string): void {
   }
 }
 
-/** The step the workflow expects next: the first top-level step neither done nor skipped. */
-function expected(state: MissionState, workflow: Workflow): string | undefined {
-  return workflow.steps.find((s) => {
-    const status = state.steps[s.name]?.status;
-    return status !== 'done' && status !== 'skipped';
-  })?.name;
-}
-
-function start(state: MissionState, workflow: Workflow, name: string, flags: Flags): void {
+function start(state: MissionState, workflow: Workflow, name: string): void {
   known(workflow, name);
   const current = state.steps[name];
 
@@ -60,17 +52,16 @@ function start(state: MissionState, workflow: Workflow, name: string, flags: Fla
     console.log(`${I}${colors.dim}${name} is already running since ${current.startedAt} — nothing changed.${colors.reset}`);
     return;
   }
-  if (current?.status === 'done') {
-    deviate(state, `restarted step ${name} after it was done`, str(flags, 'reason') ?? 'not given');
+  if (current && current.status !== 'pending') {
+    throw new Refusal(`step ${name} is ${current.status}, not pending — loop the mission back before running it again`);
   }
 
-  const want = expected(state, workflow);
-  if (findStep(workflow, name) && want && want !== name) {
-    deviate(state, `started ${name} while the workflow expected ${want}`, str(flags, 'reason') ?? 'not given');
+  // Only the current step, or a member of its parallel group, may start: the workflow is the order.
+  if (ownerStep(workflow, name)?.name !== state.step) {
+    throw new Refusal(`step ${name} is not the current step — the mission is at ${state.step}, start that with: factory step start ${state.step}`);
   }
 
   state.steps[name] = { status: 'running', startedAt: now() };
-  state.step = ownerStep(workflow, name)?.name ?? name;
 }
 
 function done(state: MissionState, workflow: Workflow, name: string): void {
@@ -79,6 +70,9 @@ function done(state: MissionState, workflow: Workflow, name: string): void {
   if (current?.status === 'done') {
     console.log(`${I}${colors.dim}${name} is already done — nothing changed.${colors.reset}`);
     return;
+  }
+  if (current?.status !== 'running') {
+    throw new Refusal(`step ${name} is ${current?.status ?? 'pending'}, not running — start it with: factory step start ${name}`);
   }
 
   const definition = findStep(workflow, name);
@@ -96,7 +90,7 @@ function done(state: MissionState, workflow: Workflow, name: string): void {
   });
   if (waiting.length > 0) throw new Refusal(`step ${name} waits on its parallel ${waiting.length === 1 ? 'member' : 'members'} ${waiting.join(', ')}`);
 
-  state.steps[name] = { ...current, status: 'done', startedAt: current?.startedAt ?? now(), endedAt: now() };
+  state.steps[name] = { ...current, status: 'done', startedAt: current.startedAt ?? now(), endedAt: now() };
 
   // Only a top-level step moves the mission on; a parallel member leaves the group current.
   if (definition && state.step === name) state.step = nextStep(workflow, name)?.name ?? name;

@@ -14,13 +14,15 @@ Factory is a CLI that installs a curated set of Claude Code skills, scripts and 
 
 ```
 src/           CLI source (entry: src/cli.ts)
-├── core/      Business logic — registry, scanner, manifest, linker, env, projects
+├── core/      Business logic — registry, scanner, manifest, linker, env, projects,
+│              args, workflow (YAML load + transitions), mission (folder, state, claim, branch)
 ├── ui/        Presentation — theme, prompts, formatters
-├── commands/  Command handlers — install, uninstall, status, update
+├── commands/  install, uninstall, status, update, mission, step, gate, handoff
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
-~/.factory/    Home dir: projects list, later missions state and events
+workflows/     story, fix, chore, research, quick — the shipped workflow YAML
+~/.factory/    Home dir: projects list, events/<session>.jsonl, later mission state
 ```
 
 ### Key principle
@@ -64,6 +66,32 @@ Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`,
 
 `update <project>` is the non-interactive version: relink installed parts, unlink parts the registry dropped, rewrite hooks and manifest. It never removes a target that is not a live symlink into the Factory.
 
+### Two command families
+
+`install | uninstall | status | update [project]` act on a project and fall back to the picker.
+`mission | step | gate | handoff <sub>` act on the checkout you are standing in, never prompt
+(the one exception is the worktree offer in `mission new` on a claimed checkout) and exit 1 with a
+one-line `✗ …` on a refusal.
+
+```
+factory mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]
+factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name]
+factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
+factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
+factory handoff save <step>            # reads the handoff from stdin
+```
+
+### Mission invariants
+
+- `mission new` creates the branch and folder first and writes `state.json` last, so an interrupted
+  run leaves an orphan branch the next run reuses, never state pointing at a branch that is not there.
+- Every `state.json` write is a temp file plus rename. No partial JSON ever lands.
+- `step start`, `gate open`, `gate answer`, `mission adopt`, `mission close` are idempotent. First
+  answer wins on a gate; a conflicting second answer is refused, not overwritten.
+- `mission close` checks its own postconditions, so a rerun after a crash finishes the remaining work.
+- The mission folder always resolves through `git worktree list`, so worktrees find it in the main checkout.
+- Any transition that disagrees with `workflow.yaml` appends a `deviations` entry with a reason.
+
 ## Conventions
 
 ### Code style
@@ -79,18 +107,20 @@ Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`,
 - **Display names**: skills prefixed with `/` (e.g. `/commit`), fixtures/mcp use bare names
 - **Column width**: `setNameCol(parts)` once in `cli.ts`, read through `nameCol()`
 - **Shared formatting**: `ui/format.ts` for `printPartResult`, `formatEnvWarnings`
-- **Cancel handling**: prompts throw `CancelError`, caught in `cli.ts`
+- **Cancel handling**: prompts throw `CancelError`, refusals throw `Refusal`, both caught in `cli.ts`
 - **JSON file I/O**: `readJson()` helper in `linker.ts` for read-parse-or-default pattern
 
 ### Testing
 
-- `bun src/cli.ts status <path>` — parts detection
+- `bun src/cli.ts status <path>` — parts detection plus the Missions block
 - `bun src/cli.ts install|update|uninstall <path>` — the full flow
+- `bun src/cli.ts mission new smoke --workflow chore` in a throwaway git repo, then walk it with
+  `step start|done`, `gate open|answer` and `mission close` — the mission flow end to end
 - `bun x tsc --noEmit` — typecheck
 
 ### What not to do
 
 - Don't add a folder under `parts/` without a `part.yaml` — it will not be seen
 - Don't use 2-space indent for console output — always use `I` from theme
-- Don't call `process.exit()` from commands or prompts — throw `CancelError` instead
+- Don't call `process.exit()` from commands or prompts — throw `CancelError` or `Refusal` instead
 - Don't read files synchronously in `src/` — use `node:fs/promises`

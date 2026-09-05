@@ -49,10 +49,12 @@ No Faster lines from I1, I2, or W2's CLI/prompt surfaces beyond the above.
 
 ## Open items carried forward
 
+- `mission close` runs `git checkout main` before committing the mission folder, so the state.json write from the preceding `gate answer` and `step done` blocks it with "local changes would be overwritten". Close must commit the mission folder on the branch first. Hit at this mission's own close, worked around by committing by hand.
+- Gatekeeper temp runs against the real HOME leave `/private/tmp/...` lines in `~/.factory/projects`; `mission list` showed one. Gatekeeper prompts should set HOME, or `projects` should skip paths that no longer exist.
+
 - Re-check the `tengu_plugin_hooks_modules` rollout flag periodically; A-HOOK-2/3 stay unchecked until it flips.
 - igs working tree has uncommitted `.claude` changes for the human to commit.
 - `mission/ai-factory` and `mission/smoke` both left behind after close, by design ("keep branches for now"), flagged in findings as a retro item.
-- `.claude/skills/{critic-self,dry,fork-critic}` in ivy are dangling legacy symlinks, owned by nobody, human to delete.
 - Empty mission branches close without a merge commit (`git branch --merged` reports them merged already); the smoke mission needed a real change to exercise the merge path.
 - Tokens per step deferred to the Mission Control mission; wall time only ships now.
 - Mission Control, memory (`mem` MCP), global parts: all named as follow-up missions in `intent.md`, not started here.

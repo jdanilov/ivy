@@ -64,3 +64,54 @@ and an `e2e` block whose `ready` builds a throwaway repo and walks `mission new 
 `.factory/claim`) on the first run instead of the last. Pair it with a `--yes` flag on `install` and
 `uninstall`, which W1, W3 and the Orchestrator all asked for — without it every check of the two
 most important commands in the product needs a hand-timed pty and arrow-key choreography.
+
+## r1 Validator
+
+Driver: the CLI itself, no UI. `.factory/factory.yaml` now exists but carries `verify` and `e2e`, no
+`e2e.ready` — the app is a CLI, so the CLI in temp repos under `/tmp` stayed the driver. Every run
+used `HOME=/tmp/valhome.Mcxd`, seeded with the machine's `vars: {codegraph: codegraph}` and nothing
+else; the real `~/.factory/projects` still lists only the six real projects, none of my temp repos.
+`/opt/ed/ivy` was never written to (tree clean apart from the Orchestrator's untracked
+`handoffs/accept-r1.md`) and `/opt/ed/igs` was read only — `agents.md`, no command run against it.
+
+`install --yes` and `uninstall --yes` removed the pty entirely: every install and uninstall below ran
+with `< /dev/null` and stdout piped, exit 0, no prompt.
+
+`bash scripts/e2e.sh` -> **exit 0**, `e2e: ok`, single run, ~40 s.
+
+A clone at `/tmp/ivyco2` (`git clone -b mission/refit`, `node_modules` symlinked) carried two driving
+edits the real registry cannot express: a scratch `zzmcp` mcp part with `default: true`, and
+`parts/codegraph/part.yaml` flipped to `default: true`. Both exist only because `--yes` cannot select
+a non-default part; neither touches linker, uninstall or snippet code. Product code was not edited.
+
+### Contract — round 1 validate-kind assertions
+
+| id | result | evidence |
+|----|--------|----------|
+| A-R1-1 | pass | Round 0's F1 scenario rerun exactly at `/tmp/r1f1`: fresh repo, one `init` commit, no `.gitignore` at all, `git check-ignore .factory/claim` -> exit 1. `mission new demo --workflow chore --no-open` -> 0, printed `ignored  .factory/claim added to .gitignore and committed`; `check-ignore -v` -> `.gitignore:1:.factory/claim`. The commit `0b4ac0d 🧹 chore: ignore .factory/claim` holds **one file**: `git show --name-only --format=''` -> `.gitignore`, stat `1 file changed, 1 insertion(+)`. Walked grill/implement/merge, `mission close demo` -> **0**, four `·` lines, back on `main`, `git status --porcelain` empty. Graph: `54638cd 📦 chore: close mission demo` on `mission/demo`, then `afc2e60 🔀 merge`, then `707ca79 🏗️ chore: close mission demo` on main. Variants: existing clean `.gitignore` (`/tmp/r1giA`) -> line appended, commit again holds only `.gitignore`; already-ignored repo (`/tmp/r1giC`) -> no `ignored` line, no commit, no duplicate. `scripts/e2e.sh` asserts the same through the stub-promotion path |
+| A-R1-2 | pass | `/tmp/r1snp2`, `AGENTS.md` with a hand-written `## Important Files` holding `` - Terminology: `docs/terminology.md` `` and `- House rules: docs/house.md`. `install --yes` -> 14 parts; `git diff` is `-- Terminology: \`docs/terminology.md\`` / `+- Terminology: @docs/terminology.md` **in place** (position kept, still above House rules) plus three appended lines. Manifest: `terminology.snippet = {file, section, line: "- Terminology: @docs/terminology.md", replaced: "- Terminology: \`docs/terminology.md\`"}`; the other three carry no `replaced`. `uninstall --yes` -> `cmp /tmp/r1snp2.orig AGENTS.md` silent. `/tmp/r1idem` pushed it further: a backticked terminology line **and** an `@docs/roadmap.md` line, both replaced in place (`@` -> backtick for roadmap), then `install --yes` again and `update` -> counts stay 1/1/1/1, file byte-stable; `uninstall --yes` -> `cmp` silent, both originals restored |
+| A-R1-3 | pass | `/tmp/r1cg`, the F5 case reproduced with codegraph itself: install wrote `.mcp.json` with the resolved `codegraph serve --mcp`, `settings.json` with `mcp__codegraph__*`, `settings.local.json` with the gate hook, `.codegraph/codegraph.db`. `uninstall --yes` -> `removed .claude/settings.json, nothing left in it`, same for `settings.local.json` and `.mcp.json`; all three **gone**, manifest gone, `.codegraph` gone, `.claude/` an empty dir. `/tmp/r1mcp` repeated it with a scratch mcp part, same three deletions. `/tmp/r1snp2` (no mcp part at all) -> both settings files deleted, no `.mcp.json` ever created. Not one `{}` or `{"mcpServers":{}}` left anywhere |
+| A-R1-4 | pass | `/tmp/r1yes`, `install $R --yes < /dev/null` piped to a file -> exit **0**, `Done. 14 parts installed.`, no clack glyph in the log. Manifest holds exactly the 14 `default: true` parts (`grep -l '^default: true' parts/*/part.yaml` -> 14; the three absent are archify, browse, codegraph). `uninstall $R --yes < /dev/null` -> exit **0**, `Done. 14 parts removed.`, `.claude/` empty. The "plus what is already installed" half at `/tmp/r1yes2`: codegraph installed from the clone, then the real registry's `install --yes` (where codegraph is `default: false`) kept it — `Done. 15 updated.`, `.mcp.json` intact |
+| A-R1-9 | pass | `parts/roadmap/part.yaml` snippet line is `` - Roadmap: `docs/roadmap.md` `` — backticks, no `@`. ivy `AGENTS.md` `## Important Files` is exactly four lines: `@.claude/docs-format.md`, `@docs/terminology.md`, `` `docs/roadmap.md` ``, `@.claude/code-format.md`; `grep -c Roadmap` -> **1**. igs `agents.md` (same inode as `AGENTS.md`, tracked as `agents.md`) lines 152-157: `@docs/terminology.md`, `@.claude/docs-format.md`, `` `docs/roadmap.md` ``, then igs' own `- Finished tasks:` and `- Unit reference example:`, then `@.claude/code-format.md`; `grep -c Roadmap` -> **1**, and its position above the project's own lines shows the old `@` line was rewritten in place, not appended. Three `@` lines in each file, terminology / docs-format / code-format, in both projects |
+
+### Findings
+
+| id | verdict | finding | blast | effort | conf |
+|----|---------|---------|-------|--------|------|
+| - | R1-1 | Two missions running in parallel worktrees can never close. `/tmp/r1par`: `mission new p1 --worktree` then `mission new p2 --worktree`, both walked to `merge`. `close p1` -> exit 1, `✗ dirty outside the mission folder, commit or stash first: .factory/missions/2026-09-05-p2/state.json, .factory/missions/2026-09-05-p2/workflow.yaml`; `close p2` names p1's two files symmetrically. Deadlock: each mission's untracked folder is dirt to the other, and the mission folders share the main checkout by design. Deleting p2's folder let p1 close immediately, which pins the cause. The claim is correctly absent from both lists, so this is not F1 coming back — it is the same dirty scan needing `.factory/missions/*` treated the way `.factory/claim` now is. `--worktree` exists so two missions can run at once; today the second one costs you the first | wide | M | high |
+| - | R1-2 | `mission new` appends its ignore line to a `.gitignore` the human has already modified, then cannot commit it, and `mission close` later refuses on that file. `/tmp/r1giB`: committed `.gitignore` plus an uncommitted `dist/` line, `mission new b` -> `ignored  .factory/claim added to .gitignore` (no "and committed"), file now carries the Factory's line mixed into the human's edit; after the walk, `mission close b` -> exit 1, `✗ dirty outside the mission folder, commit or stash first: .gitignore`. The refusal does not say that part of that dirt is the Factory's own line, and the human cannot commit theirs without shipping ours. The documented deviation covers the write; the close-side consequence is the sharp edge. Either leave a dirty `.gitignore` alone and print the line to add, or exclude the claim line from the dirty scan | narrow | S | high |
+| - | R1-3 | After a full `uninstall --yes`, `status` reports `2 installed`. `/tmp/r1yes`: manifest deleted, `.claude/` empty, yet `roadmap docs/roadmap.md` and `terminology docs/terminology.md` show `● installed` because the scanner falls back to file detection and the two `skipIfExists` templates are project-owned and stay by design. The footer reads `2 installed, 0 modified, 15 available` on a project with nothing installed. Cosmetic, but it is the first thing a human runs after an uninstall to check the uninstall worked | narrow | S | high |
+| - | R1-4 | Uninstall's new `dropEmptied()` cleans the settings and mcp files but not the agent file it created. `/tmp/r1mcp` and `/tmp/r1cg` had no `AGENTS.md` before install; install created one to hold the snippets, uninstall stripped every line and left a **0-byte `AGENTS.md`** plus an empty `.claude/` directory in a repo that had neither. Same class as F5, one `stat` short of finished | narrow | S | high |
+| - | R1-5 | `mission new` on a claimed checkout without a tty prints the worktree question and exits **0** having done nothing. `/tmp/r1giA` with mission `a` open, `mission new a3 --workflow chore --no-open < /dev/null` -> the `◆ Work a3 in a worktree at ../r1giA-a3?` prompt, then exit 0, no branch, no folder. Every other refusal in this family exits 1 with one `✗` line; a script that reads the exit code is told the mission exists. The prompt is the documented exception, the exit code is not | narrow | S | med |
+
+### Tooling
+
+`scripts/e2e.sh` plus `--yes` closed the whole T1 gap: this round needed no pty, no arrow keys and no
+hand-timed `script -q /dev/null`, and the one e2e run reproduced the F1 walk end to end in 40 seconds.
+What is still missing is the `e2e.ready` step the Validator brief asks for first — `.factory/factory.yaml`
+has `verify` and `e2e` but no `ready`, so there is no cheap "is this thing drivable" check before the
+expensive one. Add `ready: ["bun x tsc --noEmit"]` alongside them. The gap this round actually paid for
+is a second one: `install --yes` cannot select a non-default part, so validating codegraph or archify
+still means editing a throwaway clone of the registry. A `--parts a,b` flag on `install` would have
+saved that clone and would let `scripts/e2e.sh` cover the mcp and recipe paths, which is exactly where
+F5 and F6 lived.

@@ -24,3 +24,19 @@ Triage by the Orchestrator, light attention, round 0 decided without the human. 
 |---|------|----------|
 | H1 | `code-format` part: SoC, KISS, DRY, one-line comments, few lines, snippet | fix in round 1 |
 | H2 | Mission Control shows the worktree a mission runs in and whether caffeinate is on | `docs/roadmap.md` |
+
+## Round 1 triage
+
+Human gate, light attention: plan accepted 2026-09-06. Round 1 contract: 9 of 9 pass.
+
+| # | Source | Finding | Blast | Effort | Decision |
+|---|--------|---------|-------|--------|----------|
+| R1-1 | Validator | Two missions in parallel worktrees cannot close: every mission folder lives in the main checkout, so the sibling's untracked folder is dirt to the other | wide | M | fix: the close dirty scan ignores everything under `.factory/`, own folder still committed first |
+| R1-4 | Validator | Uninstall leaves the 0-byte `AGENTS.md` it created and an empty `.claude/` | narrow | S | fix |
+| V-nit | Verifier | `README.md:92` is 153 chars | narrow | S | fix |
+| R1-2 | Validator | `mission new` appends to an already dirty `.gitignore`, close then refuses on it | narrow | S | skip: user dirt, the printed line names the file |
+| R1-3 | Validator | `status` says `2 installed` after a full uninstall, skipIfExists templates seen without a manifest | narrow | S | roadmap |
+| R1-5 | Validator | `mission new` on a claimed checkout with no tty exits 0 having done nothing | narrow | S | roadmap |
+| V-ref | Verifier | commit 7146b18 message names a graph with no diff | narrow | - | skip: the graph is Mission Control, roadmap already carries it |
+
+Round 2 gatekeeper: Validator only, the change is CLI behaviour.

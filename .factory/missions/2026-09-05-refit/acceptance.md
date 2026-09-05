@@ -79,3 +79,9 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 - A-R1-7 | verify | archify init adds `.claude/skills/archify/` to `.gitignore` when the path is not already ignored | temp repo tracking `.claude`, `git check-ignore` | R1
 - A-R1-8 | verify | `update.ts` has one apply sequence, `AGENTS.md` documents `--skip` on `update` only, `docs/roadmap.md` carries the two Mission Control lines | read | R1
 - A-R1-9 | validate | roadmap snippet is a backtick reference, not an `@` include; after `update` ivy and igs `AGENTS.md` each carry exactly one Roadmap line, the backtick one, and the three `@` lines are terminology, docs-format, code-format | `grep -c Roadmap`, read | R1
+
+## Round 2
+
+- A-R2-1 | validate | Two missions, one in a worktree, both close in either order; a dirty file outside `.factory/` still refuses | temp repo, `mission new p1`, `mission new p2 --worktree`, walk both, close both | R2
+- A-R2-2 | validate | Uninstall of every part in a repo that had no `AGENTS.md` and no `.claude/` leaves neither behind | temp repo, `install --yes`, `uninstall --yes`, `ls` | R2
+- A-R2-3 | verify | `docs/roadmap.md` carries R1-3 and R1-5, README has no line over 120 chars | read | R2

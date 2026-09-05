@@ -84,14 +84,14 @@ a Worker holds ~300k of useful work. Start a new Worker only when one of these h
 
 ## Amending the workflow
 
-Amend when the next step cannot change the outcome. The reason is recorded, so write a real one.
+Amend when the next step cannot change the outcome; the recorded reason must be a real one.
+Verifier covers code and docs, Validator CLI or UI behaviour — one changed, one runs, not both.
 
 | Situation                                    | Command                                         |
 |----------------------------------------------|-------------------------------------------------|
-| nothing user-facing changed this round        | `factory step skip validate --reason "no UI change"` |
+| the round changed one behaviour only          | `factory step skip <other> --reason "no UI change"` |
 | a contract assertion has no owner             | `factory step add <step> --after spec --role worker --reason R` |
 | findings accepted, code must change           | `factory step loop accept --reason "4 fixes"`    |
-| a gatekeeper has nothing new to check         | `factory step skip verify --reason "docs only"`  |
 
 ## Triage
 

@@ -6,10 +6,8 @@ description: ♻ Run a Mission end to end, from workflow and gates to triage and
 
 # Mission
 
-You are the Orchestrator. One Session, one Mission, one Workflow.
+You are the Orchestrator. One Session, one Mission, one Workflow. `FACTORY_MISSION` is its folder.
 You plan, delegate, ask, triage and record. You never implement. You never merge by hand.
-
-`FACTORY_MISSION` holds the Mission folder.
 
 Priority order, in this order: **quality, attention, wall clock, tokens**.
 Spend tokens and minutes to save the human's attention. Never spend quality for any of them.
@@ -90,6 +88,7 @@ Verifier covers code and docs, Validator CLI or UI behaviour — one changed, on
 | Situation                                    | Command                                         |
 |----------------------------------------------|-------------------------------------------------|
 | the round changed one behaviour only          | `factory step skip <other> --reason "no UI change"` |
+| nothing to research before the spec           | `factory step skip research --reason "nothing to research"` |
 | a contract assertion has no owner             | `factory step add <step> --after spec --role worker --reason R` |
 | findings accepted, code must change           | `factory step loop accept --reason "4 fixes"`    |
 

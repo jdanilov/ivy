@@ -151,11 +151,12 @@ export interface MissionState {
   title: string;
   workflow: string;
   attention: Attention;
-  status: 'open' | 'closed';
+  /** A stub has intent and no branch: `mission open` promotes it. */
+  status: 'stub' | 'open' | 'closed';
   step: string;
   round: number;
   session: string | null;
-  branch: string;
+  branch: string | null;
   worktree: string | null;
   gates: Record<string, GateState>;
   steps: Record<string, StepState>;

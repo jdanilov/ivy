@@ -1,8 +1,8 @@
 import type { GateAnswer } from '../types.js';
 import { str, type Flags } from '../core/args.js';
-import { Refusal, listMissions, missionWorkflow, now, resolveMission, sessionLive, writeState } from '../core/mission.js';
+import { Refusal, listMissions, missionWorkflow, notStub, now, resolveMission, sessionLive, writeState } from '../core/mission.js';
 import { allStepNames, findStep } from '../core/workflow.js';
-import { loadProjects } from '../core/projects.js';
+import { existingProjects } from '../core/projects.js';
 import { field } from '../ui/format.js';
 import { I, colors } from '../ui/theme.js';
 
@@ -26,6 +26,7 @@ async function open(step: string | undefined, flags: Flags, cwd: string): Promis
   if (!step || !file) throw new Refusal('gate open <step> --file <path>');
 
   const mission = await resolveMission(cwd, str(flags, 'mission'));
+  notStub(mission.state);
   const workflow = await missionWorkflow(mission);
   if (!allStepNames(workflow).includes(step)) throw new Refusal(`no step "${step}" in workflow ${workflow.name}`);
 
@@ -44,6 +45,7 @@ async function answer(step: string | undefined, verdict: string | undefined, fla
 
   const mission = await resolveMission(cwd, str(flags, 'mission'));
   const state = mission.state;
+  notStub(state);
   const existing = state.gates[step];
 
   // First answer wins. The same answer twice is a no-op, a different one is reported, never overwritten.
@@ -71,7 +73,7 @@ async function list(): Promise<void> {
   let shown = 0;
   console.log('');
 
-  for (const project of await loadProjects()) {
+  for (const project of await existingProjects()) {
     for (const mission of await listMissions(project).catch(() => [])) {
       if (mission.state.status !== 'open') continue;
       for (const [step, entry] of Object.entries(mission.state.gates)) {

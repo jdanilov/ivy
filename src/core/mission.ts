@@ -12,6 +12,11 @@ export class Refusal extends Error {
   }
 }
 
+/** A stub has no branch, so every command that needs one stops here. */
+export function notStub(state: MissionState): asserts state is MissionState & { branch: string } {
+  if (state.status === 'stub' || state.branch === null) throw new Refusal(`mission ${state.name} is a stub, open it first`);
+}
+
 const LIVE_WINDOW_MS = 10 * 60 * 1000;
 const EVENTS_DIR = path.join(FACTORY_HOME, 'events');
 
@@ -76,16 +81,17 @@ export const now = (): string => new Date().toISOString();
 export async function readState(dir: string): Promise<MissionState> {
   const raw = (await Bun.file(path.join(dir, 'state.json')).json()) as Partial<MissionState>;
   const name = raw.name ?? path.basename(dir).replace(/^\d{4}-\d{2}-\d{2}-/, '');
+  const status = raw.status ?? 'open';
   return {
     name,
     title: raw.title ?? name,
     workflow: raw.workflow ?? 'story',
     attention: raw.attention ?? 'light',
-    status: raw.status ?? 'open',
+    status,
     step: raw.step ?? '',
     round: raw.round ?? 0,
     session: raw.session ?? null,
-    branch: raw.branch ?? `mission/${name}`,
+    branch: raw.branch ?? (status === 'stub' ? null : `mission/${name}`),
     worktree: raw.worktree ?? null,
     gates: raw.gates ?? {},
     steps: raw.steps ?? {},
@@ -153,7 +159,7 @@ export async function listMissions(cwd: string): Promise<Mission[]> {
 
 /**
  * Name given: match the mission name or the folder. No name: the mission bound to this
- * worktree, else the claimed one, else the only open one.
+ * worktree, else the claimed one, else the only open mission, else a lone stub.
  */
 export async function resolveMission(cwd: string, name?: string): Promise<Mission> {
   const main = await mainCheckout(cwd);
@@ -185,12 +191,17 @@ export async function resolveMission(cwd: string, name?: string): Promise<Missio
 
   const open = missions.filter((m) => m.state.status === 'open');
   if (open.length === 1) return open[0]!;
-  if (open.length === 0) throw new Refusal('no open mission here, name one or run mission new');
-  throw new Refusal(`several open missions here, name one: ${open.map((m) => m.state.name).join(', ')}`);
+  if (open.length > 1) throw new Refusal(`several open missions here, name one: ${open.map((m) => m.state.name).join(', ')}`);
+
+  // A lone stub answers too: the caller then says it is a stub instead of claiming there is no mission.
+  const stubs = missions.filter((m) => m.state.status === 'stub');
+  if (stubs.length === 1) return stubs[0]!;
+  throw new Refusal('no open mission here, name one or run mission new');
 }
 
 /** The row state of a whole mission, per docs/design.md. An open gate outranks a running step. */
 export function missionRowState(state: MissionState): string {
+  if (state.status === 'stub') return 'pending';
   if (state.status === 'closed') return 'done';
   if (Object.values(state.gates).some((g) => g.status === 'open')) return 'blocked';
   if (Object.values(state.steps).some((s) => s.status === 'running')) return 'running';
@@ -212,6 +223,7 @@ export interface NewMission {
   workflow: string;
   attention: Attention;
   worktree: boolean;
+  stub: boolean;
 }
 
 /**
@@ -224,35 +236,42 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   const main = await mainCheckout(cwd);
   const checkout = await currentCheckout(cwd);
   const workflow = await loadWorkflow(opts.workflow, main);
-  const branch = `mission/${opts.name}`;
+  const title = opts.title ?? opts.name;
   const folder = path.join(missionsDir(main), `${today()}-${opts.name}`);
 
-  if (await Bun.file(path.join(folder, 'state.json')).exists()) throw new Refusal(`mission "${opts.name}" already exists at ${folder}`);
+  const taken = opts.stub
+    ? await stat(folder).then(() => true, () => false)
+    : await Bun.file(path.join(folder, 'state.json')).exists();
+  if (taken) throw new Refusal(`mission "${opts.name}" already exists at ${folder}`);
 
-  // 1. branch, reusing an orphan from an interrupted run
-  const branchExists = await gitOk(main, 'rev-parse', '--verify', `refs/heads/${branch}`);
+  // 1. branch, reusing an orphan from an interrupted run. A stub has none until `mission open`.
+  const branch = opts.stub ? null : `mission/${opts.name}`;
   let worktree: string | null = null;
 
-  if (opts.worktree) {
-    worktree = path.join(path.dirname(main), `${path.basename(main)}-${opts.name}`);
-    const existing = (await listWorktrees(main)).find((w) => w.dir === worktree);
-    if (existing && existing.branch !== branch) throw new Refusal(`${worktree} is already a worktree on ${existing.branch ?? 'a detached HEAD'}`);
-    if (!existing) await git(main, 'worktree', 'add', ...(branchExists ? [worktree, branch] : [worktree, '-b', branch]));
-  } else if ((await currentBranch(checkout)) !== branch) {
-    await git(checkout, 'checkout', ...(branchExists ? [branch] : ['-b', branch]));
+  if (branch) {
+    const branchExists = await gitOk(main, 'rev-parse', '--verify', `refs/heads/${branch}`);
+    if (opts.worktree) {
+      worktree = path.join(path.dirname(main), `${path.basename(main)}-${opts.name}`);
+      const existing = (await listWorktrees(main)).find((w) => w.dir === worktree);
+      if (existing && existing.branch !== branch) throw new Refusal(`${worktree} is already a worktree on ${existing.branch ?? 'a detached HEAD'}`);
+      if (!existing) await git(main, 'worktree', 'add', ...(branchExists ? [worktree, branch] : [worktree, '-b', branch]));
+    } else if ((await currentBranch(checkout)) !== branch) {
+      await git(checkout, 'checkout', ...(branchExists ? [branch] : ['-b', branch]));
+    }
   }
 
   // 2. folder
   await mkdir(path.join(folder, 'handoffs'), { recursive: true });
   await Bun.write(path.join(folder, 'workflow.yaml'), dumpWorkflow(workflow));
+  if (opts.stub) await Bun.write(path.join(folder, 'intent.md'), intentSkeleton(title));
 
   // 3. state.json last
   const state: MissionState = {
     name: opts.name,
-    title: opts.title ?? opts.name,
+    title,
     workflow: workflow.name,
     attention: opts.attention,
-    status: 'open',
+    status: opts.stub ? 'stub' : 'open',
     step: workflow.steps[0]!.name,
     round: 0,
     session: null,
@@ -267,10 +286,34 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   await writeState(folder, state);
 
   // 4. claim, only when this mission works in the main checkout and nobody else holds it
-  if (!worktree && !(await readClaim(main))) await writeClaim(main, { mission: opts.name, session: null, at: now() });
+  if (branch && !worktree && !(await readClaim(main))) await writeClaim(main, { mission: opts.name, session: null, at: now() });
 
   await saveProject(main);
   return { dir: folder, state };
+}
+
+/** The Why, Done looks like and Not in this mission the human fills in before opening the stub. */
+function intentSkeleton(title: string): string {
+  return `# Intent: ${title}\n\n## Why\n\n## Done looks like\n\n## Not in this mission\n`;
+}
+
+/** A stub becomes a real mission: branch from HEAD, claim, status open. `open` then proceeds as usual. */
+export async function promoteMission(cwd: string, mission: Mission): Promise<void> {
+  const state = mission.state;
+  const main = await mainCheckout(cwd);
+  const claim = await readClaim(main);
+  if (claim && claim.mission !== state.name) throw new Refusal(`${main} is claimed by mission ${claim.mission}`);
+
+  const checkout = await currentCheckout(cwd);
+  const branch = `mission/${state.name}`;
+  const branchExists = await gitOk(main, 'rev-parse', '--verify', `refs/heads/${branch}`);
+  if ((await currentBranch(checkout)) !== branch) await git(checkout, 'checkout', ...(branchExists ? [branch] : ['-b', branch]));
+
+  state.status = 'open';
+  state.branch = branch;
+  await writeState(mission.dir, state);
+
+  if (!claim) await writeClaim(main, { mission: state.name, session: null, at: now() });
 }
 
 // ── mission close ────────────────────────────────────────────────────────────
@@ -278,12 +321,13 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
 /** Every action checks its own postcondition, so a rerun after a crash finishes the job. */
 export async function closeMission(cwd: string, mission: Mission): Promise<string[]> {
   const state = mission.state;
+  notStub(state);
   const main = await mainCheckout(cwd);
   const trunk = await trunkBranch(main);
   const log: string[] = [];
 
   const rel = path.relative(main, mission.dir);
-  const merged = (await git(main, 'branch', '--merged', trunk, '--format=%(refname:short)')).split('\n').includes(state.branch);
+  let merged = (await git(main, 'branch', '--merged', trunk, '--format=%(refname:short)')).split('\n').includes(state.branch);
   const committed = await gitOk(main, 'cat-file', '-e', `${trunk}:${rel}/state.json`);
 
   // A branch with no commits of its own reads as merged, so the folder commit is the real postcondition.
@@ -295,6 +339,21 @@ export async function closeMission(cwd: string, mission: Mission): Promise<strin
     const last = workflow.steps[workflow.steps.length - 1]!.name;
     const lastState = state.steps[last]?.status;
     if (lastState !== 'done' && lastState !== 'skipped') throw new Refusal(`step "${last}" is ${lastState ?? 'pending'} — the final step must be done or skipped before close`);
+
+    // The mission folder rides along on the branch. Anything else dirty would not survive the checkout.
+    const dirty = [
+      ...(await git(main, 'diff', '--name-only', 'HEAD')).split('\n'),
+      ...(await git(main, 'ls-files', '--others', '--exclude-standard')).split('\n'),
+    ].filter((f) => f !== '');
+    const outside = dirty.filter((f) => f !== rel && !f.startsWith(`${rel}/`));
+    if (outside.length > 0) throw new Refusal(`dirty outside the mission folder, commit or stash first: ${outside.join(', ')}`);
+
+    if (dirty.length > 0 && (await currentBranch(main)) === state.branch) {
+      await git(main, 'add', '--', rel);
+      await git(main, 'commit', '-m', `📦 chore: close mission ${state.name}`, '--', rel);
+      log.push(`committed ${rel} on ${state.branch}`);
+      merged = false;
+    }
   }
 
   const was = await currentBranch(main);

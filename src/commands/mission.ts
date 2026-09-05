@@ -4,11 +4,11 @@ import type { Attention, Mission, MissionState } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import {
   Refusal, closeMission, createMission, currentBranch, currentCheckout, git, listMissions,
-  listWorktrees, mainCheckout, missionRowState, missionWorkflow, readClaim, resolveMission,
-  sessionLive, writeClaim, writeState,
+  listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, promoteMission,
+  readClaim, resolveMission, sessionLive, writeClaim, writeState,
 } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
-import { loadProjects } from '../core/projects.js';
+import { existingProjects } from '../core/projects.js';
 import { field, headerRow, missionRow, rule } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
 import { CancelError } from '../ui/prompts.js';
@@ -37,16 +37,18 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
 }
 
 async function create(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
-  if (!name) throw new Refusal('mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]');
+  if (!name) throw new Refusal('mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]');
 
   const attention = (str(flags, 'attention') ?? 'light') as Attention;
   if (!ATTENTION.includes(attention)) throw new Refusal(`attention must be one of ${ATTENTION.join(', ')}`);
 
+  const stub = flags.stub === true;
   const main = await mainCheckout(cwd);
   const claim = await readClaim(main);
   let worktree = flags.worktree === true;
 
-  if (claim && claim.mission !== name && !worktree && flags['no-worktree'] !== true) {
+  // A stub touches no branch, so a claim held by someone else is none of its business.
+  if (!stub && claim && claim.mission !== name && !worktree && flags['no-worktree'] !== true) {
     console.log(`${I}${colors.yellow}⊘${colors.reset} ${main} is claimed by mission ${colors.bold}${claim.mission}${colors.reset}`);
     const answer = await p.confirm({ message: `Work ${name} in a worktree at ../${path.basename(main)}-${name}?`, initialValue: true });
     if (p.isCancel(answer)) throw new CancelError();
@@ -59,23 +61,25 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
     workflow: str(flags, 'workflow') ?? 'story',
     attention,
     worktree,
+    stub,
   });
 
   console.log('');
   headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${created.state.name}${colors.reset}`, `${colors.dim}${created.state.workflow} · ${created.state.attention}${colors.reset}`);
   rule();
   field('folder', created.dir);
-  field('branch', created.state.branch);
+  field('branch', created.state.branch ?? `${colors.dim}stub — open it to branch${colors.reset}`);
   if (created.state.worktree) field('worktree', created.state.worktree);
   field('step', created.state.step);
   console.log('');
 
-  if (flags['no-open'] !== true) await open(created.state.name, flags, cwd);
+  if (!stub && flags['no-open'] !== true) await open(created.state.name, flags, cwd);
 }
 
 /** Writes the Warp tab config and opens it. The session id reaches state.json first. */
 async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
+  if (m.state.status === 'stub') await promoteMission(cwd, m);
   const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
   const dry = flags['dry-run'] === true;
   const spawn = await openSession(cwd, m, preset, dry);
@@ -102,9 +106,10 @@ async function list(flags: Flags): Promise<void> {
   let shown = 0;
 
   console.log('');
-  for (const project of await loadProjects()) {
+  for (const project of await existingProjects()) {
     const missions = await listMissions(project).catch(() => []);
-    const rows = all ? missions : missions.filter((m) => m.state.status === 'open');
+    const rows = (all ? missions : missions.filter((m) => m.state.status !== 'closed'))
+      .sort((a, b) => Number(a.state.status === 'stub') - Number(b.state.status === 'stub'));
     if (rows.length === 0) continue;
 
     console.log(`${I}${colors.dim}${project}${colors.reset}`);
@@ -171,6 +176,7 @@ async function adopt(name: string | undefined, flags: Flags, cwd: string): Promi
 
   const m = await resolveMission(cwd, name);
   const state = m.state;
+  notStub(state);
 
   if (state.session === session) {
     console.log(`${I}${colors.dim}${state.name} is already bound to ${session}.${colors.reset}`);
@@ -197,6 +203,7 @@ async function adopt(name: string | undefined, flags: Flags, cwd: string): Promi
 async function resume(name: string | undefined, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
   const state = m.state;
+  notStub(state);
   const checkout = await currentCheckout(cwd);
   const branch = await currentBranch(checkout);
 
@@ -226,6 +233,7 @@ async function resume(name: string | undefined, cwd: string): Promise<void> {
 
 async function close(name: string | undefined, cwd: string): Promise<void> {
   const m: Mission = await resolveMission(cwd, name);
+  notStub(m.state);
   const log = await closeMission(cwd, m);
 
   console.log('');

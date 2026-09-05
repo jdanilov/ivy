@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { MissionState, Workflow } from '../types.js';
 import { str, type Flags } from '../core/args.js';
-import { Refusal, deviate, missionWorkflow, now, resolveMission, writeState } from '../core/mission.js';
+import { Refusal, deviate, missionWorkflow, notStub, now, resolveMission, writeState } from '../core/mission.js';
 import { allStepNames, dumpWorkflow, findStep, nextStep, ownerStep, validate } from '../core/workflow.js';
 import { field } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
@@ -11,6 +11,7 @@ export async function step(sub: string, args: string[], flags: Flags, cwd: strin
   if (!name) throw new Refusal(`step ${sub ?? '<sub>'} <step> — start, done, skip, add, loop`);
 
   const mission = await resolveMission(cwd, str(flags, 'mission'));
+  notStub(mission.state);
   const workflow = await missionWorkflow(mission);
   const state = mission.state;
 

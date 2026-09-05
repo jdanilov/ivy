@@ -109,7 +109,7 @@ picker. `--skip` records the part in the manifest, so the project keeps its own 
 one-line `✗ …` on a refusal.
 
 ```
-factory mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
 factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name]
 factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
@@ -130,6 +130,13 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission open` writes the session id to `state.json` before the tab exists, so the first hook
   event the new session emits already finds a mission bound to it.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
+- A stub is a mission with `status: stub` and `branch: null`: folder, workflow copy and an
+  `intent.md` skeleton, no branch and no claim. Every command that needs a branch refuses with
+  `mission <name> is a stub, open it first`; `mission open` promotes it and then proceeds as usual,
+  landing in the same state `mission new` would have.
+- `mission close` commits a dirty mission folder on the mission branch before it leaves the branch,
+  and refuses when anything outside the folder is dirty, naming the paths.
+- `mission list` and `gate list` skip a registered project whose path is gone. The projects file keeps it.
 
 ## Conventions
 

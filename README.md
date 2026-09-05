@@ -35,12 +35,13 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
 | `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |
 | `mission new <name>`                           | Create the mission folder, workflow copy, `state.json`, branch and claim   |
-| `mission open [name]`                          | Spawn the mission's session in a Warp tab from a preset                    |
-| `mission list [--all]`                         | Every mission across `~/.factory/projects`                                 |
+| `mission new <name> --stub`                    | Folder and intent skeleton only: no branch, no claim, status `stub`        |
+| `mission open [name]`                          | Spawn the mission's session in a Warp tab; a stub is promoted first        |
+| `mission list [--all]`                         | Every mission across `~/.factory/projects`, stubs last                     |
 | `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness      |
 | `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                          |
 | `mission resume [name]`                        | Check the branch back out and print the current step and open gates        |
-| `mission close [name]`                         | Merge the branch, commit the folder on trunk, clear claim, drop worktree   |
+| `mission close [name]`                         | Commit the folder on the branch, merge, commit on trunk, clear claim       |
 | `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                    |
 | `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                   |
 | `step loop <step>`                             | Record a round and send the mission back to the step's loop target         |

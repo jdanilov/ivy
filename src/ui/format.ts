@@ -24,7 +24,9 @@ export function headerRow(left: string, right: string): void {
 export function missionRow(state: MissionState, row: string, live: boolean): void {
   const glyph = `${rowColor(row)}${rowSymbol(row)}${colors.reset}`;
   const detail = `${colors.dim}${state.workflow} · ${state.step || '—'} · r${state.round}${colors.reset}`;
-  const session = state.status === 'closed'
+  const session = state.status === 'stub'
+    ? `${colors.dim}stub${colors.reset}`
+    : state.status === 'closed'
     ? `${colors.dim}closed${colors.reset}`
     : live
       ? `${colors.cyan}session${colors.reset}`

@@ -1,0 +1,6 @@
+type: skill
+description: verifier gatekeeper over the diff and the contract (sonnet)
+default: true
+files:
+  - source: skill.md
+  - source: agents/Verifier.md

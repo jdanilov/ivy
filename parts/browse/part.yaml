@@ -1,0 +1,6 @@
+type: tool
+description: drive a real or headless browser through agent-browser (sonnet)
+default: true
+files:
+  - source: skill.md
+  - source: scripts/connect.ts

@@ -1,6 +1,5 @@
 type: skill
-description: reviews uncommitted changes and works through findings (opus)
+description: verifier over the uncommitted diff, no contract (sonnet)
 default: true
 files:
   - source: skill.md
-  - source: agents/Critic.md

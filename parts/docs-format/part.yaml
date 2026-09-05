@@ -1,0 +1,6 @@
+type: fixture
+description: how agent-facing docs are written
+default: true
+files:
+  - source: docs-format.md
+    target: .claude/docs-format.md

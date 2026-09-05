@@ -1,13 +1,20 @@
 ---
 name: critic
-model: opus
-description: ♻ Run @Critic sub-agent and present findings for selective implementation
+model: sonnet
+description: ♻ Review the uncommitted diff with the Verifier and triage the findings
 ---
 
-# Critique code via Sub-Agent
+# Critic
 
-- Spawn @Critic sub-agent to review uncommitted changes.
-- Look through `findings` and think through what is reasonable and makes sense implementing.
-- Present `findings` and your thinking to the user. Let user confirm or pick which ones to implement.
+Alias for the Verifier on the diff, with no contract behind it.
+
+- Spawn `@Verifier` over `git diff` and `git diff --cached`. Do not review the code yourself.
+- No Mission is bound here, so there is no `acceptance.md`: the quality baseline is the whole check
+  and the findings come back in the sub-agent's final message.
+- Nothing changed: say the tree is clean and stop.
+
+Then think through what is worth doing. Gatekeepers over-report, so rank by blast radius, effort
+and confidence, and present fix or skip per finding with a reason. Let the user confirm or pick
+before you implement anything.
 
 $ARGUMENTS

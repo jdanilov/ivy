@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdir, symlink, unlink, readdir, readlink, rmdir, readFile, lstat } from 'node:fs/promises';
-import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet } from '../types.js';
+import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet, SnippetRecord } from '../types.js';
 import { hashFile } from './scanner.js';
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
@@ -99,16 +99,22 @@ function sectionEnd(lines: string[], at: number): number {
   return lines.length;
 }
 
+/** The path a snippet line points at: what a line about the same file must contain to be its match. */
+const snippetPath = (line: string): string | undefined => /@(\S+)/.exec(line)?.[1];
+
 /**
  * Adds the part's line under its section, creating the section at the end of the file when it is
- * missing. Idempotent: the exact line anywhere in the section is enough. Returns what to record.
+ * missing. A line the project already wrote about the same path is rewritten in place instead, and
+ * kept in the record so uninstall can put it back. Idempotent. Returns what to record.
  */
 export async function writeSnippet(
   snippet: Snippet,
   targetDir: string,
-): Promise<{ record: Required<Snippet>; changed: boolean }> {
+  prev?: SnippetRecord,
+): Promise<{ record: SnippetRecord; changed: boolean }> {
   const file = snippet.file ?? (await agentFile(targetDir));
-  const record = { file, section: snippet.section, line: snippet.line };
+  const record: SnippetRecord = { file, section: snippet.section, line: snippet.line };
+  if (prev?.replaced !== undefined) record.replaced = prev.replaced;
   const filePath = path.join(targetDir, file);
   const lines = await readLines(filePath);
 
@@ -119,11 +125,19 @@ export async function writeSnippet(
   }
 
   const end = sectionEnd(lines, at);
-  if (lines.slice(at + 1, end).some((l) => l === snippet.line)) return { record, changed: false };
+  const body = lines.slice(at + 1, end);
+  if (body.some((l) => l === snippet.line)) return { record, changed: false };
 
-  let insert = end;
-  while (insert > at + 1 && lines[insert - 1]!.trim() === '') insert--;
-  lines.splice(insert, 0, snippet.line);
+  const target = snippetPath(snippet.line);
+  const hit = target === undefined ? -1 : body.findIndex((l) => l.includes(target));
+  if (hit !== -1) {
+    if (record.replaced === undefined) record.replaced = body[hit]!;
+    lines[at + 1 + hit] = snippet.line;
+  } else {
+    let insert = end;
+    while (insert > at + 1 && lines[insert - 1]!.trim() === '') insert--;
+    lines.splice(insert, 0, snippet.line);
+  }
 
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeLines(filePath, lines);
@@ -131,10 +145,11 @@ export async function writeSnippet(
 }
 
 /**
- * Takes the recorded line back out of the recorded file. A section left with nothing but blank
- * lines goes too, together with the blank the install put in front of it. Nothing else is touched.
+ * Takes the recorded line back out of the recorded file, or puts the displaced line back where it
+ * was. A section left with nothing but blank lines goes too, together with the blank the install
+ * put in front of it. Nothing else is touched.
  */
-export async function removeSnippet(record: Required<Snippet>, targetDir: string): Promise<boolean> {
+export async function removeSnippet(record: SnippetRecord, targetDir: string): Promise<boolean> {
   const filePath = path.join(targetDir, record.file);
   const lines = await readLines(filePath);
 
@@ -142,8 +157,16 @@ export async function removeSnippet(record: Required<Snippet>, targetDir: string
   if (at === -1) return false;
 
   const end = sectionEnd(lines, at);
+  const hit = lines.slice(at + 1, end).indexOf(record.line);
+  if (hit === -1) return false;
+
+  if (record.replaced !== undefined) {
+    lines[at + 1 + hit] = record.replaced;
+    await writeLines(filePath, lines);
+    return true;
+  }
+
   const body = lines.slice(at + 1, end).filter((l) => l !== record.line);
-  if (body.length === end - at - 1) return false;
 
   // An emptied section that ran to EOF was appended by an install: its leading blank goes with it.
   const empty = body.every((l) => l.trim() === '');
@@ -351,6 +374,33 @@ export async function injectMcp(mcp: McpConfig, targetDir: string): Promise<void
   mcpConfig.mcpServers[mcp.serverName] = mcp.config;
 
   await Bun.write(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+}
+
+const EMPTIABLE = ['.claude/settings.json', '.claude/settings.local.json', '.mcp.json'];
+
+/**
+ * Deletes a settings or mcp file the Factory just emptied — `{}` or a bare `{"mcpServers": {}}`.
+ * A file still holding anything of the project's own stays. Returns what went, for the report.
+ */
+export async function dropEmptied(targetDir: string): Promise<string[]> {
+  const gone: string[] = [];
+
+  for (const rel of EMPTIABLE) {
+    const filePath = path.join(targetDir, rel);
+    const json = await readJson<Record<string, unknown> | null>(filePath, null);
+    if (!isObject(json)) continue;
+
+    const keys = Object.keys(json);
+    const servers = json.mcpServers;
+    const empty = keys.length === 0
+      || (keys.length === 1 && isObject(servers) && Object.keys(servers).length === 0);
+    if (!empty) continue;
+
+    await unlink(filePath).catch(() => {});
+    gone.push(rel);
+  }
+
+  return gone;
 }
 
 export async function removeMcp(serverName: string, targetDir: string): Promise<void> {

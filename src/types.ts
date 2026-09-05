@@ -43,6 +43,11 @@ export interface Snippet {
   line: string;
 }
 
+/** Where the line actually went, plus the project's own line about the same path it displaced. */
+export interface SnippetRecord extends Required<Snippet> {
+  replaced?: string;
+}
+
 /** Shell lines run once in the project root: init when the part lands, uninit when it goes. */
 export interface Recipes {
   init?: string[];
@@ -95,7 +100,7 @@ export interface ManifestPart {
   mcp?: { serverName: string; config: object };
   settings?: Settings;
   /** Resolved at install time: uninstall removes this line from this file, no fresh guess. */
-  snippet?: Required<Snippet>;
+  snippet?: SnippetRecord;
   /** Resolved uninit lines, kept here so a part the registry dropped can still clean up. */
   uninit?: string[];
   /** Set once `recipes.init` succeeded. Its absence is what makes `update` run init. */

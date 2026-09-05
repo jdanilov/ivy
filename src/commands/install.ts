@@ -10,7 +10,7 @@ import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
 import { printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
 
-export async function install(targetDir: string): Promise<void> {
+export async function install(targetDir: string, yes = false): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 
   // Validate git repo
@@ -54,13 +54,16 @@ export async function install(targetDir: string): Promise<void> {
 
   console.log('');
 
-  // Select parts
-  const selectedNames = await selectParts(states, 'install');
+  // Select parts. `--yes` answers nobody's question: the defaults plus what is already installed,
+  // and a part whose target holds a file of the project's own is left alone.
+  const selectedNames = yes
+    ? states.filter((s) => s.status !== 'conflict' && (s.part.default || s.status === 'installed' || s.status === 'modified')).map((s) => s.part.name)
+    : await selectParts(states, 'install');
 
   // Filter out conflicts that user doesn't want to overwrite
   let filteredNames = [...selectedNames];
 
-  for (const name of selectedNames) {
+  for (const name of yes ? [] : selectedNames) {
     const ps = states.find((s) => s.part.name === name);
     if (ps && ps.status === 'conflict') {
       const conflictFiles = ps.part.files
@@ -83,7 +86,7 @@ export async function install(targetDir: string): Promise<void> {
     return ps && ps.status === 'modified';
   });
 
-  if (modifiedSelected.length > 0) {
+  if (modifiedSelected.length > 0 && !yes) {
     const ok = await confirmModified(modifiedSelected);
     if (!ok) {
       filteredNames = filteredNames.filter((n) => !modifiedSelected.includes(n));
@@ -147,7 +150,7 @@ export async function install(targetDir: string): Promise<void> {
     // Add the part's line to the agent file, recording where it went.
     let snippetAdded = false;
     if (part.snippet) {
-      const { record, changed } = await writeSnippet(part.snippet, resolvedDir);
+      const { record, changed } = await writeSnippet(part.snippet, resolvedDir, previous?.snippet);
       manifestPart.snippet = record;
       snippetAdded = changed;
     }

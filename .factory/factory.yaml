@@ -1,0 +1,7 @@
+# Recipes the Verifier and the Validator run. Shell lines, project root, first failure stops.
+recipes:
+  verify:
+    - bun x tsc --noEmit
+    - bun src/cli.ts status /opt/ed/ivy
+  e2e:
+    - scripts/e2e.sh

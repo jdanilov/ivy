@@ -1,0 +1,33 @@
+{
+  "name": "smoke",
+  "title": "smoke",
+  "workflow": "chore",
+  "attention": "unattended",
+  "status": "closed",
+  "step": "merge",
+  "round": 0,
+  "session": null,
+  "branch": "mission/smoke",
+  "worktree": "/opt/ed/ivy-smoke",
+  "gates": {},
+  "steps": {
+    "grill": {
+      "status": "done",
+      "startedAt": "2026-09-05T08:16:22.063Z",
+      "endedAt": "2026-09-05T08:16:22.119Z"
+    },
+    "implement": {
+      "status": "done",
+      "startedAt": "2026-09-05T08:16:22.176Z",
+      "endedAt": "2026-09-05T08:16:30.549Z"
+    },
+    "merge": {
+      "status": "done",
+      "startedAt": "2026-09-05T08:16:30.610Z",
+      "endedAt": "2026-09-05T08:16:30.671Z"
+    }
+  },
+  "deviations": [],
+  "created": "2026-09-05T08:16:18.400Z",
+  "updated": "2026-09-05T08:16:33.645Z"
+}

@@ -1,14 +1,14 @@
 import path from 'node:path';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
-import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet } from '../core/linker.js';
+import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied } from '../core/linker.js';
 import { runUninit } from '../core/recipes.js';
 import { FACTORY_ROOT } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
 import { printPartResult, printSnippetInfo } from '../ui/format.js';
 
-export async function uninstall(targetDir: string): Promise<void> {
+export async function uninstall(targetDir: string, yes = false): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 
   // Read manifest
@@ -61,8 +61,10 @@ export async function uninstall(targetDir: string): Promise<void> {
 
   console.log('');
 
-  // Select parts to uninstall
-  let selectedNames = await selectParts(installedStates, 'uninstall');
+  // Select parts to uninstall. `--yes` takes every installed part and asks nothing.
+  let selectedNames = yes
+    ? installedStates.map((s) => s.part.name)
+    : await selectParts(installedStates, 'uninstall');
 
   if (selectedNames.length === 0) {
     console.log('');
@@ -77,7 +79,7 @@ export async function uninstall(targetDir: string): Promise<void> {
     return ps && ps.status === 'modified';
   });
 
-  if (modifiedSelected.length > 0) {
+  if (modifiedSelected.length > 0 && !yes) {
     const ok = await confirmModified(modifiedSelected);
     if (!ok) {
       selectedNames = selectedNames.filter((n) => !modifiedSelected.includes(n));
@@ -117,6 +119,10 @@ export async function uninstall(targetDir: string): Promise<void> {
     if (entry?.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
       printSnippetInfo(entry.snippet.file, 'removed');
     }
+  }
+
+  for (const file of await dropEmptied(resolvedDir)) {
+    console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
   }
 
   // Write or delete manifest

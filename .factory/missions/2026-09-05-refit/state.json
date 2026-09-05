@@ -4,16 +4,18 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "intent",
+  "step": "implement",
   "round": 0,
   "session": null,
   "branch": "mission/refit",
   "worktree": null,
   "gates": {
     "intent": {
-      "status": "open",
+      "status": "answered",
       "file": "intent.md",
-      "at": "2026-09-05T18:04:36.705Z"
+      "answer": "accept",
+      "note": "Accepted 2026-09-05. Added: codegraph package source configurable per project, default @colbymchenry/codegraph",
+      "at": "2026-09-05T18:14:11.935Z"
     }
   },
   "steps": {
@@ -23,11 +25,21 @@
       "endedAt": "2026-09-05T18:04:36.580Z"
     },
     "intent": {
+      "status": "done",
+      "startedAt": "2026-09-05T18:04:36.641Z",
+      "endedAt": "2026-09-05T18:14:11.995Z"
+    },
+    "spec": {
+      "status": "done",
+      "startedAt": "2026-09-05T18:14:12.060Z",
+      "endedAt": "2026-09-05T18:19:25.591Z"
+    },
+    "implement": {
       "status": "running",
-      "startedAt": "2026-09-05T18:04:36.641Z"
+      "startedAt": "2026-09-05T18:19:25.647Z"
     }
   },
   "deviations": [],
   "created": "2026-09-05T18:04:36.435Z",
-  "updated": "2026-09-05T18:04:36.705Z"
+  "updated": "2026-09-05T18:19:25.647Z"
 }

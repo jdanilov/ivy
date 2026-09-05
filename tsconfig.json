@@ -3,7 +3,9 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["bun"],
+    "types": [
+      "bun"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,5 +17,9 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["src/**/*.ts", "cycle/**/*.ts", "mcps/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "parts/**/*.ts",
+    "plugins/**/*.ts"
+  ]
 }

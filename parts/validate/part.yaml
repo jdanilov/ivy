@@ -1,0 +1,6 @@
+type: skill
+description: validator gatekeeper driving the running system (opus)
+default: true
+files:
+  - source: skill.md
+  - source: agents/Validator.md

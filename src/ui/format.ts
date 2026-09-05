@@ -1,7 +1,41 @@
-import type { Part, EnvWarning } from '../types.js';
-import { I, NAME_COL, colors, symbols, displayName } from './theme.js';
+import type { Part, EnvWarning, MissionState } from '../types.js';
+import { I, nameCol, colors, symbols, displayName, rowColor, rowSymbol } from './theme.js';
 
-const PAD = ' '.repeat(I.length + 2 + NAME_COL); // indent + "✓ " + name column
+const ROW_WIDTH = 62;
+const visible = (text: string): number => text.replace(/\x1b\[[0-9;]*m/g, '').length;
+
+/** Dim label, bright value, one per line. */
+export function field(label: string, value: string): void {
+  console.log(`${I}${colors.dim}${label.padEnd(9)}${colors.reset}${value}`);
+}
+
+export function rule(): void {
+  console.log(`${I}${colors.dim}${'─'.repeat(ROW_WIDTH)}${colors.reset}`);
+}
+
+/** Left text, right-aligned metrics, padded by visible width so colors do not shift it. */
+export function headerRow(left: string, right: string): void {
+  if (right === '') return console.log(`${I}${left.trimEnd()}`);
+  const gap = Math.max(1, ROW_WIDTH - visible(left) - visible(right));
+  console.log(`${I}${left}${' '.repeat(gap)}${right}`);
+}
+
+/** One mission line: glyph, name, workflow · step · round, then session liveness. */
+export function missionRow(state: MissionState, row: string, live: boolean): void {
+  const glyph = `${rowColor(row)}${rowSymbol(row)}${colors.reset}`;
+  const detail = `${colors.dim}${state.workflow} · ${state.step || '—'} · r${state.round}${colors.reset}`;
+  const session = state.status === 'closed'
+    ? `${colors.dim}closed${colors.reset}`
+    : live
+      ? `${colors.cyan}session${colors.reset}`
+      : `${colors.dim}no session${colors.reset}`;
+  headerRow(`${glyph} ${state.name.padEnd(20)}${detail}`, session);
+}
+
+// indent + "✓ " + name column
+function pad(): string {
+  return ' '.repeat(I.length + 2 + nameCol());
+}
 
 /**
  * Print a part's result line with file list, MCP info, or plain name.
@@ -17,12 +51,12 @@ export function printPartResult(
   const verb = opts.verb ? `${opts.verb} ` : '';
 
   if (fileList.length > 0) {
-    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(NAME_COL)}${verb}${fileList[0]}${suffix}`);
+    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(nameCol())}${verb}${fileList[0]}${suffix}`);
     for (let i = 1; i < fileList.length; i++) {
-      console.log(`${PAD}${fileList[i]}`);
+      console.log(`${pad()}${fileList[i]}`);
     }
   } else if (part.mcp) {
-    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(NAME_COL)}${verb}.mcp.json → ${part.mcp.serverName}${suffix}`);
+    console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname.padEnd(nameCol())}${verb}.mcp.json → ${part.mcp.serverName}${suffix}`);
   } else {
     console.log(`${I}${colors.green}${symbols.check}${colors.reset} ${dname}${suffix}`);
   }
@@ -32,7 +66,7 @@ export function printPartResult(
  * Print hook injection info line (indented under the part result).
  */
 export function printHookInfo(): void {
-  console.log(`${PAD}.claude/settings.local.json → hook added`);
+  console.log(`${pad()}.claude/settings.local.json → hook added`);
 }
 
 /**

@@ -1,5 +1,4 @@
 import type { Part } from '../types.js';
-import { PARTS } from '../core/registry.js';
 
 // 3-space indent to match @clack/prompts gutter (│)
 export const I = '   ';
@@ -20,7 +19,8 @@ export const symbols = {
   installed: '●',
   modified: '▲',
   notInstalled: '○',
-  conflict: '▲',
+  conflict: '✗',   // docs/design.md: ▲ yellow is modified, ✗ red is conflict
+  skipped: '⊘',
   check: '✓',
   cross: '✗',
   selected: '◉',
@@ -37,6 +37,8 @@ export function statusColor(status: string): string {
       return colors.dim;
     case 'conflict':
       return colors.red;
+    case 'skipped':
+      return colors.dim;
     default:
       return colors.reset;
   }
@@ -52,9 +54,53 @@ export function statusSymbol(status: string): string {
       return symbols.notInstalled;
     case 'conflict':
       return symbols.conflict;
+    case 'skipped':
+      return symbols.skipped;
     default:
       return symbols.notInstalled;
   }
+}
+
+// Row states from docs/design.md: pending ○, running ●, done ✓, failed ✗, blocked ⊘.
+export function rowSymbol(state: string): string {
+  switch (state) {
+    case 'running':
+      return symbols.installed;
+    case 'done':
+      return symbols.check;
+    case 'failed':
+      return symbols.cross;
+    case 'blocked':
+      return '⊘';
+    default:
+      return symbols.notInstalled;
+  }
+}
+
+export function rowColor(state: string): string {
+  switch (state) {
+    case 'running':
+      return colors.cyan;
+    case 'done':
+      return colors.green;
+    case 'failed':
+      return colors.red;
+    case 'blocked':
+      return colors.yellow;
+    default:
+      return colors.dim;
+  }
+}
+
+/** `23m 25s`, or just `10s` under a minute. */
+export function duration(fromISO?: string, toISO?: string): string {
+  if (!fromISO) return '';
+  const ms = new Date(toISO ?? Date.now()).getTime() - new Date(fromISO).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  const total = Math.round(ms / 1000);
+  const seconds = total % 60;
+  const minutes = Math.floor(total / 60);
+  return minutes === 0 ? `${seconds}s` : `${minutes}m ${seconds}s`;
 }
 
 export function typeLabel(part: Part): string {
@@ -66,8 +112,16 @@ export function displayName(part: Part): string {
   return part.name;
 }
 
-// Column width for part display names, derived from registry + 2 padding
-export const NAME_COL = Math.max(...PARTS.map((p) => displayName(p).length)) + 2;
+// Column width for part display names, set once from the loaded parts
+let nameColWidth = 16;
+
+export function setNameCol(parts: Part[]): void {
+  if (parts.length > 0) nameColWidth = Math.max(...parts.map((p) => displayName(p).length)) + 2;
+}
+
+export function nameCol(): number {
+  return nameColWidth;
+}
 
 export function pluralize(count: number, singular: string, plural: string = singular + 's'): string {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -83,6 +137,8 @@ export function statusLabel(status: string): string {
       return 'not installed';
     case 'conflict':
       return 'conflict';
+    case 'skipped':
+      return 'skipped';
     default:
       return status;
   }

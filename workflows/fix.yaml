@@ -1,0 +1,8 @@
+name: fix
+steps:
+  - grill
+  - implement: { role: worker }
+  - verify:
+      role: verifier
+      loop: { back: implement, max: 2, human_from: 3 }   # orchestrator decides every round
+  - merge

@@ -1,6 +1,8 @@
 export interface PartFile {
-  source: string;   // relative to ivy project root (e.g., "parts/skills/commit/skill.md")
-  target: string;   // relative to target project root (derived from source at load time)
+  source: string;   // relative to the Factory root (e.g., "parts/commit/skill.md")
+  target: string;   // relative to the target project root
+  /** Template file: install it only when the project has nothing there yet. */
+  skipIfExists?: boolean;
 }
 
 export interface EnvVar {
@@ -9,9 +11,17 @@ export interface EnvVar {
   url: string;      // where to get the key
 }
 
+export const HOOK_EVENTS = [
+  'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop',
+  'SubagentStart', 'SubagentStop', 'PreCompact', 'SessionStart', 'SessionEnd',
+] as const;
+
+export type HookEvent = (typeof HOOK_EVENTS)[number];
+
 export interface HookConfig {
-  event: 'PreToolUse' | 'PostToolUse' | 'Stop';
-  matcher: string;
+  event: HookEvent;
+  /** Omitted for events Claude Code does not match on (UserPromptSubmit, Stop). */
+  matcher?: string;
   command: string;
 }
 
@@ -26,6 +36,9 @@ export interface McpConfig {
 
 export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 
+/** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
+export type Settings = Record<string, unknown>;
+
 export interface Part {
   name: string;
   type: PartType;
@@ -35,9 +48,10 @@ export interface Part {
   envVars?: EnvVar[];
   hooks?: HookConfig[];
   mcp?: McpConfig;
+  settings?: Settings;
 }
 
-export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict';
+export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict' | 'skipped';
 
 export interface PartState {
   part: Part;
@@ -47,10 +61,12 @@ export interface PartState {
 
 export interface Manifest {
   version: number;
-  ivy: string;             // path to ivy installation
+  factory: string;         // path to the Factory installation
   installedAt: string;
   updatedAt: string;
   parts: Record<string, ManifestPart>;
+  /** Parts this project owns itself: `update --skip` never installs or touches them again. */
+  skipped?: string[];
 }
 
 export interface ManifestPart {
@@ -58,9 +74,93 @@ export interface ManifestPart {
   hashes: Record<string, string>;
   hooks?: HookConfig[];
   mcp?: { serverName: string; config: object };
+  settings?: Settings;
 }
 
 export interface EnvWarning {
   partName: string;
   envVar: EnvVar;
+}
+
+// ── Workflows and missions ───────────────────────────────────────────────────
+
+export interface WorkflowStep {
+  name: string;
+  role?: string;
+  gate?: 'human' | 'orchestrator';
+  parallel?: string[];
+  loop?: { back: string; max: number; human_from: number };
+}
+
+export interface Workflow {
+  name: string;
+  steps: WorkflowStep[];
+}
+
+export type Attention = 'full' | 'light' | 'unattended';
+export type StepStatus = 'pending' | 'running' | 'done' | 'skipped';
+export type GateAnswer = 'accept' | 'amend' | 'reject';
+
+export interface GateState {
+  status: 'open' | 'answered';
+  file?: string;
+  answer?: GateAnswer;
+  note?: string;
+  at: string;
+}
+
+export interface StepState {
+  status: StepStatus;
+  startedAt?: string;
+  endedAt?: string;
+  reason?: string;
+}
+
+export interface Deviation {
+  at: string;
+  what: string;
+  reason: string;
+}
+
+export interface MissionState {
+  name: string;
+  title: string;
+  workflow: string;
+  attention: Attention;
+  status: 'open' | 'closed';
+  step: string;
+  round: number;
+  session: string | null;
+  branch: string;
+  worktree: string | null;
+  gates: Record<string, GateState>;
+  steps: Record<string, StepState>;
+  deviations: Deviation[];
+  created: string;
+  updated: string;
+}
+
+export interface Claim {
+  mission: string;
+  session: string | null;
+  at: string;
+}
+
+/** A mission on disk: the folder in the main checkout plus its parsed state. */
+export interface Mission {
+  dir: string;
+  state: MissionState;
+}
+
+// ── Presets ──────────────────────────────────────────────────────────────────
+
+/** A spawn-time bundle: presets/<name>/{preset.yaml,prompt.md,settings.json,mcp.json}. */
+export interface Preset {
+  name: string;
+  dir: string;
+  model: string;
+  effort: string;
+  plugins: string[];
+  mcp: string[];
+  sendMessage: boolean;
 }

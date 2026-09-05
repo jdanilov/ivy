@@ -75,7 +75,7 @@ Ivy evolves into the Factory: a harness around Claude Code that tracks missions 
 | Condense      | Summarizer step at close reads all artefacts and transcripts, drops mid-stage handoffs and dead ends, writes `retro.md`, proposes memories. |
 | Self-improve  | Any agent that sees a faster or cheaper way logs it in its handoff. `retro.md` is the feedback channel from agents to the human: tools, context bloat, wrong memories, workflow defaults. Periodically spawns a chore mission. |
 | Questions     | `ask` tool registered by the `factory` function-hooks plugin, backed by `$.ui.ask`. Drawn in the Warp session, mirrored in the Inbox, answered in either. Verified in sub-agents first. Fallback is blocked-return plus orchestrator ask. |
-| Function hooks| Used for ask, gate, status line mission row, precompact focus, secret redactor, handoff capture. Event log stays command hooks. |
+| Function hooks| Present in 2.1.257 but hook modules are gated by the server rollout flag `tengu_plugin_hooks_modules`, off for this account on 2026-09-05, no local override. `plugins/factory` ships and self-activates when the flag flips. Until then the fallback is the live path: native questions in the session, `factory gate answer`, Inbox read-only with jump. PreCompact focus, handoff capture and the event log stay command hooks, the module API has no compaction event. |
 | Gates         | Plugin tool `gate`, same primitive as `ask`. Draws the gate in the Warp session and watches the Inbox file. First answer wins, the other prompt is dismissed. Never a blocking Bash call. `orchestrator` gates are recorded decisions. Fallback: native question plus `factory gate answer` by the orchestrator, Inbox read-only with jump. |
 | Config        | Factory ships default workflows. `.factory/factory.yaml` replaces a workflow by name, adds recipes.   |
 | Agent API     | `factory mission|step|handoff` CLI plus plugin tools `ask` and `gate`, documented in the `mission` skill. |
@@ -88,6 +88,9 @@ Ivy evolves into the Factory: a harness around Claude Code that tracks missions 
 | Compaction    | autoCompactWindow near 300k in the orchestrator preset. PreCompact hook injects mission focus.        |
 | Caffeinate    | Inside `hook-factory`, keyed on mission binding. Global caffeinate part dropped.                      |
 | Docs format   | `docs-format` fixture referenced by every agent prompt. intent.md is for humans, the rest for agents.  |
+| Home dir      | `~/.factory`. Droid is dropped. First run refuses to init while Droid files (`auth.v2.key`, `droids/`) are present and tells the human to move them. |
+| Design        | `docs/design.md` is the design language for the TUI and CLI output, extracted from the Droid Mission Control screenshots: dark ground, one orange accent, dim labels and bright values, glyph status column, inverted selected row, relative timestamps, verb-aligned tool log, key bar. |
+| This mission  | Covers build order 1 and 2 plus the function-hook spike and the design doc. Mission Control and memory are follow-up missions. |
 | Terminology   | `docs/terminology.md` in the Factory and a template part for projects, linked from agents.md.        |
 | Memory        | `mem` MCP on Mnemosyne over note files. Integral to the Factory. Minimal design below.               |
 | Research      | Grok primary plus a keyless YouTube transcript MCP.                                                   |
@@ -218,8 +221,8 @@ Stay in igs: nudge, support, analytics, doc-id-drift, release-audit, touch-file-
 
 ## Context
 
-- Factory (the company) Missions talk: orchestrator, serial workers, two validators, contract before code, handoffs, Mission Control. Transcript and screenshots in `docs/`.
-- Graph engineering: chain, diamond, branch, loop. Weight test: does a step need the previous result. Transcript in `docs/`.
+- Factory (the company) Missions talk: orchestrator, serial workers, two validators, contract before code, handoffs, Mission Control. Transcript and screenshots in the mission folder.
+- Graph engineering: chain, diamond, branch, loop. Weight test: does a step need the previous result. Transcript in the mission folder.
 - Function hooks: present and gated in Claude Code 2.1.257 with `$.ui`, `$.model`, `$.http`, `$.store`, `$.fs`, `$.clock`, `$.session` and tool registration. Public proposal filed 2026-09-03. API may change.
 - Warp tab configs: TOML, open as a tab in the active window by URI, params, no group API.
 - Claude Code 2.1.257 verified: PreCompact, SubagentStart, SubagentStop, PermissionRequest, notification types, MCP_TOOL_TIMEOUT, autoCompactWindow. Sub-agents have no question tool.
@@ -229,11 +232,11 @@ Stay in igs: nudge, support, analytics, doc-id-drift, release-audit, touch-file-
 - Final step schema and the prompt file per role. The orchestrator prompt states the priority order and when to amend the workflow.
 - Events file schema and how Mission Control derives session state from it.
 - Mnemosyne integration: what it indexes, note format, recall cost per prompt against the 300 ms budget.
-- Function hooks: enable flag, whether a plugin tool is visible inside sub-agents, whether a `$.ui.ask` prompt can be raced against a file watch and dismissed when the Inbox answers first, fallback when the worker crashes.
+- Function hooks: re-run `plugins/factory/test.md` step 0 periodically; when the rollout flag is on, steps 2 to 4 decide sub-agent visibility and Inbox dismissal.
 - Recovery pass output format and what `resume` does per step.
 - Findings ranking heuristics for blast radius, effort and confidence.
 - Handoff template and the loose rule for skipping it.
-- Memory and Inbox visibility from the phone via Remote Control.
+- Memory and Inbox visibility from the phone via Remote Control. Global settings currently deny `SendMessage` and disable Remote Control, both must be lifted per preset.
 
 ## Review log 2026-09-04
 
@@ -250,3 +253,5 @@ Folded from the intent review.
 - Memory kept as integral with a minimal file-first design.
 - Roles set per workflow, `quick` workflow added. Hard budgets rejected.
 - Added DX section. Gate became a plugin tool racing the session prompt against the Inbox. Blocking `factory gate` call dropped. `suggestions.md` renamed `retro.md`.
+- 2026-09-05 grill: `~/.factory` kept, Droid dropped. Design language doc added. Scope set to build order 1-2 plus hook spike. Dropped parts deleted in this mission.
+- 2026-09-05 hook spike: modules gated by a server rollout flag, fallback is the live path, plugin kept.

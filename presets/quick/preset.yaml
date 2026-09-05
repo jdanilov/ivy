@@ -1,0 +1,5 @@
+model: opus
+effort: high
+plugins: []
+mcp: []
+sendMessage: false

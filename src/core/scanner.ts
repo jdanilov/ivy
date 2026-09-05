@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { lstat } from 'node:fs/promises';
 import type { PartState, PartStatus } from '../types.js';
-import { PARTS, IVY_ROOT } from './registry.js';
+import { loadParts, FACTORY_ROOT } from './registry.js';
 import { readManifest } from './manifest.js';
 
 export async function hashFile(filePath: string): Promise<string> {
@@ -17,9 +17,17 @@ export async function hashFile(filePath: string): Promise<string> {
 
 export async function scanProject(targetDir: string): Promise<PartState[]> {
   const manifest = await readManifest(targetDir);
+  const parts = await loadParts();
+  const skipped = new Set(manifest?.skipped ?? []);
   const states: PartState[] = [];
 
-  for (const part of PARTS) {
+  for (const part of parts) {
+    // A skipped part is the project's own business: whatever sits at its targets is not our conflict.
+    if (skipped.has(part.name)) {
+      states.push({ part, status: 'skipped', files: {} });
+      continue;
+    }
+
     const fileStates: PartState['files'] = {};
     let allExist = true;
     let anyExists = false;
@@ -29,7 +37,7 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
 
     for (const pf of part.files) {
       const targetPath = path.join(targetDir, pf.target);
-      const sourcePath = path.join(IVY_ROOT, pf.source);
+      const sourcePath = path.join(FACTORY_ROOT, pf.source);
 
       let exists = false;
       let isSymlink = false;
@@ -49,13 +57,20 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
         // file doesn't exist
       }
 
+      fileStates[pf.target] = { exists, isSymlink, hashMatch };
+
+      // A seeded template belongs to the project once it is there: present is installed, whatever it holds.
+      if (pf.skipIfExists) {
+        if (exists) anyExists = true;
+        else allExist = false;
+        continue;
+      }
+
       if (exists) anyExists = true;
       else allExist = false;
 
       if (!hashMatch) allHashMatch = false;
       if (!isSymlink) allSymlinks = false;
-
-      fileStates[pf.target] = { exists, isSymlink, hashMatch };
     }
 
     // MCP parts with no files: check manifest only

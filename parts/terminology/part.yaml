@@ -1,0 +1,7 @@
+type: fixture
+description: template docs/terminology.md for the project domain
+default: true
+files:
+  - source: terminology.md
+    target: docs/terminology.md
+    skipIfExists: true

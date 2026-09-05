@@ -1,0 +1,7 @@
+name: research
+steps:
+  - grill
+  - investigate:
+      role: investigator
+      parallel: [sources, transcripts]
+  - report                                 # docs/research/<name>.md

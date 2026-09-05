@@ -1,0 +1,5 @@
+type: skill
+description: verifier over the uncommitted diff, no contract (sonnet)
+default: true
+files:
+  - source: skill.md

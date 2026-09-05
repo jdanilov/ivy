@@ -1,0 +1,8 @@
+type: skill
+description: run a mission through its workflow, gates and triage (fable)
+default: true
+files:
+  - source: skill.md
+  - source: agents/Worker.md
+  - source: agents/Investigator.md
+  - source: agents/Summarizer.md

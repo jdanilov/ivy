@@ -1,0 +1,10 @@
+type: tool
+description: web research via Grok
+default: true
+files:
+  - source: skill.md
+  - source: scripts/research.ts
+envVars:
+  - name: XAI_API_KEY
+    description: Grok AI API key
+    url: https://console.x.ai

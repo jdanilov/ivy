@@ -1,0 +1,6 @@
+model: fable
+effort: high
+plugins:
+  - factory
+mcp: []
+sendMessage: true

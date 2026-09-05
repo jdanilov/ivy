@@ -56,12 +56,12 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
   return entry;
 }
 
-/** A target we may remove: a symlink into the Factory whose source still exists. */
+/** A target we may remove: a symlink into the Factory. Dangling counts, a dropped part leaves those. */
 async function isFactoryLink(targetPath: string, factoryRoot: string): Promise<boolean> {
   try {
     if (!(await lstat(targetPath)).isSymbolicLink()) return false;
     const dest = path.resolve(path.dirname(targetPath), await readlink(targetPath));
-    return dest.startsWith(factoryRoot + path.sep) && (await Bun.file(dest).exists());
+    return dest.startsWith(factoryRoot + path.sep);
   } catch {
     return false;
   }

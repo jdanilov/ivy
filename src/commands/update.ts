@@ -49,6 +49,16 @@ export async function update(targetDir: string): Promise<void> {
       if (part.settings) await injectSettings(part.settings, resolvedDir);
       manifest.parts[name] = next;
 
+      // A file the part stopped shipping leaves a dangling symlink behind unless someone else owns it.
+      const dropped = entry.files.filter((f) => !next.files.includes(f) && !liveFiles.has(f));
+      if (dropped.length > 0) {
+        const gone = await unlinkPart({ ...entry, files: dropped }, resolvedDir, FACTORY_ROOT);
+        for (const file of gone.removed) {
+          line('-', colors.yellow, displayName(part), file);
+          removed++;
+        }
+      }
+
       if (JSON.stringify(entry) !== JSON.stringify(next) || String(before) !== String(await links())) {
         line(symbols.installed, colors.green, displayName(part), 'relinked');
         relinked++;

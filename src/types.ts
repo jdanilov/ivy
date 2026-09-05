@@ -64,3 +64,73 @@ export interface EnvWarning {
   partName: string;
   envVar: EnvVar;
 }
+
+// ── Workflows and missions ───────────────────────────────────────────────────
+
+export interface WorkflowStep {
+  name: string;
+  role?: string;
+  gate?: 'human' | 'orchestrator';
+  parallel?: string[];
+  loop?: { back: string; max: number; human_from: number };
+}
+
+export interface Workflow {
+  name: string;
+  steps: WorkflowStep[];
+}
+
+export type Attention = 'full' | 'light' | 'unattended';
+export type StepStatus = 'pending' | 'running' | 'done' | 'skipped';
+export type GateAnswer = 'accept' | 'amend' | 'reject';
+
+export interface GateState {
+  status: 'open' | 'answered';
+  file?: string;
+  answer?: GateAnswer;
+  note?: string;
+  at: string;
+}
+
+export interface StepState {
+  status: StepStatus;
+  startedAt?: string;
+  endedAt?: string;
+  reason?: string;
+}
+
+export interface Deviation {
+  at: string;
+  what: string;
+  reason: string;
+}
+
+export interface MissionState {
+  name: string;
+  title: string;
+  workflow: string;
+  attention: Attention;
+  status: 'open' | 'closed';
+  step: string;
+  round: number;
+  session: string | null;
+  branch: string;
+  worktree: string | null;
+  gates: Record<string, GateState>;
+  steps: Record<string, StepState>;
+  deviations: Deviation[];
+  created: string;
+  updated: string;
+}
+
+export interface Claim {
+  mission: string;
+  session: string | null;
+  at: string;
+}
+
+/** A mission on disk: the folder in the main checkout plus its parsed state. */
+export interface Mission {
+  dir: string;
+  state: MissionState;
+}

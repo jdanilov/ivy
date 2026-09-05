@@ -18,9 +18,11 @@
       "at": "2026-09-05T18:14:11.935Z"
     },
     "merge": {
-      "status": "open",
+      "status": "answered",
       "file": ".factory/missions/2026-09-05-refit/retro.md",
-      "at": "2026-09-05T21:58:01.499Z"
+      "answer": "accept",
+      "note": "Accepted 2026-09-06, 57 assertions pass, retro swept",
+      "at": "2026-09-05T21:59:05.124Z"
     }
   },
   "steps": {
@@ -65,8 +67,9 @@
       "endedAt": "2026-09-05T21:58:01.388Z"
     },
     "merge": {
-      "status": "running",
-      "startedAt": "2026-09-05T21:58:01.444Z"
+      "status": "done",
+      "startedAt": "2026-09-05T21:58:01.444Z",
+      "endedAt": "2026-09-05T21:59:11.759Z"
     }
   },
   "deviations": [
@@ -77,5 +80,5 @@
     }
   ],
   "created": "2026-09-05T18:04:36.435Z",
-  "updated": "2026-09-05T21:58:01.499Z"
+  "updated": "2026-09-05T21:59:11.759Z"
 }

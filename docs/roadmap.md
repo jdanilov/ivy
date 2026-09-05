@@ -15,3 +15,4 @@ a human prunes it, nothing else reads it.
 - [ ] `mission new` on a claimed checkout with no tty exits 0 having done nothing, it should refuse (2026-09-05-refit)
 - [ ] `uninstall` leaves behind a `docs/` it created (2026-09-05-refit)
 - [ ] Directory `source` in a part's `files[]`, for vendors too large to list file by file (2026-09-05-refit)
+- [ ] `step add --after X` when X is done and the pointer sits on the next pending step: the pointer should move to the new step (2026-09-06-control)

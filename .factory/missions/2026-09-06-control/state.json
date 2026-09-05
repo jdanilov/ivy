@@ -1,0 +1,54 @@
+{
+  "name": "control",
+  "title": "Mission Control: the OpenTUI screen",
+  "workflow": "story",
+  "attention": "light",
+  "status": "open",
+  "step": "prototype",
+  "round": 0,
+  "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
+  "branch": "mission/control",
+  "worktree": null,
+  "gates": {
+    "intent": {
+      "status": "answered",
+      "file": "intent.md",
+      "answer": "accept",
+      "note": "Design confirmed in session 2026-09-06: three right-pane modes, opentui core, fixture first",
+      "at": "2026-09-05T23:12:02.199Z"
+    }
+  },
+  "steps": {
+    "grill": {
+      "status": "done",
+      "startedAt": "2026-09-05T23:11:31.900Z",
+      "endedAt": "2026-09-05T23:11:31.953Z"
+    },
+    "intent": {
+      "status": "done",
+      "startedAt": "2026-09-05T23:11:32.007Z",
+      "endedAt": "2026-09-05T23:12:02.255Z"
+    },
+    "prototype": {
+      "status": "running",
+      "startedAt": "2026-09-05T23:12:37.238Z"
+    },
+    "research": {
+      "status": "pending"
+    }
+  },
+  "deviations": [
+    {
+      "at": "2026-09-05T23:12:02.312Z",
+      "what": "added step prototype after intent",
+      "reason": "look and feel review on fake data before spec, as the intent requires"
+    },
+    {
+      "at": "2026-09-05T23:12:37.175Z",
+      "what": "current step moved from research back to prototype",
+      "reason": "step add --after a done step landed the new step behind the pointer; the CLI should place the pointer on it"
+    }
+  ],
+  "created": "2026-09-05T23:11:21.304Z",
+  "updated": "2026-09-05T23:12:37.238Z"
+}

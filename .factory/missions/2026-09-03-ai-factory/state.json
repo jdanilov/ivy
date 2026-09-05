@@ -1,11 +1,14 @@
 {
-  "workflow": "story",
-  "step": "merge",
-  "created": "2026-09-03",
+  "name": "ai-factory",
   "title": "AI Factory v1: missions, workflows, parts refresh, Mission Control",
+  "workflow": "story",
   "attention": "light",
+  "status": "open",
+  "step": "merge",
   "round": 1,
+  "session": null,
   "branch": "mission/ai-factory",
+  "worktree": null,
   "gates": {
     "intent": {
       "status": "answered",
@@ -38,8 +41,10 @@
       "at": "2026-09-05"
     },
     "merge": {
-      "status": "open",
-      "at": "2026-09-05"
+      "status": "answered",
+      "answer": "accept",
+      "note": "human accepted in session",
+      "at": "2026-09-05T10:14:46.645Z"
     }
   },
   "steps": {
@@ -71,8 +76,9 @@
       "endedAt": "2026-09-05"
     },
     "merge": {
-      "status": "running",
-      "startedAt": "2026-09-05"
+      "status": "done",
+      "startedAt": "2026-09-05",
+      "endedAt": "2026-09-05T10:14:46.704Z"
     }
   },
   "deviations": [
@@ -86,5 +92,7 @@
       "what": "round 2 runs Verifier only, validate skipped",
       "reason": "one CLI behaviour change, Verifier checks it with a live run"
     }
-  ]
+  ],
+  "created": "2026-09-03",
+  "updated": "2026-09-05T10:14:46.704Z"
 }

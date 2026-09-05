@@ -67,3 +67,14 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 
 - A-DOG-1 | validate | `update /opt/ed/igs` unlinks critic, links retro and roadmap, adds three snippet lines to igs `AGENTS.md`, keeps igs' own `docs/roadmap.md` (skipIfExists), `status` shows `0 modified`; a `conflict` row for hand-wired codegraph is expected until the human installs the part | run | W5
 - A-DOG-2 | verify | igs hand-wired codegraph untouched by the update, diff against the part recorded in the handoff | read handoff, `git -C /opt/ed/igs status` | W5
+
+## Round 1
+
+- A-R1-1 | validate | `mission close` succeeds in a fresh repo that never ignored `.factory/claim`; `mission new` leaves `.factory/claim` ignored | temp repo without the ignore line, `git check-ignore .factory/claim` | R1
+- A-R1-2 | validate | Installing a snippet part into a section that already names the path replaces that line with the snippet line; uninstall restores the original | temp repo with `- Terminology: \`docs/terminology.md\``, `cmp` after uninstall | R1
+- A-R1-3 | validate | `uninstall` of every part leaves no `{}` settings file and no empty `.mcp.json` | temp repo, `ls .claude .mcp.json` | R1
+- A-R1-4 | validate | `install --yes` installs the defaults and `uninstall --yes` removes everything without a prompt | temp repo, plain pipe, exit 0 | R1
+- A-R1-5 | verify | `.factory/factory.yaml` in ivy has `verify` and `e2e` recipes and `e2e` walks stub, open, step, close in a throwaway repo and exits 0 | run the recipe | R1
+- A-R1-6 | verify | `code-format` part: fixture, default true, `.claude/code-format.md` under 12 lines, snippet under `## Important Files`; installed on ivy and igs | read, `status` | R1
+- A-R1-7 | verify | archify init adds `.claude/skills/archify/` to `.gitignore` when the path is not already ignored | temp repo tracking `.claude`, `git check-ignore` | R1
+- A-R1-8 | verify | `update.ts` has one apply sequence, `AGENTS.md` documents `--skip` on `update` only, `docs/roadmap.md` carries the two Mission Control lines | read | R1

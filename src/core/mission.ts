@@ -364,11 +364,13 @@ export async function closeMission(cwd: string, mission: Mission): Promise<strin
       ...(await git(main, 'diff', '--name-only', 'HEAD')).split('\n'),
       ...(await git(main, 'ls-files', '--others', '--exclude-standard')).split('\n'),
     ].filter((f) => f !== '');
-    // The claim is the Factory's own file: never a reason to refuse the close that clears it.
-    const outside = dirty.filter((f) => f !== rel && !f.startsWith(`${rel}/`) && f !== '.factory/claim');
+    // Everything under `.factory/` is the Factory's own: the claim this close clears, this mission's
+    // folder, and a sibling's folder that belongs to whoever is running it in another worktree.
+    const outside = dirty.filter((f) => !f.startsWith('.factory/'));
     if (outside.length > 0) throw new Refusal(`dirty outside the mission folder, commit or stash first: ${outside.join(', ')}`);
 
-    if (dirty.length > 0 && (await currentBranch(main)) === state.branch) {
+    const own = dirty.filter((f) => f === rel || f.startsWith(`${rel}/`));
+    if (own.length > 0 && (await currentBranch(main)) === state.branch) {
       await git(main, 'add', '--', rel);
       await git(main, 'commit', '-m', `📦 chore: close mission ${state.name}`, '--', rel);
       log.push(`committed ${rel} on ${state.branch}`);

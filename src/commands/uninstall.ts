@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
-import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied } from '../core/linker.js';
+import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied, dropCreated } from '../core/linker.js';
 import { runUninit } from '../core/recipes.js';
 import { FACTORY_ROOT } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
@@ -98,6 +98,9 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
   console.log(`${I}Uninstalling ${pluralize(selectedNames.length, 'part')}...`);
   console.log('');
 
+  // Agent files the install created: candidates for deletion once every snippet is out of them.
+  const created: string[] = [];
+
   for (const name of selectedNames) {
     const ps = installedStates.find((s) => s.part.name === name)!;
     const part = ps.part;
@@ -116,6 +119,7 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
 
     printPartResult(part, { verb: 'removed' });
 
+    if (entry?.snippet?.created) created.push(entry.snippet.file);
     if (entry?.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
       printSnippetInfo(entry.snippet.file, 'removed');
     }
@@ -132,6 +136,11 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
   } else {
     manifest.updatedAt = new Date().toISOString();
     await writeManifest(resolvedDir, manifest);
+  }
+
+  // Last, so the manifest is already gone and an untouched `.claude/` reads as empty.
+  for (const file of await dropCreated(created, resolvedDir)) {
+    console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
   }
 
   console.log('');

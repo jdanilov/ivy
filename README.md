@@ -2,7 +2,8 @@
 
 **Minimalistic portable agent harness for Claude Code.**
 
-- Factory manages an extendable set of `skills`, `tools`, `hooks` and `MCPs` for a fast, practical SDLC with Claude Code.
+- Factory manages an extendable set of `skills`, `tools`, `hooks` and `MCPs` for a fast, practical
+  SDLC with Claude Code.
 - One command installs them into any project, one updates, one removes.
 - Parts are symlinked, so updating the Factory updates every connected project.
 
@@ -21,7 +22,9 @@ bun start                                # interactive: pick a command and a pro
 bun src/cli.ts <command> [args]          # or run a command directly
 ```
 
-Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256 hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent projects live in `~/.factory/projects`.
+Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256
+hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent
+projects live in `~/.factory/projects`.
 
 ## Commands
 
@@ -89,10 +92,10 @@ A part may own one line in the project's `AGENTS.md` (`CLAUDE.md` when that is t
 uninstall, so `terminology`, `docs-format` and `code-format` reach every agent through one `@path`
 list instead of a sentence in every prompt. `roadmap` names its path in backticks instead: a file
 that grows with every retro is a pointer, not something to pull into every context. A section that
-already names the same path has that line rewritten in place, and gets it back on uninstall. A part may also declare `recipes.init` and `recipes.uninit`,
-shell lines run once in the project root when the part arrives and leaves, and `vars` defaults for
-`${name}` used in its hooks, MCP command and recipes. `~/.factory/config.yaml` overrides a var for
-the whole machine:
+already names the same path has that line rewritten in place, and gets it back on uninstall. A part
+may also declare `recipes.init` and `recipes.uninit`, shell lines run once in the project root when
+the part arrives and leaves, and `vars` defaults for `${name}` used in its hooks, MCP command and
+recipes. `~/.factory/config.yaml` overrides a var for the whole machine:
 
 ```yaml
 vars:
@@ -106,7 +109,8 @@ copy and `vars.archify` re-points them all at a fork.
 
 ## Adding a part
 
-1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`, `mcp`, `settings`, `envVars`, `snippet`, `recipes`, `vars`).
+1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`,
+   `mcp`, `settings`, `envVars`, `snippet`, `recipes`, `vars`).
 2. Put the files it installs beside it — `skill.md`, `agents/<Agent>.md`, `scripts/…`.
 3. Run `bun src/cli.ts install <project>`.
 

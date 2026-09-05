@@ -11,3 +11,5 @@ a human prunes it, nothing else reads it.
 - [ ] Global parts: a part that installs into `~/.claude` instead of a project (2026-09-05-refit)
 - [ ] Codex harness support: a second harness reading the same parts (2026-09-05-refit)
 - [ ] Tokens per step: recorded in `state.json` and shown in `mission status` (2026-09-05-refit)
+- [ ] `status` counts `skipIfExists` templates as installed when there is no manifest (2026-09-05-refit)
+- [ ] `mission new` on a claimed checkout with no tty exits 0 having done nothing, it should refuse (2026-09-05-refit)

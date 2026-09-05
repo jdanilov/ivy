@@ -46,6 +46,8 @@ export interface Snippet {
 /** Where the line actually went, plus the project's own line about the same path it displaced. */
 export interface SnippetRecord extends Required<Snippet> {
   replaced?: string;
+  /** The install created the file to hold this line, so an uninstall that empties it may delete it. */
+  created?: true;
 }
 
 /** Shell lines run once in the project root: init when the part lands, uninit when it goes. */

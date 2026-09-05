@@ -122,6 +122,8 @@ export async function writeSnippet(
   const record: SnippetRecord = { file, section: snippet.section, line: snippet.line };
   if (prev?.replaced !== undefined) record.replaced = prev.replaced;
   const filePath = path.join(targetDir, file);
+  // Whoever brings the file into existence records it, so an uninstall knows the file is ours.
+  if (prev?.created || !(await lstat(filePath).catch(() => null))) record.created = true;
   const lines = await readLines(filePath);
 
   let at = lines.findIndex((l) => l.trimEnd() === snippet.section);
@@ -406,6 +408,27 @@ export async function dropEmptied(targetDir: string): Promise<string[]> {
     await unlink(filePath).catch(() => {});
     gone.push(rel);
   }
+
+  return gone;
+}
+
+/**
+ * The counterpart of the install's file creation: an agent file the Factory made and the snippet
+ * removals just emptied, and a `.claude/` with nothing left in it. Anything holding content stays.
+ */
+export async function dropCreated(files: string[], targetDir: string): Promise<string[]> {
+  const gone: string[] = [];
+
+  for (const rel of new Set(files)) {
+    const filePath = path.join(targetDir, rel);
+    const raw = await readFile(filePath, 'utf-8').catch(() => null);
+    if (raw === null || raw.trim() !== '') continue;
+    await unlink(filePath).catch(() => {});
+    gone.push(rel);
+  }
+
+  // rmdir refuses a directory with anything in it, so this only fires once the last part is gone.
+  if (await rmdir(path.join(targetDir, '.claude')).then(() => true, () => false)) gone.push('.claude/');
 
   return gone;
 }

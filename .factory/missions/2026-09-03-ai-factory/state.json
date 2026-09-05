@@ -18,6 +18,12 @@
       "answer": "accept",
       "note": "human asked to proceed after grill",
       "at": "2026-09-05"
+    },
+    "hook-spike": {
+      "status": "answered",
+      "answer": "fallback",
+      "note": "A-HOOK-1 pass (plugin loads, listed). A-HOOK-2 fail: hooks module not loaded, rollout flag tengu_plugin_hooks_modules off, no local override. A-HOOK-3 unchecked.",
+      "at": "2026-09-05"
     }
   },
   "steps": {

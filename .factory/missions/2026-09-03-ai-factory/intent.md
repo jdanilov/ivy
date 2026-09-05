@@ -75,7 +75,7 @@ Ivy evolves into the Factory: a harness around Claude Code that tracks missions 
 | Condense      | Summarizer step at close reads all artefacts and transcripts, drops mid-stage handoffs and dead ends, writes `retro.md`, proposes memories. |
 | Self-improve  | Any agent that sees a faster or cheaper way logs it in its handoff. `retro.md` is the feedback channel from agents to the human: tools, context bloat, wrong memories, workflow defaults. Periodically spawns a chore mission. |
 | Questions     | `ask` tool registered by the `factory` function-hooks plugin, backed by `$.ui.ask`. Drawn in the Warp session, mirrored in the Inbox, answered in either. Verified in sub-agents first. Fallback is blocked-return plus orchestrator ask. |
-| Function hooks| Used for ask, gate, status line mission row, precompact focus, secret redactor, handoff capture. Event log stays command hooks. |
+| Function hooks| Present in 2.1.257 but hook modules are gated by the server rollout flag `tengu_plugin_hooks_modules`, off for this account on 2026-09-05, no local override. `plugins/factory` ships and self-activates when the flag flips. Until then the fallback is the live path: native questions in the session, `factory gate answer`, Inbox read-only with jump. PreCompact focus, handoff capture and the event log stay command hooks, the module API has no compaction event. |
 | Gates         | Plugin tool `gate`, same primitive as `ask`. Draws the gate in the Warp session and watches the Inbox file. First answer wins, the other prompt is dismissed. Never a blocking Bash call. `orchestrator` gates are recorded decisions. Fallback: native question plus `factory gate answer` by the orchestrator, Inbox read-only with jump. |
 | Config        | Factory ships default workflows. `.factory/factory.yaml` replaces a workflow by name, adds recipes.   |
 | Agent API     | `factory mission|step|handoff` CLI plus plugin tools `ask` and `gate`, documented in the `mission` skill. |
@@ -232,7 +232,7 @@ Stay in igs: nudge, support, analytics, doc-id-drift, release-audit, touch-file-
 - Final step schema and the prompt file per role. The orchestrator prompt states the priority order and when to amend the workflow.
 - Events file schema and how Mission Control derives session state from it.
 - Mnemosyne integration: what it indexes, note format, recall cost per prompt against the 300 ms budget.
-- Function hooks: enable flag, whether a plugin tool is visible inside sub-agents, whether a `$.ui.ask` prompt can be raced against a file watch and dismissed when the Inbox answers first, fallback when the worker crashes.
+- Function hooks: re-run `plugins/factory/test.md` step 0 periodically; when the rollout flag is on, steps 2 to 4 decide sub-agent visibility and Inbox dismissal.
 - Recovery pass output format and what `resume` does per step.
 - Findings ranking heuristics for blast radius, effort and confidence.
 - Handoff template and the loose rule for skipping it.
@@ -254,3 +254,4 @@ Folded from the intent review.
 - Roles set per workflow, `quick` workflow added. Hard budgets rejected.
 - Added DX section. Gate became a plugin tool racing the session prompt against the Inbox. Blocking `factory gate` call dropped. `suggestions.md` renamed `retro.md`.
 - 2026-09-05 grill: `~/.factory` kept, Droid dropped. Design language doc added. Scope set to build order 1-2 plus hook spike. Dropped parts deleted in this mission.
+- 2026-09-05 hook spike: modules gated by a server rollout flag, fallback is the live path, plugin kept.

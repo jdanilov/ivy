@@ -3,6 +3,14 @@
 Four steps, one Warp tab, ~5 minutes, from `/opt/ed/ivy` on `mission/ai-factory`.
 Paste the three result lines back to the orchestrator.
 
+## 0 — is the rollout on?
+
+Hook modules are gated server-side by `tengu_plugin_hooks_modules`. Check before anything else:
+
+    claude --debug -p "Reply ok." --model sonnet --plugin-dir /opt/ed/ivy/plugins/factory >/dev/null 2>&1; grep -i "hooks modules" "$(ls -t ~/.claude/debug/*.txt | head -1)"
+
+`hooks modules not loaded: rollout flag ... is off` means stop here, the fallback stays live. No such line means continue.
+
 ## 1 — loads (A-HOOK-1)
 
 `cd /opt/ed/ivy && claude --plugin-dir /opt/ed/ivy/plugins/factory`

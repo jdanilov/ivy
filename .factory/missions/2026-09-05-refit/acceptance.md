@@ -40,8 +40,8 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 - A-CG-1 | validate | Installing codegraph into a temp repo with one `.ts` file runs `init`, writes `.codegraph/`, `.mcp.json` with the resolved command, the hook and the allow entry | temp repo, `ls`, `cat` | W3
 - A-CG-2 | validate | Uninstalling codegraph removes `.codegraph/`, the mcp entry, the hook and the allow entry | same repo | W3
 - A-CG-3 | verify | codegraph part is default false, pins a version in the default var, `gate.sh` uses `${CODEGRAPH:-codegraph}` | read | W3
-- A-ARC-1 | verify | archify part is a skill, default false, vendors `skill.md` and `bin/archify.mjs`, records the upstream sha | read | W3
-- A-ARC-2 | validate | `node .claude/skills/archify/bin/archify.mjs doctor` exits 0 in a project with archify installed | temp repo | W3
+- A-ARC-1 | verify | archify part is a skill, default false, installed per project by an init recipe cloning `${archify}` into `.claude/skills/archify`, removed by uninit, upstream sha recorded | read part.yaml | W6
+- A-ARC-2 | validate | `node .claude/skills/archify/bin/archify.mjs doctor` exits 0 in a project with archify installed, uninstall removes the folder | temp repo | W6
 - A-DOC-1 | verify | `AGENTS.md` documents `snippet`, `recipes`, `vars` and `--stub` | read | W3
 - A-DOC-2 | verify | `README.md` command table has `--stub`, part list matches `ls parts` | read | W3
 - A-DOC-3 | verify | `docs/roadmap.md` in ivy lists the five carried items | read | W3

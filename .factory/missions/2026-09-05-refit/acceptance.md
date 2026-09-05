@@ -65,5 +65,5 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 
 ## Dogfood
 
-- A-DOG-1 | validate | `update /opt/ed/igs` unlinks critic, links retro and roadmap, adds three snippet lines to igs `AGENTS.md`, creates `docs/roadmap.md`, `status` clean | run | W5
+- A-DOG-1 | validate | `update /opt/ed/igs` unlinks critic, links retro and roadmap, adds three snippet lines to igs `AGENTS.md`, keeps igs' own `docs/roadmap.md` (skipIfExists), `status` shows `0 modified`; a `conflict` row for hand-wired codegraph is expected until the human installs the part | run | W5
 - A-DOG-2 | verify | igs hand-wired codegraph untouched by the update, diff against the part recorded in the handoff | read handoff, `git -C /opt/ed/igs status` | W5

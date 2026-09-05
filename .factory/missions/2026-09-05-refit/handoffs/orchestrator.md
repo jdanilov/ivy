@@ -7,3 +7,6 @@ Issues: ivy has no `.factory/factory.yaml`, so Workers have no `verify` recipe (
 Issues: `install` and `uninstall` need a pty; a `--yes` flag would make them scriptable (W1).
 Deviations: W3 and W4 packed into one Worker per the new packing rule.
 Faster: install the codegraph part on ivy itself after this mission, as the first real per-project use.
+Issues: `hook-factory` SubagentStop names the handoff after the current step, so a Commit sub-agent spawned by a Worker overwrote `handoffs/implement.md` with a 36-byte progress line. Name by step plus agent type, skip messages under a few lines, never overwrite a longer file with a shorter one.
+Issues: A-DOG-1 pinned "creates docs/roadmap.md" and "status clean" for a project that owns its roadmap and hand-wires codegraph. Contract wording, not a defect; amended in place.
+Issues: Orchestrator committed mid-step and swept a Worker's staged `git rm` and `git mv` into its own commit. Never commit while a Worker runs.

@@ -1,0 +1,5 @@
+model: sonnet
+effort: medium
+plugins: []
+mcp: []
+sendMessage: false

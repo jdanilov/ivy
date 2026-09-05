@@ -4,8 +4,8 @@ One assertion per line. `id | kind | claim | check | owner`. Kind `verify` is ch
 
 ## CLI and parts
 
-- A-CLI-1 | verify | Every part is a `parts/<name>/part.yaml` loaded at startup, no TypeScript registry remains | `grep -r "PARTS" src` empty, `ls parts/*/part.yaml` lists five | W1
-- A-CLI-2 | validate | `factory status <project>` lists parts from YAML with install state | run against `/opt/ed/ivy`, five rows, no error | W1
+- A-CLI-1 | verify | Every part is a `parts/<name>/part.yaml` loaded at startup, no TypeScript registry remains | `grep -r "PARTS" src` empty, every part is a `parts/*/part.yaml` | W1
+- A-CLI-2 | validate | `factory status <project>` lists parts from YAML with install state | run against `/opt/ed/ivy`, one row per `parts/*/part.yaml`, no error | W1
 - A-CLI-3 | validate | `factory update <project>` relinks installed parts and removes parts gone from the registry, non-interactive | run against `/opt/ed/ivy`, `brainstorm` and `cycle` symlinks gone, `critic-self` untouched, exit 0 | W1
 - A-CLI-4 | verify | Manifest is `.claude/.factory-manifest.json`, an old `.ivy-manifest.json` is read and renamed on next write | inspect `manifest.ts`, run update on a project with the old file | W1
 - A-CLI-5 | verify | `cycle/`, `mcps/`, dropped parts, `@modelcontextprotocol/sdk` are gone and `bun x tsc --noEmit` passes | `ls`, `package.json`, tsc exit 0 | W1

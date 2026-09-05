@@ -56,11 +56,21 @@ function parsePart(name: string, raw: unknown): Part {
 
   if (raw.hooks !== undefined) {
     if (!Array.isArray(raw.hooks)) fail('hooks must be a list');
-    part.hooks = (raw.hooks as unknown[]).map((h): HookConfig => {
-      if (!isRecord(h) || typeof h.event !== 'string' || typeof h.command !== 'string') return fail('every hook needs event and command');
-      if (!HOOK_EVENTS.includes(h.event as HookEvent)) fail(`hook event must be one of ${HOOK_EVENTS.join(', ')}`);
-      if (h.matcher !== undefined && typeof h.matcher !== 'string') fail(`hook on ${h.event} has a non-string matcher`);
-      return { event: h.event as HookEvent, ...(h.matcher === undefined ? {} : { matcher: h.matcher }), command: h.command };
+    // `events: [A, B]` is sugar for one entry per event, `${event}` in the command naming each.
+    part.hooks = (raw.hooks as unknown[]).flatMap((h): HookConfig[] => {
+      if (!isRecord(h) || typeof h.command !== 'string') return fail('every hook needs a command');
+      const { command, matcher } = h as { command: string; matcher?: unknown };
+      const events = h.events === undefined ? [h.event] : h.events;
+      if (!Array.isArray(events) || events.length === 0) fail('a hook needs event, or events as a non-empty list');
+      if (matcher !== undefined && typeof matcher !== 'string') fail(`hook on ${events.join(', ')} has a non-string matcher`);
+      return events.map((event): HookConfig => {
+        if (!HOOK_EVENTS.includes(event as HookEvent)) fail(`hook event must be one of ${HOOK_EVENTS.join(', ')}`);
+        return {
+          event: event as HookEvent,
+          ...(matcher === undefined ? {} : { matcher: matcher as string }),
+          command: command.replaceAll('${event}', event as string),
+        };
+      });
     });
   }
 

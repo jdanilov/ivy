@@ -63,6 +63,7 @@ files:
     skipIfExists: true       # seed it once, then it belongs to the project
 hooks:               # optional, merged into .claude/settings.local.json
   - { event: PreToolUse, matcher: Bash, command: ... }   # matcher omitted where the event takes none
+  - { events: [Stop, SessionEnd], command: ... }          # sugar: one entry per event, ${event} names it
 settings:            # optional, merged into .claude/settings.json: lists union, scalars overwrite
   permissions: { allow: [...] }
 mcp:                 # optional, written to .mcp.json

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
-import { unlinkPart, removeHooks, removeMcp } from '../core/linker.js';
+import { unlinkPart, removeHooks, removeMcp, removeSettings } from '../core/linker.js';
 import { FACTORY_ROOT } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
@@ -108,6 +108,10 @@ export async function uninstall(targetDir: string): Promise<void> {
 
     if (part.mcp) {
       await removeMcp(part.mcp.serverName, resolvedDir);
+    }
+
+    if (part.settings) {
+      await removeSettings(part.settings, resolvedDir);
     }
 
     delete manifest.parts[name];

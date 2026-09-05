@@ -44,9 +44,11 @@ function parsePart(name: string, raw: unknown): Part {
   const files = (raw.files as unknown[]).map((f): PartFile => {
     if (!isRecord(f) || typeof f.source !== 'string') return fail('every files entry needs a source');
     if (f.target !== undefined && typeof f.target !== 'string') fail(`files entry "${f.source}" has a non-string target`);
+    if (f.skipIfExists !== undefined && typeof f.skipIfExists !== 'boolean') fail(`files entry "${f.source}" has a non-boolean skipIfExists`);
     return {
       source: path.join('parts', name, f.source),
       target: (f.target as string | undefined) ?? defaultTarget(name, type, f.source) ?? fail(`files entry "${f.source}" needs a target`),
+      ...(f.skipIfExists === true ? { skipIfExists: true } : {}),
     };
   });
 
@@ -68,6 +70,11 @@ function parsePart(name: string, raw: unknown): Part {
       fail('mcp needs serverName and config { command, args }');
     }
     part.mcp = mcp as unknown as McpConfig;
+  }
+
+  if (raw.settings !== undefined) {
+    if (!isRecord(raw.settings)) fail('settings must be a mapping');
+    part.settings = raw.settings;
   }
 
   if (raw.envVars !== undefined) {

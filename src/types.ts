@@ -1,6 +1,8 @@
 export interface PartFile {
   source: string;   // relative to the Factory root (e.g., "parts/commit/skill.md")
   target: string;   // relative to the target project root
+  /** Template file: install it only when the project has nothing there yet. */
+  skipIfExists?: boolean;
 }
 
 export interface EnvVar {
@@ -34,6 +36,9 @@ export interface McpConfig {
 
 export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 
+/** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
+export type Settings = Record<string, unknown>;
+
 export interface Part {
   name: string;
   type: PartType;
@@ -43,6 +48,7 @@ export interface Part {
   envVars?: EnvVar[];
   hooks?: HookConfig[];
   mcp?: McpConfig;
+  settings?: Settings;
 }
 
 export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict';
@@ -66,6 +72,7 @@ export interface ManifestPart {
   hashes: Record<string, string>;
   hooks?: HookConfig[];
   mcp?: { serverName: string; config: object };
+  settings?: Settings;
 }
 
 export interface EnvWarning {

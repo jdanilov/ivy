@@ -50,13 +50,20 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
         // file doesn't exist
       }
 
+      fileStates[pf.target] = { exists, isSymlink, hashMatch };
+
+      // A seeded template belongs to the project once it is there: present is installed, whatever it holds.
+      if (pf.skipIfExists) {
+        if (exists) anyExists = true;
+        else allExist = false;
+        continue;
+      }
+
       if (exists) anyExists = true;
       else allExist = false;
 
       if (!hashMatch) allHashMatch = false;
       if (!isSymlink) allSymlinks = false;
-
-      fileStates[pf.target] = { exists, isSymlink, hashMatch };
     }
 
     // MCP parts with no files: check manifest only

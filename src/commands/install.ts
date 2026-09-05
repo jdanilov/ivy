@@ -2,7 +2,7 @@ import path from 'node:path';
 import { access } from 'node:fs/promises';
 import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
-import { linkPart, injectHooks, injectMcp } from '../core/linker.js';
+import { linkPart, injectHooks, injectMcp, injectSettings } from '../core/linker.js';
 import { FACTORY_ROOT } from '../core/registry.js';
 import { checkEnvVars } from '../core/env.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
@@ -133,6 +133,11 @@ export async function install(targetDir: string): Promise<void> {
     // Inject MCP if part has it
     if (part.mcp) {
       await injectMcp(part.mcp, resolvedDir);
+    }
+
+    // Merge settings if part has them
+    if (part.settings) {
+      await injectSettings(part.settings, resolvedDir);
     }
 
     // Update manifest

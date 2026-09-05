@@ -3,7 +3,7 @@ import { readlink } from 'node:fs/promises';
 import type { HookConfig, ManifestPart } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, FACTORY_ROOT } from '../core/registry.js';
-import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp } from '../core/linker.js';
+import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings } from '../core/linker.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
@@ -35,6 +35,7 @@ export async function update(targetDir: string): Promise<void> {
 
   let relinked = 0;
   let removed = 0;
+  let installed = 0;
 
   for (const [name, entry] of Object.entries(manifest.parts)) {
     const part = registry.get(name);
@@ -45,6 +46,7 @@ export async function update(targetDir: string): Promise<void> {
       const next = await linkPart(part, resolvedDir, FACTORY_ROOT);
       if (part.hooks) await injectHooks(part.hooks, resolvedDir);
       if (part.mcp) await injectMcp(part.mcp, resolvedDir);
+      if (part.settings) await injectSettings(part.settings, resolvedDir);
       manifest.parts[name] = next;
 
       if (JSON.stringify(entry) !== JSON.stringify(next) || String(before) !== String(await links())) {
@@ -75,9 +77,28 @@ export async function update(targetDir: string): Promise<void> {
       removed++;
     }
 
+    if (entry.settings) {
+      await removeSettings(entry.settings, resolvedDir);
+      line('-', colors.yellow, name, '.claude/settings.json → settings removed');
+      removed++;
+    }
+
     // Stop tracking the part either way: what the Factory will not remove it will not manage.
     delete manifest.parts[name];
     if (result.left.length > 0) line('!', colors.dim, name, `left in place: ${result.left.join(', ')}`);
+  }
+
+  // A part the Factory ships as a default reaches an already-installed project on the next update.
+  for (const part of parts) {
+    if (!part.default || manifest.parts[part.name]) continue;
+
+    manifest.parts[part.name] = await linkPart(part, resolvedDir, FACTORY_ROOT);
+    if (part.hooks) await injectHooks(part.hooks, resolvedDir);
+    if (part.mcp) await injectMcp(part.mcp, resolvedDir);
+    if (part.settings) await injectSettings(part.settings, resolvedDir);
+
+    line(symbols.installed, colors.green, displayName(part), 'installed');
+    installed++;
   }
 
   if (Object.keys(manifest.parts).length === 0) {
@@ -89,10 +110,10 @@ export async function update(targetDir: string): Promise<void> {
   }
 
   console.log('');
-  if (relinked === 0 && removed === 0) {
+  if (relinked === 0 && removed === 0 && installed === 0) {
     console.log(`${I}${colors.bold}Up to date.${colors.reset}`);
   } else {
-    console.log(`${I}${colors.bold}Done.${colors.reset} ${relinked} relinked, ${removed} removed.`);
+    console.log(`${I}${colors.bold}Done.${colors.reset} ${installed} installed, ${relinked} relinked, ${removed} removed.`);
   }
   console.log('');
 }

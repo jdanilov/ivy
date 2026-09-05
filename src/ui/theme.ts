@@ -19,7 +19,7 @@ export const symbols = {
   installed: '●',
   modified: '▲',
   notInstalled: '○',
-  conflict: '▲',
+  conflict: '✗',   // docs/design.md: ▲ yellow is modified, ✗ red is conflict
   check: '✓',
   cross: '✗',
   selected: '◉',

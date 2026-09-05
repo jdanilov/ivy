@@ -143,7 +143,11 @@ async function saveHandoff(mission: Bound, input: HookInput): Promise<string | n
   const text = final !== '' ? final : (await lastAssistantText(input.agent_transcript_path)).trim();
   if (text === '' || mission.step === '') return null;
 
-  const file = path.join(mission.dir, 'handoffs', mission.round > 0 ? `${mission.step}-r${mission.round}.md` : `${mission.step}.md`);
+  // Only the Worker owns the step's handoff; anyone else running inside the step gets their own file.
+  const agent = (input.agent_type ?? '').trim();
+  const role = agent === '' || agent === 'Worker' ? '' : `-${agent.replace(/[^A-Za-z0-9_-]+/g, '-')}`;
+  const round = mission.round > 0 ? `-r${mission.round}` : '';
+  const file = path.join(mission.dir, 'handoffs', `${mission.step}${role}${round}.md`);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${text}\n`);
   return file;

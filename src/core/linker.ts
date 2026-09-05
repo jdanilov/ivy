@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdir, symlink, unlink, readdir, readlink, rmdir, readFile, lstat } from 'node:fs/promises';
-import type { Part, HookConfig, McpConfig, ManifestPart } from '../types.js';
+import type { Part, HookConfig, McpConfig, ManifestPart, Settings } from '../types.js';
 import { hashFile } from './scanner.js';
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
@@ -19,6 +19,9 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
   for (const pf of part.files) {
     const sourcePath = path.join(factoryRoot, pf.source);
     const targetPath = path.join(targetDir, pf.target);
+
+    // A template is seeded once: whatever the project already has there is the project's.
+    if (pf.skipIfExists && (await lstat(targetPath).catch(() => null))) continue;
 
     await mkdir(path.dirname(targetPath), { recursive: true });
 
@@ -44,6 +47,10 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
 
   if (part.mcp) {
     entry.mcp = { serverName: part.mcp.serverName, config: part.mcp.config };
+  }
+
+  if (part.settings) {
+    entry.settings = part.settings;
   }
 
   return entry;
@@ -80,9 +87,10 @@ export async function unlinkPart(
     await unlink(targetPath);
     removed.push(file);
 
+    // Empty parents are tidied up inside .claude only; a target elsewhere leaves its folders alone.
     let dir = path.dirname(targetPath);
     const claudeDir = path.join(targetDir, '.claude');
-    while (dir !== claudeDir && dir.startsWith(claudeDir)) {
+    while (dir !== claudeDir && dir.startsWith(claudeDir + path.sep)) {
       try {
         const entries = await readdir(dir);
         if (entries.length === 0) {
@@ -166,6 +174,64 @@ export async function removeHooks(hooks: HookConfig[], targetDir: string): Promi
   }
 
   await Bun.write(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const key = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v));
+
+/** Merges a part's settings into the project's, deduping list entries by string. */
+function mergeSettings(into: Record<string, unknown>, from: Settings): void {
+  for (const [k, value] of Object.entries(from)) {
+    const current = into[k];
+    if (Array.isArray(value)) {
+      const list = Array.isArray(current) ? current : [];
+      const seen = new Set(list.map(key));
+      into[k] = [...list, ...value.filter((v) => !seen.has(key(v)))];
+    } else if (isObject(value)) {
+      const nested = isObject(current) ? current : {};
+      mergeSettings(nested, value);
+      into[k] = nested;
+    } else {
+      into[k] = value;
+    }
+  }
+}
+
+/** Takes the part's entries back out, dropping any key it emptied. */
+function pruneSettings(from: Record<string, unknown>, part: Settings): void {
+  for (const [k, value] of Object.entries(part)) {
+    const current = from[k];
+    if (Array.isArray(value) && Array.isArray(current)) {
+      const drop = new Set(value.map(key));
+      from[k] = current.filter((v) => !drop.has(key(v)));
+      if ((from[k] as unknown[]).length === 0) delete from[k];
+    } else if (isObject(value) && isObject(current)) {
+      pruneSettings(current, value);
+      if (Object.keys(current).length === 0) delete from[k];
+    } else if (key(current) === key(value)) {
+      delete from[k];
+    }
+  }
+}
+
+export async function injectSettings(settings: Settings, targetDir: string): Promise<void> {
+  const settingsPath = path.join(targetDir, '.claude', 'settings.json');
+  const current = await readJson<Record<string, unknown>>(settingsPath, {});
+
+  mergeSettings(current, settings);
+
+  await mkdir(path.dirname(settingsPath), { recursive: true });
+  await Bun.write(settingsPath, JSON.stringify(current, null, 2) + '\n');
+}
+
+export async function removeSettings(settings: Settings, targetDir: string): Promise<void> {
+  const settingsPath = path.join(targetDir, '.claude', 'settings.json');
+  const current = await readJson<Record<string, unknown> | null>(settingsPath, null);
+  if (!current) return;
+
+  pruneSettings(current, settings);
+
+  await Bun.write(settingsPath, JSON.stringify(current, null, 2) + '\n');
 }
 
 export async function injectMcp(mcp: McpConfig, targetDir: string): Promise<void> {

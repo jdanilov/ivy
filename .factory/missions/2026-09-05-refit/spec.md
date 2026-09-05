@@ -148,7 +148,20 @@ Files: `/opt/ed/igs/.claude/**`, `/opt/ed/igs/AGENTS.md`, `/opt/ed/igs/.claude/s
 
 Owns A-DOG-1..2.
 
-### Orchestrator, after W5
+### W6 Archify as a clone recipe
+
+Added after W3 found the two-file vendor non-functional (`doctor` needs 28 files). Files: `parts/archify/`, `README.md`, `AGENTS.md` part list if it has one, `docs/terminology.md` only if archify is named there.
+
+- `parts/archify/part.yaml`: type `skill`, default false, `files: []`, `vars: { archify: "https://github.com/tt-a1i/archify" }`, `recipes.init`: shallow-clone `${archify}` into `.claude/skills/archify`, remove its `.git` and `test/`, then `node .claude/skills/archify/bin/archify.mjs doctor`; `recipes.uninit`: `rm -rf .claude/skills/archify`. One shell line per recipe entry, `sh -c` semantics. Init refuses if the folder already exists and is not empty, so a project's own copy is never overwritten.
+- Delete the vendored `skill.md` and `bin/archify.mjs` from `parts/archify/`. Keep the upstream sha comment as the version the recipe was checked against.
+- Project `.gitignore` is not touched. The handoff notes whether the clone lands inside a tracked tree for projects that do not ignore `.claude/`.
+- README part row and any doc line saying archify is vendored are corrected: installed per project by recipe, re-pointable through `vars.archify`.
+
+Checks: temp repo, install or `update` with archify selected runs the clone, `doctor` exits 0, uninstall removes the folder. A-ARC-1 is reread as: skill part, default false, recipe-installed, var for the source, sha recorded. A-ARC-2 as written.
+
+Owns A-ARC-1, A-ARC-2.
+
+### Orchestrator, after W5 and W6
 
 - `/retro` dogfood on `.factory/missions/2026-09-03-ai-factory/retro.md` in this session with the human. Owns A-RET-4 through the human's answers. Items the refit already covers (close commits first, HOME scratch, projects skip) are dropped by the sweep with that reason.
 - Accept round: `/verify` and `/validate` in parallel, triage, loop or merge gate.

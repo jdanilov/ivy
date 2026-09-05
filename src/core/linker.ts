@@ -20,8 +20,16 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
     const sourcePath = path.join(factoryRoot, pf.source);
     const targetPath = path.join(targetDir, pf.target);
 
-    // A template is seeded once: whatever the project already has there is the project's.
-    if (pf.skipIfExists && (await lstat(targetPath).catch(() => null))) continue;
+    // A template is a copy, seeded once: the project edits it, and whatever is already there stays.
+    if (pf.skipIfExists) {
+      if (!(await lstat(targetPath).catch(() => null))) {
+        await mkdir(path.dirname(targetPath), { recursive: true });
+        await Bun.write(targetPath, Bun.file(sourcePath));
+      }
+      files.push(pf.target);
+      hashes[pf.target] = await hashFile(targetPath);
+      continue;
+    }
 
     await mkdir(path.dirname(targetPath), { recursive: true });
 

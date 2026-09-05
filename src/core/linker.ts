@@ -15,10 +15,12 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
 export async function linkPart(part: Part, targetDir: string, factoryRoot: string): Promise<ManifestPart> {
   const files: string[] = [];
   const hashes: Record<string, string> = {};
+  const sources: Record<string, string> = {};
 
   for (const pf of part.files) {
     const sourcePath = path.join(factoryRoot, pf.source);
     const targetPath = path.join(targetDir, pf.target);
+    sources[pf.target] = pf.source;
 
     // A template is a copy, seeded once: the project edits it, and whatever is already there stays.
     if (pf.skipIfExists) {
@@ -47,7 +49,7 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
     hashes[pf.target] = await hashFile(sourcePath);
   }
 
-  const entry: ManifestPart = { files, hashes };
+  const entry: ManifestPart = { files, hashes, sources };
 
   if (part.hooks) {
     entry.hooks = part.hooks;
@@ -186,10 +188,12 @@ export async function removeSnippet(record: SnippetRecord, targetDir: string): P
   return true;
 }
 
-/** A target we may remove: a symlink into the Factory. Dangling counts, a dropped part leaves those. */
-async function isFactoryLink(targetPath: string, factoryRoot: string): Promise<boolean> {
+/** A target we may remove: a symlink the manifest records as ours, else one pointing into the Factory. */
+async function isFactoryLink(targetPath: string, factoryRoot: string, source?: string): Promise<boolean> {
   try {
     if (!(await lstat(targetPath)).isSymbolicLink()) return false;
+    // The manifest says we linked it, so where it points now is not the question. Dangling counts.
+    if (source !== undefined) return true;
     const dest = path.resolve(path.dirname(targetPath), await readlink(targetPath));
     return dest.startsWith(factoryRoot + path.sep);
   } catch {
@@ -209,7 +213,7 @@ export async function unlinkPart(
   for (const file of entry.files) {
     const targetPath = path.join(targetDir, file);
 
-    if (!(await isFactoryLink(targetPath, factoryRoot))) {
+    if (!(await isFactoryLink(targetPath, factoryRoot, entry.sources?.[file]))) {
       if (await lstat(targetPath).catch(() => null)) left.push(file);
       continue;
     }

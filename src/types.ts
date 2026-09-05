@@ -100,6 +100,9 @@ export interface Manifest {
 export interface ManifestPart {
   files: string[];
   hashes: Record<string, string>;
+  /** target -> source under the Factory root: what makes a file ours without asking the symlink.
+   *  Absent in manifests written before it existed, and those fall back to `readlink`. */
+  sources?: Record<string, string>;
   hooks?: HookConfig[];
   mcp?: { serverName: string; config: object };
   settings?: Settings;

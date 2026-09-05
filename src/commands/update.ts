@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { readlink } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import type { HookConfig, ManifestPart, Part, SnippetRecord } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, withRequires, FACTORY_ROOT } from '../core/registry.js';
@@ -78,8 +78,8 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     const part = registry.get(name);
 
     if (part) {
-      const links = () => Promise.all(part.files.map((f) => readlink(path.join(resolvedDir, f.target)).catch(() => '')));
-      const before = await links();
+      // Where each file comes from is recorded in the manifest, so only its absence needs the disk.
+      const gone = await Promise.all(part.files.map((f) => lstat(path.join(resolvedDir, f.target)).then(() => false, () => true)));
       const { next, snippetAdded, failure: initFailed } = await applyPart(part, entry, resolvedDir);
       if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
 
@@ -105,7 +105,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
 
       if (initFailed) failure = initFailed;
 
-      if (JSON.stringify(entry) !== JSON.stringify(next) || String(before) !== String(await links())) {
+      if (JSON.stringify(entry) !== JSON.stringify(next) || gone.includes(true)) {
         line(symbols.installed, colors.green, displayName(part), 'relinked');
         relinked++;
       }

@@ -28,6 +28,7 @@ export interface HookConfig {
 export interface McpConfig {
   serverName: string;
   config: {
+    type?: string;
     command: string;
     args: string[];
     env?: Record<string, string>;

@@ -7,6 +7,7 @@ files:
 mcp:
   serverName: codegraph
   config:
+    type: stdio
     command: "${codegraph}"
     args: [serve, --mcp]
 hooks:

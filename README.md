@@ -62,7 +62,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `/explain`       | skill   | sonnet | Explains and visualizes system flows                          |
 | `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`        |
 | `/browse`        | tool    | sonnet | Drives a real or headless browser through `agent-browser`     |
-| `/archify`       | skill   | opus   | Architecture diagrams from a typed spec, html and svg (opt-in) |
+| `/archify`       | skill   | opus   | Architecture diagrams from a typed spec, cloned per project (opt-in) |
 | `docs-format`    | fixture | —      | How agent-facing docs are written, referenced by every agent  |
 | `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
 | `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
@@ -94,7 +94,12 @@ the whole machine:
 ```yaml
 vars:
   codegraph: codegraph      # a local build on PATH instead of the pinned npx default
+  archify: ~/src/archify    # a local clone instead of the upstream GitHub URL
 ```
+
+`archify` is that shape: it ships no files, its `init` clones `${archify}` into
+`.claude/skills/archify` and its `uninit` removes the folder again, so every project gets its own
+copy and `vars.archify` re-points them all at a fork.
 
 ## Adding a part
 

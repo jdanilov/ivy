@@ -13,6 +13,8 @@ export async function readManifest(targetDir: string): Promise<Manifest | null> 
       const manifest = (await file.json()) as Manifest & { ivy?: string };
       if (!manifest.factory && manifest.ivy) manifest.factory = manifest.ivy;
       delete manifest.ivy;
+      // Rename here, not on the next write: a legacy manifest with no parts never reaches one.
+      if (rel === LEGACY_MANIFEST_PATH) await writeManifest(targetDir, manifest);
       return manifest;
     } catch {
       return null;
@@ -21,7 +23,7 @@ export async function readManifest(targetDir: string): Promise<Manifest | null> 
   return null;
 }
 
-/** Writes the current manifest and drops the legacy one, so an ivy install renames on first write. */
+/** Writes the current manifest and drops the legacy one, so an ivy install renames on first read or write. */
 export async function writeManifest(targetDir: string, manifest: Manifest): Promise<void> {
   await Bun.write(path.join(targetDir, MANIFEST_PATH), JSON.stringify(manifest, null, 2) + '\n');
   await drop(targetDir, LEGACY_MANIFEST_PATH);

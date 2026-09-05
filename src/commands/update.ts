@@ -80,8 +80,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     }
 
     const staleHooks = (entry.hooks ?? []).filter((h) => !liveHooks.has(hookKey(h)));
-    if (staleHooks.length > 0) {
-      await removeHooks(staleHooks, resolvedDir);
+    if (staleHooks.length > 0 && (await removeHooks(staleHooks, resolvedDir)) > 0) {
       line('-', colors.yellow, name, '.claude/settings.local.json → hook removed');
       removed++;
     }

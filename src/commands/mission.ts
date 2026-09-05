@@ -90,7 +90,7 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   rule();
   field('session', spawn.session);
   field('cwd', spawn.cwd);
-  field('config', spawn.configPath);
+  field('config', dry ? `would write ${spawn.configPath}` : spawn.configPath);
   field('uri', spawn.uri);
   console.log(`${I}${colors.dim}command${colors.reset}`);
   console.log(`${I}${spawn.command}`);

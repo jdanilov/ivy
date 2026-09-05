@@ -152,7 +152,8 @@ export async function injectHooks(hooks: HookConfig[], targetDir: string): Promi
   await Bun.write(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
-export async function removeHooks(hooks: HookConfig[], targetDir: string): Promise<void> {
+/** Returns how many hook entries were actually removed, so a caller reports only real changes. */
+export async function removeHooks(hooks: HookConfig[], targetDir: string): Promise<number> {
   const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
   let settings: Record<string, any>;
 
@@ -160,28 +161,35 @@ export async function removeHooks(hooks: HookConfig[], targetDir: string): Promi
     const content = await readFile(settingsPath, 'utf-8');
     settings = JSON.parse(content);
   } catch {
-    return;
+    return 0;
   }
 
-  if (!settings.hooks) return;
+  if (!settings.hooks) return 0;
+
+  let removed = 0;
 
   for (const hook of hooks) {
     const eventKey = hook.event;
     if (!Array.isArray(settings.hooks[eventKey])) continue;
 
+    const before = settings.hooks[eventKey].length;
     settings.hooks[eventKey] = (settings.hooks[eventKey] as HookEntry[])
       .filter((h) => !(h.matcher === hook.matcher && h.hooks?.some((hh) => hh.command === hook.command)));
+    removed += before - settings.hooks[eventKey].length;
 
     if (settings.hooks[eventKey].length === 0) {
       delete settings.hooks[eventKey];
     }
   }
 
+  if (removed === 0) return 0;
+
   if (Object.keys(settings.hooks).length === 0) {
     delete settings.hooks;
   }
 
   await Bun.write(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  return removed;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

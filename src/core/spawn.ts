@@ -33,7 +33,6 @@ export async function loadPreset(name: string): Promise<Preset> {
     dir,
     model: String(raw.model ?? 'fable'),
     effort: String(raw.effort ?? 'high'),
-    plugins: list(raw.plugins),
     mcp: list(raw.mcp),
     sendMessage: raw.sendMessage === true,
   };
@@ -57,7 +56,6 @@ export function assembleCommand(preset: Preset, mission: Mission, session: strin
     '--mcp-config', path.join(preset.dir, 'mcp.json'),
     '--strict-mcp-config',
   ];
-  for (const plugin of preset.plugins) args.push('--plugin-dir', path.join(FACTORY_ROOT, 'plugins', plugin));
 
   // Warp tab configs carry no env key, so the variable is inlined in the command.
   return `FACTORY_MISSION=${quote(mission.dir)} ${args.map(quote).join(' ')}`;

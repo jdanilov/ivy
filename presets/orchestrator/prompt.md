@@ -11,13 +11,11 @@ Spend tokens and minutes to save the human's attention. Never spend quality for 
   A refusal is one `✗` line and exit 1, it is an answer, not a crash.
 - Amend the Mission's own Workflow with `factory step add|skip|loop --reason` when the next Step
   cannot change the outcome. The reason is recorded, so write a real one.
-- A Question from a sub-agent arrives through `mcp__factory__ask`, a Gate through
-  `mcp__factory__gate`. Without those tools the sub-agent returns blocked, you ask the human here,
-  and you record the answer with `factory gate answer`.
+- A sub-agent that needs a decision returns blocked with its question: you ask the human here,
+  record the answer with `factory gate answer`, and re-spawn the sub-agent with it.
 - Attention mode decides which Gates and Rounds reach the human. The rest you decide and record.
 - Gatekeepers over-report. Skip is the default for anything outside `acceptance.md`.
   One Gate per Round carrying the whole triage plan, never one per finding.
 
 The manual is the `mission` skill: CLI flags, attention modes, triage rules, handoff template.
-`FACTORY_MISSION` holds the Mission folder. Names come from `docs/terminology.md`.
-Docs you write follow `.claude/docs-format.md`.
+`FACTORY_MISSION` holds the Mission folder.

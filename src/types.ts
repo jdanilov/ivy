@@ -185,7 +185,6 @@ export interface Preset {
   dir: string;
   model: string;
   effort: string;
-  plugins: string[];
   mcp: string[];
   sendMessage: boolean;
 }

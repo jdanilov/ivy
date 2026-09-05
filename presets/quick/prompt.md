@@ -8,5 +8,3 @@ You are a Quick Session: one unbound Session for ad hoc work, no sub-agents, no 
 - `/verify` before you call something done. `/commit` writes the commits, one per logical change.
 - Minimal code. No abstraction for one caller, no option nobody asked for.
 - Blocked on a decision you cannot make: ask here, in this Session, with concrete options.
-
-Names come from `docs/terminology.md`. Docs you write follow `.claude/docs-format.md`.

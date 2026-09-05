@@ -1,13 +1,40 @@
 import path from 'node:path';
 import { readlink } from 'node:fs/promises';
-import type { HookConfig, ManifestPart } from '../types.js';
+import type { HookConfig, ManifestPart, Part } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, FACTORY_ROOT } from '../core/registry.js';
-import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet } from '../core/linker.js';
+import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
 import { resolvePart, runInit, runUninit } from '../core/recipes.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
+
+/**
+ * The one sequence that puts a part in place: vars resolved (a changed ~/.factory/config.yaml
+ * re-points the project here), files linked, hooks, mcp and settings injected, snippet written,
+ * init run. The init error is returned, not thrown, because the caller still has a manifest to write.
+ */
+async function applyPart(
+  part: Part,
+  prev: ManifestPart | undefined,
+  targetDir: string,
+): Promise<{ next: ManifestPart; snippetAdded: boolean; failure: unknown }> {
+  const resolved = await resolvePart(part);
+  const next = await linkPart(resolved, targetDir, FACTORY_ROOT);
+  if (resolved.hooks) await injectHooks(resolved.hooks, targetDir);
+  if (resolved.mcp) await injectMcp(resolved.mcp, targetDir);
+  if (resolved.settings) await injectSettings(resolved.settings, targetDir);
+
+  let snippetAdded = false;
+  if (resolved.snippet) {
+    const { record, changed } = await writeSnippet(resolved.snippet, targetDir, prev?.snippet);
+    next.snippet = record;
+    snippetAdded = changed;
+  }
+
+  const failure = await runInit(resolved, prev, next, targetDir).then(() => null, (err: unknown) => err);
+  return { next, snippetAdded, failure };
+}
 
 /** Non-interactive refresh of an installed project: relink what stayed, unlink what the registry dropped. */
 export async function update(targetDir: string, skip: string[] = []): Promise<void> {
@@ -49,24 +76,15 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     const part = registry.get(name);
 
     if (part) {
-      // Re-resolved every run: a changed ~/.factory/config.yaml re-points the project here.
-      const resolved = await resolvePart(part);
       const links = () => Promise.all(part.files.map((f) => readlink(path.join(resolvedDir, f.target)).catch(() => '')));
       const before = await links();
-      const next = await linkPart(resolved, resolvedDir, FACTORY_ROOT);
-      if (resolved.hooks) await injectHooks(resolved.hooks, resolvedDir);
-      if (resolved.mcp) await injectMcp(resolved.mcp, resolvedDir);
-      if (resolved.settings) await injectSettings(resolved.settings, resolvedDir);
+      const { next, snippetAdded, failure: initFailed } = await applyPart(part, entry, resolvedDir);
+      if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
 
       // A var change rewrites the hook command, so the command we recorded last time has to go.
       const stale = (entry.hooks ?? []).filter((h) => !(next.hooks ?? []).some((n) => hookKey(n) === hookKey(h)));
       if (stale.length > 0) await removeHooks(stale, resolvedDir);
 
-      if (resolved.snippet) {
-        const { record, changed } = await writeSnippet(resolved.snippet, resolvedDir);
-        next.snippet = record;
-        if (changed) line(symbols.installed, colors.green, displayName(part), `${record.file} → line added`);
-      }
       if (entry.snippet && JSON.stringify(entry.snippet) !== JSON.stringify(next.snippet)) {
         if (await removeSnippet(entry.snippet, resolvedDir)) line('-', colors.yellow, displayName(part), `${entry.snippet.file} → line removed`);
       }
@@ -83,11 +101,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
         }
       }
 
-      try {
-        await runInit(resolved, entry, next, resolvedDir);
-      } catch (err) {
-        failure = err;
-      }
+      if (initFailed) failure = initFailed;
 
       if (JSON.stringify(entry) !== JSON.stringify(next) || String(before) !== String(await links())) {
         line(symbols.installed, colors.green, displayName(part), 'relinked');
@@ -139,26 +153,23 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
   for (const part of parts) {
     if (!part.default || manifest.parts[part.name] || skipped.has(part.name)) continue;
 
-    const resolved = await resolvePart(part);
-    const next = await linkPart(resolved, resolvedDir, FACTORY_ROOT);
-    if (resolved.hooks) await injectHooks(resolved.hooks, resolvedDir);
-    if (resolved.mcp) await injectMcp(resolved.mcp, resolvedDir);
-    if (resolved.settings) await injectSettings(resolved.settings, resolvedDir);
-    if (resolved.snippet) {
-      const { record, changed } = await writeSnippet(resolved.snippet, resolvedDir);
-      next.snippet = record;
-      if (changed) line(symbols.installed, colors.green, displayName(part), `${record.file} → line added`);
-    }
+    const { next, snippetAdded, failure: initFailed } = await applyPart(part, undefined, resolvedDir);
+    if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
     manifest.parts[part.name] = next;
 
     line(symbols.installed, colors.green, displayName(part), 'installed');
     installed++;
 
-    try {
-      await runInit(resolved, undefined, next, resolvedDir);
-    } catch (err) {
-      failure = err;
+    if (initFailed) {
+      failure = initFailed;
       break;
+    }
+  }
+
+  if (removed > 0) {
+    for (const file of await dropEmptied(resolvedDir)) {
+      line('-', colors.yellow, '', `${file} → removed, nothing left in it`);
+      removed++;
     }
   }
 

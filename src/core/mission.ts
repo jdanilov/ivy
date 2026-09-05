@@ -132,6 +132,25 @@ export async function clearClaim(main: string): Promise<void> {
   await unlink(claimPath(main)).catch(() => {});
 }
 
+/**
+ * The Factory writes the claim, so the project must ignore it: a tracked claim reads as dirty and
+ * blocks every close. The line is committed on the spot when `.gitignore` is otherwise clean, since
+ * the edit would itself be the dirt that blocks the close. Returns what happened, for one printed line.
+ */
+export async function ensureClaimIgnored(checkout: string): Promise<'added' | 'committed' | null> {
+  if (await gitOk(checkout, 'check-ignore', '-q', '.factory/claim')) return null;
+
+  const clean = (await git(checkout, 'status', '--porcelain', '--', '.gitignore')) === '';
+  const file = path.join(checkout, '.gitignore');
+  const current = await Bun.file(file).text().catch(() => '');
+  await Bun.write(file, `${current}${current === '' || current.endsWith('\n') ? '' : '\n'}.factory/claim\n`);
+  if (!clean) return 'added';
+
+  const done = await gitOk(checkout, 'add', '--', '.gitignore')
+    && await gitOk(checkout, 'commit', '-m', '🧹 chore: ignore .factory/claim', '--', '.gitignore');
+  return done ? 'committed' : 'added';
+}
+
 // ── sessions ─────────────────────────────────────────────────────────────────
 
 /** Live means the session's events file was touched inside the last ten minutes. */
@@ -345,7 +364,8 @@ export async function closeMission(cwd: string, mission: Mission): Promise<strin
       ...(await git(main, 'diff', '--name-only', 'HEAD')).split('\n'),
       ...(await git(main, 'ls-files', '--others', '--exclude-standard')).split('\n'),
     ].filter((f) => f !== '');
-    const outside = dirty.filter((f) => f !== rel && !f.startsWith(`${rel}/`));
+    // The claim is the Factory's own file: never a reason to refuse the close that clears it.
+    const outside = dirty.filter((f) => f !== rel && !f.startsWith(`${rel}/`) && f !== '.factory/claim');
     if (outside.length > 0) throw new Refusal(`dirty outside the mission folder, commit or stash first: ${outside.join(', ')}`);
 
     if (dirty.length > 0 && (await currentBranch(main)) === state.branch) {

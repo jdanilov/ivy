@@ -3,8 +3,8 @@ import * as p from '@clack/prompts';
 import type { Attention, Mission, MissionState } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import {
-  Refusal, closeMission, createMission, currentBranch, currentCheckout, git, listMissions,
-  listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, promoteMission,
+  Refusal, closeMission, createMission, currentBranch, currentCheckout, ensureClaimIgnored, git,
+  listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, promoteMission,
   readClaim, resolveMission, sessionLive, writeClaim, writeState,
 } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
@@ -64,6 +64,10 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
     stub,
   });
 
+  // A stub has no branch to commit on: `mission open` promotes it and takes care of the ignore then.
+  const workdir = created.state.worktree ?? (await currentCheckout(cwd));
+  const ignored = created.state.branch ? await ensureClaimIgnored(workdir) : null;
+
   console.log('');
   headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${created.state.name}${colors.reset}`, `${colors.dim}${created.state.workflow} · ${created.state.attention}${colors.reset}`);
   rule();
@@ -71,6 +75,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   field('branch', created.state.branch ?? `${colors.dim}stub — open it to branch${colors.reset}`);
   if (created.state.worktree) field('worktree', created.state.worktree);
   field('step', created.state.step);
+  if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log('');
 
   if (!stub && flags['no-open'] !== true) await open(created.state.name, flags, cwd);
@@ -79,7 +84,11 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
 /** Writes the Warp tab config and opens it. The session id reaches state.json first. */
 async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
-  if (m.state.status === 'stub') await promoteMission(cwd, m);
+  let ignored: 'added' | 'committed' | null = null;
+  if (m.state.status === 'stub') {
+    await promoteMission(cwd, m);
+    ignored = await ensureClaimIgnored(await currentCheckout(cwd));
+  }
   const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
   const dry = flags['dry-run'] === true;
   const spawn = await openSession(cwd, m, preset, dry);
@@ -96,6 +105,7 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   field('cwd', spawn.cwd);
   field('config', dry ? `would write ${spawn.configPath}` : spawn.configPath);
   field('uri', spawn.uri);
+  if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log(`${I}${colors.dim}command${colors.reset}`);
   console.log(`${I}${spawn.command}`);
   console.log('');

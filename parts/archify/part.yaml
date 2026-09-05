@@ -1,0 +1,7 @@
+# Vendored from github.com/tt-a1i/archify @ d8e4daf2610d512821365f41b139d874b29efe81 (archify/)
+type: skill
+description: architecture diagrams from a typed spec, html and svg (opus)
+default: false
+files:
+  - source: skill.md
+  - source: bin/archify.mjs

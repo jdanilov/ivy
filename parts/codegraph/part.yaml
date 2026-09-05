@@ -1,0 +1,23 @@
+type: mcp
+description: code graph MCP plus prompt hook, per project index (codegraph)
+default: false
+files:
+  - source: gate.sh
+    target: .claude/scripts/codegraph-gate.sh
+mcp:
+  serverName: codegraph
+  config:
+    command: "${codegraph}"
+    args: [serve, --mcp]
+hooks:
+  - event: UserPromptSubmit
+    command: CODEGRAPH="${codegraph}" $CLAUDE_PROJECT_DIR/.claude/scripts/codegraph-gate.sh
+settings:
+  permissions:
+    allow:
+      - "mcp__codegraph__*"
+recipes:
+  init: ["${codegraph} init"]
+  uninit: ["${codegraph} uninit --force"]
+vars:
+  codegraph: "npx -y @colbymchenry/codegraph@1.6.0"

@@ -5,3 +5,6 @@ files:
   - source: terminology.md
     target: docs/terminology.md
     skipIfExists: true
+snippet:
+  section: "## Important Files"
+  line: "- Terminology: @docs/terminology.md"

@@ -4,3 +4,6 @@ default: true
 files:
   - source: docs-format.md
     target: .claude/docs-format.md
+snippet:
+  section: "## Important Files"
+  line: "- Docs format: @.claude/docs-format.md"

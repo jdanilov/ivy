@@ -1,8 +1,13 @@
 # Factory — Portable Development Harness
 
-## Overview
+Factory is a CLI that installs a curated set of Claude Code skills, scripts and hooks into any
+project via symlinks, and runs missions across those projects. Install, update, uninstall, tracked
+in a manifest.
 
-Factory is a CLI that installs a curated set of Claude Code skills, scripts and hooks into any project via symlinks. Install, update, uninstall, tracked in a manifest. Names follow `docs/terminology.md`.
+## Important Files
+- Docs format: @.claude/docs-format.md
+- Terminology: @docs/terminology.md
+- Roadmap: @docs/roadmap.md
 
 ## Tech Stack
 
@@ -14,9 +19,9 @@ Factory is a CLI that installs a curated set of Claude Code skills, scripts and 
 
 ```
 src/           CLI source (entry: src/cli.ts)
-├── core/      Business logic — registry, scanner, manifest, linker, env, projects,
-│              args, workflow (YAML load + transitions), mission (folder, state, claim, branch),
-│              spawn (preset, Warp tab config, claude command)
+├── core/      Business logic — registry, scanner, manifest, linker, env, projects, config,
+│              recipes, args, workflow (YAML load + transitions), mission (folder, state,
+│              claim, branch), spawn (preset, Warp tab config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── commands/  install, uninstall, status, update, mission, step, gate, handoff
 └── types.ts   Shared type definitions
@@ -24,7 +29,6 @@ src/           CLI source (entry: src/cli.ts)
 parts/<name>/  One folder per part: part.yaml plus the files it installs
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
-plugins/factory/ function-hooks plugin: the ask and gate tools and the status line
 ~/.factory/    Home dir: projects list, config.yaml (var overrides), events/<session>.jsonl,
                caffeinate/<session>.pid
 ~/.warp/tab_configs/factory-<mission>.toml   written by `mission open`, opened by URI
@@ -32,9 +36,13 @@ plugins/factory/ function-hooks plugin: the ask and gate tools and the status li
 
 ### Key principle
 
-Files under `parts/<name>/` get **symlinked** into the target `.claude/`. Updating the Factory updates every connected project. A file marked `skipIfExists` is copied in as a template only when the project has nothing there.
+Files under `parts/<name>/` get **symlinked** into the target `.claude/`. Updating the Factory
+updates every connected project. A file marked `skipIfExists` is copied in as a template only when
+the project has nothing there.
 
-Roles ship as parts: `/mission` carries the Orchestrator's manual plus `Worker`, `Investigator` and `Summarizer`; `/verify` carries `Verifier`; `/validate` carries `Validator`. Every agent prompt points at `.claude/docs-format.md` and uses `docs/terminology.md` names. The `mission` skill stays under 120 lines, every other prompt under 80.
+Roles ship as parts: `/mission` carries the Orchestrator's manual plus `Worker`, `Investigator`
+and `Summarizer`; `/verify` carries `Verifier`; `/validate` carries `Validator`. The `mission`
+skill stays under 120 lines, `Worker` under 40, every other prompt under 80.
 
 ### part.yaml
 
@@ -59,13 +67,15 @@ snippet:             # optional, one line the part owns in the project's agent f
   line: "- Terminology: @docs/terminology.md"    # appended at the end of that section, deduped
   file: AGENTS.md    # optional, overrides AGENTS.md → CLAUDE.md → create AGENTS.md
 recipes:             # optional, shell lines run in the project root
-  init:   ["${codegraph} init"]           # once, when the part becomes installed
-  uninit: ["${codegraph} uninit --yes"]   # once, when it is uninstalled or dropped
+  init:   ["${codegraph} init"]             # once, when the part becomes installed
+  uninit: ["${codegraph} uninit --force"]   # once, when it is uninstalled or dropped
 vars:                # optional, defaults for ${name}
   codegraph: "npx -y @colbymchenry/codegraph@1.6.0"
 ```
 
-Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else → `.claude/skills/<name>/X`. Fixtures and mcp parts give each file an explicit `target`, which may sit outside `.claude`.
+Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else →
+`.claude/skills/<name>/X`. Fixtures and mcp parts give each file an explicit `target`, which may
+sit outside `.claude`.
 
 `${name}` is substituted in `mcp.config.command`, `mcp.config.args`, `hooks[].command` and both recipe
 lists: `~/.factory/config.yaml` `vars.<name>` wins over the part's `vars.<name>`, and nothing defining
@@ -80,30 +90,14 @@ absent and refuses on a non-zero exit with the part left linked, so a fix plus `
 runs on uninstall and when `update` drops a part the registry no longer has; a failure prints `◈` and the
 unlink continues.
 
-### Part types
-
-| Type    | Display  | Description                           |
-|---------|----------|---------------------------------------|
-| skill   | `/name`  | Single skill.md with model directive  |
-| tool    | `/name`  | Skill + supporting scripts/runtime    |
-| fixture | `name`   | Scripts/hooks/assets, no slash prefix |
-| mcp     | `name`   | MCP server entry in .mcp.json         |
-
-### Installation flow
-
-1. Validate target is a git repo
-2. Scan `.claude/` for existing parts (manifest + file hashes)
-3. Show status matrix, present multiselect
-4. Create symlinks, inject hooks into settings.local.json, settings into settings.json, MCP into .mcp.json
-5. Write `.claude/.factory-manifest.json` with SHA-256 hashes (an old `.ivy-manifest.json` is read once, then replaced)
-6. Check env vars (process.env + target's .env file)
-
-`update <project>` is the non-interactive version: relink installed parts, install parts the registry added as `default`, unlink parts and files the registry dropped, rewrite hooks, settings and manifest. It only ever removes a symlink pointing into the Factory.
-
 ### Two command families
 
 `install | uninstall | status | update [project] [--skip a,b]` act on a project and fall back to the
 picker. `--skip` records the part in the manifest, so the project keeps its own copy for good.
+`update` is the non-interactive install: relink, add parts the registry marks `default`, drop parts
+and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever removes a
+symlink pointing into the Factory.
+
 `mission | step | gate | handoff <sub>` act on the checkout you are standing in, never prompt
 (the one exception is the worktree offer in `mission new` on a claimed checkout) and exit 1 with a
 one-line `✗ …` on a refusal.

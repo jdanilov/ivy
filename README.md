@@ -57,16 +57,19 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `/mission`       | skill   | fable  | Orchestrator's manual: workflow, steps, gates, triage, close  |
 | `/verify`        | skill   | sonnet | Verifier over the diff, the `verify` recipe and the contract  |
 | `/validate`      | skill   | opus   | Validator drives the running system, evidence per assertion   |
-| `/critic`        | skill   | sonnet | Verifier over the uncommitted diff, no contract               |
+| `/retro`         | skill   | opus   | Sweeps closed missions' `retro.md`, one actionable item at a time |
 | `/commit`        | skill   | sonnet | Structured git commits                                        |
 | `/explain`       | skill   | sonnet | Explains and visualizes system flows                          |
 | `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`        |
 | `/browse`        | tool    | sonnet | Drives a real or headless browser through `agent-browser`     |
+| `/archify`       | skill   | opus   | Architecture diagrams from a typed spec, html and svg (opt-in) |
 | `docs-format`    | fixture | —      | How agent-facing docs are written, referenced by every agent  |
 | `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
+| `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
 | `permissions`    | fixture | —      | Baseline tool allow list merged into `.claude/settings.json`  |
 | `hook-factory`   | fixture | —      | Reports session events to `~/.factory/events`                 |
 | `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                              |
+| `codegraph`      | mcp     | —      | Code graph MCP plus prompt hook, per project index (opt-in)   |
 
 Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summarizer` with
 `/mission`, `Verifier` with `/verify`, `Validator` with `/validate`, `Commit` with `/commit`.
@@ -78,13 +81,28 @@ Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summar
 | **fixture** | —      | Project configuration: hooks, scripts, assets                     |
 | **mcp**     | —      | MCP server entry injected into `.mcp.json`                        |
 
+## Snippets and vars
+
+A part may own one line in the project's `AGENTS.md` (`CLAUDE.md` when that is the only agent file):
+`snippet: { section, line }` appends it under the named heading on install and takes it back out on
+uninstall, so `terminology`, `roadmap` and `docs-format` reach every agent through one `@path` list
+instead of a sentence in every prompt. A part may also declare `recipes.init` and `recipes.uninit`,
+shell lines run once in the project root when the part arrives and leaves, and `vars` defaults for
+`${name}` used in its hooks, MCP command and recipes. `~/.factory/config.yaml` overrides a var for
+the whole machine:
+
+```yaml
+vars:
+  codegraph: codegraph      # a local build on PATH instead of the pinned npx default
+```
+
 ## Adding a part
 
-1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`, `mcp`, `settings`, `envVars`).
+1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`, `mcp`, `settings`, `envVars`, `snippet`, `recipes`, `vars`).
 2. Put the files it installs beside it — `skill.md`, `agents/<Agent>.md`, `scripts/…`.
 3. Run `bun src/cli.ts install <project>`.
 
-See `CLAUDE.md` for the target rules and `docs/terminology.md` for the names.
+See `AGENTS.md` for the target rules and `docs/terminology.md` for the names.
 
 ## Environment variables
 

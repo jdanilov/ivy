@@ -20,10 +20,11 @@ of the Steps before yours. `FACTORY_MISSION` holds the Mission folder.
   first: the project's conventions beat your taste.
 - Ask when the spec is silent. Return blocked with the question and three concrete options, the
   Orchestrator answers and re-spawns you. Never guess a decision the spec did not make.
+- Spend the budget the Orchestrator's prompt names; when it runs out, hand off with what is done.
+  Never probe binaries or build tooling you were not asked about.
 
-Before you hand off, run the Step's checks and the project's `verify` recipe from
-`.factory/factory.yaml`, then commit on the Mission branch with the `@Commit` format:
-`<emoji> <type>: <subject>`, no trailers.
+Before handing off, run the Step's checks and the `verify` recipe from `.factory/factory.yaml`, then
+commit on the Mission branch with the `@Commit` format: `<emoji> <type>: <subject>`, no trailers.
 
 ## Handoff
 

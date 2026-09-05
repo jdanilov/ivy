@@ -1,10 +1,10 @@
 {
   "workflow": "story",
-  "step": "accept",
+  "step": "implement",
   "created": "2026-09-03",
   "title": "AI Factory v1: missions, workflows, parts refresh, Mission Control",
   "attention": "light",
-  "round": 0,
+  "round": 1,
   "branch": "mission/ai-factory",
   "gates": {
     "intent": {
@@ -24,6 +24,12 @@
       "answer": "fallback",
       "note": "A-HOOK-1 pass (plugin loads, listed). A-HOOK-2 fail: hooks module not loaded, rollout flag tengu_plugin_hooks_modules off, no local override. A-HOOK-3 unchecked.",
       "at": "2026-09-05"
+    },
+    "accept-r1": {
+      "status": "answered",
+      "answer": "accept",
+      "note": "orchestrator triage under light attention, 7 fix 2 skip, see findings.md",
+      "at": "2026-09-05"
     }
   },
   "steps": {
@@ -38,13 +44,14 @@
       "endedAt": "2026-09-05"
     },
     "implement": {
+      "status": "running",
+      "startedAt": "2026-09-05",
+      "reason": "round 1 fixes"
+    },
+    "accept": {
       "status": "done",
       "startedAt": "2026-09-05",
       "endedAt": "2026-09-05"
-    },
-    "accept": {
-      "status": "running",
-      "startedAt": "2026-09-05"
     }
   },
   "deviations": [
@@ -52,6 +59,11 @@
       "at": "2026-09-05",
       "what": "orchestrator wrote spec before the recovery pass",
       "reason": "recovery pass runs in parallel with W1, W2 reads it"
+    },
+    {
+      "at": "2026-09-05",
+      "what": "round 2 runs Verifier only, validate skipped",
+      "reason": "one CLI behaviour change, Verifier checks it with a live run"
     }
   ]
 }

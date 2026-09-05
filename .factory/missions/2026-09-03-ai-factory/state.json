@@ -3,7 +3,7 @@
   "title": "AI Factory v1: missions, workflows, parts refresh, Mission Control",
   "workflow": "story",
   "attention": "light",
-  "status": "open",
+  "status": "closed",
   "step": "merge",
   "round": 1,
   "session": null,
@@ -94,5 +94,5 @@
     }
   ],
   "created": "2026-09-03",
-  "updated": "2026-09-05T10:14:46.704Z"
+  "updated": "2026-09-05T10:15:20.350Z"
 }

@@ -1,6 +1,6 @@
 {
   "workflow": "story",
-  "step": "accept",
+  "step": "condense",
   "created": "2026-09-03",
   "title": "AI Factory v1: missions, workflows, parts refresh, Mission Control",
   "attention": "light",
@@ -30,6 +30,12 @@
       "answer": "accept",
       "note": "orchestrator triage under light attention, 7 fix 2 skip, see findings.md",
       "at": "2026-09-05"
+    },
+    "accept-r2": {
+      "status": "answered",
+      "answer": "accept",
+      "note": "Verifier clean, nothing to triage",
+      "at": "2026-09-05"
     }
   },
   "steps": {
@@ -50,9 +56,14 @@
       "endedAt": "2026-09-05"
     },
     "accept": {
-      "status": "running",
+      "status": "done",
       "startedAt": "2026-09-05",
-      "round": 2
+      "round": 2,
+      "endedAt": "2026-09-05"
+    },
+    "condense": {
+      "status": "running",
+      "startedAt": "2026-09-05"
     }
   },
   "deviations": [

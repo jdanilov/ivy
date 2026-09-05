@@ -124,3 +124,26 @@ about a second each. Ship `scripts/fixture-repo.sh <dir>` that makes a temp git 
 commit, a stale `.factory-manifest.json` naming a retired part, and a fake `HOME`, then walks the
 story workflow to any named step. It would have caught finding 1 on the first run, because a scripted
 walk asserts the step status before every `done` and the current code never does.
+
+## Round 2 Verifier
+
+tsc: `bun x tsc --noEmit` -> exit 0. Live runs in /tmp temp repos, HOME=/tmp/verify2-home, both cleaned up.
+
+### Findings
+
+| # | item | file:line | finding | blast | effort | confidence | fix |
+|---|------|-----------|---------|-------|--------|------------|-----|
+| 1 | 1 | src/commands/step.ts:74-76 | done on a never-started gated step now says "pending, not running" instead of the gate message; acceptable, start is a hard precondition for every step and the gate message still fires once running, confirmed live | narrow | - | high | none |
+| 2 | - | src/commands/step.ts | clean: start/done refusals are one line, exit 1, cover running/done/skipped source states plus wrong-current-step; no dead code, no unused params left from the old deviate-based paths | - | - | high | none |
+
+### Items (triage 1 to 7)
+
+| triage | pass/fail | evidence |
+|--------|-----------|----------|
+| 1 | pass | live story walk: done-on-pending exits 1 one line, start-on-non-current exits 1 one line, restart-on-done refused, restart-on-running idempotent exit 0, skip-then-start refused, add-then-start-out-of-order refused, loop back then start implement then step start implement r1 all correct |
+| 2 | pass | legacy `.ivy-manifest.json` with `{"parts":{}}` renamed to `.factory-manifest.json` on both `update` and `status` (read path), old file gone |
+| 3 | pass | package.json has no `zod`; `ai`/`@ai-sdk/xai` still resolve it as a peer in bun.lock; tsc and bun install clean |
+| 4 | pass | parts/browse/part.yaml `default: false` |
+| 5 | pass | registry reads every `parts/*/part.yaml` dynamically, no hardcoded count in src; acceptance.md wording no longer pins a number |
+| 6 | pass | `mission open --dry-run` prints `would write <path>`, no file appears under `.warp/tab_configs` after the run |
+| 7 | pass | hook removal line printed only when a matching hook was actually deleted from settings.local.json (case A: no match, no line, exit 0; case B: match, line printed, entry gone, other hooks untouched) |

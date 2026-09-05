@@ -6,3 +6,4 @@ dist
 .claude
 .idea
 .factory/claim
+.factory/inbox/

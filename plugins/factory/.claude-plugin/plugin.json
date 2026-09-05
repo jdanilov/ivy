@@ -1,0 +1,8 @@
+{
+  "name": "factory",
+  "version": "0.1.0",
+  "description": "AI Factory: ask and gate tools backed by AskUserQuestion, plus a mission status line row.",
+  "author": {
+    "name": "jdanilov"
+  }
+}

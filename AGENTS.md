@@ -141,6 +141,10 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission open` writes the session id to `state.json` before the tab exists, so the first hook
   event the new session emits already finds a mission bound to it.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
+- A `SubagentStop` handoff lands in `handoffs/<step>[-<agent>][-r<round>].md`: a message under five
+  lines is not saved, and a longer file is never traded for a shorter one, that gets a `-2` sibling.
+- A claimed mission whose `state.json` has `session: null` adopts the first session to send a
+  `SessionStart` or `UserPromptSubmit`; a session already recorded is never overwritten.
 - `mission new` and the promotion in `mission open` add `.factory/claim` to the project `.gitignore`
   when nothing ignores it yet, committing that line when the file is otherwise clean, and `mission
   close` never counts the claim as dirt: the Factory's own file cannot block the Factory.

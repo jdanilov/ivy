@@ -32,7 +32,7 @@ plugins/factory/                 untouched, unreferenced
 
 ## Train
 
-Serial. Each step names the acceptance ids it owns.
+Serial. Each step names the acceptance ids it owns. W3 and W4 run in one Worker: same nature, no verification needed between them. W5 gets its own Worker because it touches another repo after the Orchestrator has checked W3 and W4.
 
 ### W1 Parts engine: snippet, recipes, vars
 
@@ -132,6 +132,7 @@ Files: `parts/mission/{skill.md,agents/Worker.md,agents/Investigator.md,agents/S
   - End: `@Commit` for the retro and roadmap changes, then a three-line summary: applied, stubbed, roadmapped counts.
   - Refuse to run with a dirty working tree outside `.factory/`, say why.
 - `AGENTS.md` roles paragraph names `/retro` beside `/verify` and `/validate`.
+- Mission skill.md keeps the Sub-agents packing paragraph (added by the Orchestrator mid-mission) and ends under 120 lines: the Questions and gates cut and the two context sentences pay for it.
 
 Checks: `wc -l` every prompt within limits (mission 120, Worker 40, retro 60, others 80). The greps above return nothing. `bun x tsc --noEmit`. `bun src/cli.ts mission open refit --dry-run` prints a command without `--plugin-dir`.
 

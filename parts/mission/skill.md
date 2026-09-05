@@ -48,8 +48,17 @@ factory handoff save <step>              # reads the handoff from stdin
 
 ## Sub-agents
 
-One Worker at a time, clean context. Give each one the step, `spec.md`, `acceptance.md` and the
-files it may touch. Never let a sub-agent pick its own scope.
+Workers run serially with clean context. Give each one its steps, `spec.md`, `acceptance.md` and
+the files it may touch. Never let a sub-agent pick its own scope.
+
+Pack steps into one Worker. A spawn costs the context it rereads, so small serial tasks across many
+Workers are waste. Estimate up front: a step touching under ten files with its checks is ~100k tokens,
+a Worker holds ~300k of useful work. Start a new Worker only when one of these holds:
+
+- you must verify the work before the next step can start
+- the packed steps would exceed ~300k tokens
+- the next step is of a different nature or module: research after code, another repo, a rewrite of
+  what the previous step built
 
 | Role         | Agent          | Runs                                              |
 |--------------|----------------|---------------------------------------------------|

@@ -1,11 +1,12 @@
 import path from 'node:path';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
-import { unlinkPart, removeHooks, removeMcp, removeSettings } from '../core/linker.js';
+import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet } from '../core/linker.js';
+import { runUninit } from '../core/recipes.js';
 import { FACTORY_ROOT } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
-import { printPartResult } from '../ui/format.js';
+import { printPartResult, printSnippetInfo } from '../ui/format.js';
 
 export async function uninstall(targetDir: string): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
@@ -99,24 +100,23 @@ export async function uninstall(targetDir: string): Promise<void> {
     const ps = installedStates.find((s) => s.part.name === name)!;
     const part = ps.part;
 
+    // The manifest holds what the install actually wrote, vars resolved; the part.yaml may have moved on.
     const entry = manifest.parts[name];
-    if (entry) await unlinkPart(entry, resolvedDir, FACTORY_ROOT);
-
-    if (part.hooks) {
-      await removeHooks(part.hooks, resolvedDir);
-    }
-
-    if (part.mcp) {
-      await removeMcp(part.mcp.serverName, resolvedDir);
-    }
-
-    if (part.settings) {
-      await removeSettings(part.settings, resolvedDir);
+    if (entry) {
+      await runUninit(name, entry.uninit, resolvedDir);
+      await unlinkPart(entry, resolvedDir, FACTORY_ROOT);
+      if (entry.hooks) await removeHooks(entry.hooks, resolvedDir);
+      if (entry.mcp) await removeMcp(entry.mcp.serverName, resolvedDir);
+      if (entry.settings) await removeSettings(entry.settings, resolvedDir);
     }
 
     delete manifest.parts[name];
 
     printPartResult(part, { verb: 'removed' });
+
+    if (entry?.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
+      printSnippetInfo(entry.snippet.file, 'removed');
+    }
   }
 
   // Write or delete manifest

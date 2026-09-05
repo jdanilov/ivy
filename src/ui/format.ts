@@ -69,6 +69,11 @@ export function printHookInfo(): void {
   console.log(`${pad()}.claude/settings.local.json → hook added`);
 }
 
+/** One line under the part result for the agent-file line a snippet added or removed. */
+export function printSnippetInfo(file: string, action: 'added' | 'removed'): void {
+  console.log(`${pad()}${file} \u2192 line ${action}`);
+}
+
 /**
  * Format environment variable warnings for display.
  */

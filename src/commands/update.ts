@@ -3,7 +3,8 @@ import { readlink } from 'node:fs/promises';
 import type { HookConfig, ManifestPart } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, FACTORY_ROOT } from '../core/registry.js';
-import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings } from '../core/linker.js';
+import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet } from '../core/linker.js';
+import { resolvePart, runInit, runUninit } from '../core/recipes.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
@@ -40,18 +41,36 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
   let relinked = 0;
   let removed = 0;
   let installed = 0;
+  // A failing init stops the run with everything written so far kept, so a rerun picks up where it broke.
+  let failure: unknown = null;
 
   for (const [name, entry] of Object.entries(manifest.parts)) {
     if (skipped.has(name)) continue;
     const part = registry.get(name);
 
     if (part) {
+      // Re-resolved every run: a changed ~/.factory/config.yaml re-points the project here.
+      const resolved = await resolvePart(part);
       const links = () => Promise.all(part.files.map((f) => readlink(path.join(resolvedDir, f.target)).catch(() => '')));
       const before = await links();
-      const next = await linkPart(part, resolvedDir, FACTORY_ROOT);
-      if (part.hooks) await injectHooks(part.hooks, resolvedDir);
-      if (part.mcp) await injectMcp(part.mcp, resolvedDir);
-      if (part.settings) await injectSettings(part.settings, resolvedDir);
+      const next = await linkPart(resolved, resolvedDir, FACTORY_ROOT);
+      if (resolved.hooks) await injectHooks(resolved.hooks, resolvedDir);
+      if (resolved.mcp) await injectMcp(resolved.mcp, resolvedDir);
+      if (resolved.settings) await injectSettings(resolved.settings, resolvedDir);
+
+      // A var change rewrites the hook command, so the command we recorded last time has to go.
+      const stale = (entry.hooks ?? []).filter((h) => !(next.hooks ?? []).some((n) => hookKey(n) === hookKey(h)));
+      if (stale.length > 0) await removeHooks(stale, resolvedDir);
+
+      if (resolved.snippet) {
+        const { record, changed } = await writeSnippet(resolved.snippet, resolvedDir);
+        next.snippet = record;
+        if (changed) line(symbols.installed, colors.green, displayName(part), `${record.file} → line added`);
+      }
+      if (entry.snippet && JSON.stringify(entry.snippet) !== JSON.stringify(next.snippet)) {
+        if (await removeSnippet(entry.snippet, resolvedDir)) line('-', colors.yellow, displayName(part), `${entry.snippet.file} → line removed`);
+      }
+
       manifest.parts[name] = next;
 
       // A file the part stopped shipping leaves a dangling symlink behind unless someone else owns it.
@@ -64,12 +83,21 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
         }
       }
 
+      try {
+        await runInit(resolved, entry, next, resolvedDir);
+      } catch (err) {
+        failure = err;
+      }
+
       if (JSON.stringify(entry) !== JSON.stringify(next) || String(before) !== String(await links())) {
         line(symbols.installed, colors.green, displayName(part), 'relinked');
         relinked++;
       }
+      if (failure) break;
       continue;
     }
+
+    await runUninit(name, entry.uninit, resolvedDir);
 
     const orphan: ManifestPart = { ...entry, files: entry.files.filter((f) => !liveFiles.has(f)) };
     const result = await unlinkPart(orphan, resolvedDir, FACTORY_ROOT);
@@ -97,6 +125,11 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       removed++;
     }
 
+    if (entry.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
+      line('-', colors.yellow, name, `${entry.snippet.file} → line removed`);
+      removed++;
+    }
+
     // Stop tracking the part either way: what the Factory will not remove it will not manage.
     delete manifest.parts[name];
     if (result.left.length > 0) line('!', colors.dim, name, `left in place: ${result.left.join(', ')}`);
@@ -106,13 +139,27 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
   for (const part of parts) {
     if (!part.default || manifest.parts[part.name] || skipped.has(part.name)) continue;
 
-    manifest.parts[part.name] = await linkPart(part, resolvedDir, FACTORY_ROOT);
-    if (part.hooks) await injectHooks(part.hooks, resolvedDir);
-    if (part.mcp) await injectMcp(part.mcp, resolvedDir);
-    if (part.settings) await injectSettings(part.settings, resolvedDir);
+    const resolved = await resolvePart(part);
+    const next = await linkPart(resolved, resolvedDir, FACTORY_ROOT);
+    if (resolved.hooks) await injectHooks(resolved.hooks, resolvedDir);
+    if (resolved.mcp) await injectMcp(resolved.mcp, resolvedDir);
+    if (resolved.settings) await injectSettings(resolved.settings, resolvedDir);
+    if (resolved.snippet) {
+      const { record, changed } = await writeSnippet(resolved.snippet, resolvedDir);
+      next.snippet = record;
+      if (changed) line(symbols.installed, colors.green, displayName(part), `${record.file} → line added`);
+    }
+    manifest.parts[part.name] = next;
 
     line(symbols.installed, colors.green, displayName(part), 'installed');
     installed++;
+
+    try {
+      await runInit(resolved, undefined, next, resolvedDir);
+    } catch (err) {
+      failure = err;
+      break;
+    }
   }
 
   if (Object.keys(manifest.parts).length === 0) {
@@ -123,6 +170,8 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     if (skipped.size > 0) manifest.skipped = [...skipped];
     await writeManifest(resolvedDir, manifest);
   }
+
+  if (failure) throw failure;
 
   console.log('');
   if (relinked === 0 && removed === 0 && installed === 0) {

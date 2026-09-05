@@ -25,7 +25,8 @@ parts/<name>/  One folder per part: part.yaml plus the files it installs
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
 plugins/factory/ function-hooks plugin: the ask and gate tools and the status line
-~/.factory/    Home dir: projects list, events/<session>.jsonl, caffeinate/<session>.pid
+~/.factory/    Home dir: projects list, config.yaml (var overrides), events/<session>.jsonl,
+               caffeinate/<session>.pid
 ~/.warp/tab_configs/factory-<mission>.toml   written by `mission open`, opened by URI
 ```
 
@@ -53,9 +54,31 @@ settings:            # optional, merged into .claude/settings.json: lists union,
   permissions: { allow: [...] }
 mcp:                 # optional, written to .mcp.json
 envVars:             # optional, checked against process.env and the project .env
+snippet:             # optional, one line the part owns in the project's agent file
+  section: "## Important Files"                  # an ATX heading, created at EOF when missing
+  line: "- Terminology: @docs/terminology.md"    # appended at the end of that section, deduped
+  file: AGENTS.md    # optional, overrides AGENTS.md → CLAUDE.md → create AGENTS.md
+recipes:             # optional, shell lines run in the project root
+  init:   ["${codegraph} init"]           # once, when the part becomes installed
+  uninit: ["${codegraph} uninit --yes"]   # once, when it is uninstalled or dropped
+vars:                # optional, defaults for ${name}
+  codegraph: "npx -y @colbymchenry/codegraph@1.6.0"
 ```
 
 Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else → `.claude/skills/<name>/X`. Fixtures and mcp parts give each file an explicit `target`, which may sit outside `.claude`.
+
+`${name}` is substituted in `mcp.config.command`, `mcp.config.args`, `hooks[].command` and both recipe
+lists: `~/.factory/config.yaml` `vars.<name>` wins over the part's `vars.<name>`, and nothing defining
+it is a refusal. A value may carry arguments; in `mcp.config.command` the first word is the command and
+the rest leads the args. Substitution happens as the manifest entry is built, so the manifest, `.mcp.json`
+and the hooks hold resolved strings and `update` re-points a project after a config edit.
+
+The manifest records each part's `snippet: { file, section, line }` and, after `recipes.init` succeeded,
+`initAt`. Uninstall works from those records, not from a fresh resolution: it removes the recorded line
+from the recorded file and drops the section when only blank lines are left. `init` runs when `initAt` is
+absent and refuses on a non-zero exit with the part left linked, so a fix plus `update` retries. `uninit`
+runs on uninstall and when `update` drops a part the registry no longer has; a failure prints `◈` and the
+unlink continues.
 
 ### Part types
 

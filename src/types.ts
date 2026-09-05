@@ -34,6 +34,20 @@ export interface McpConfig {
   };
 }
 
+/** A line a part owns in the project's agent file, added on install and taken back on uninstall. */
+export interface Snippet {
+  /** Overrides the AGENTS.md / CLAUDE.md resolution. */
+  file?: string;
+  section: string;   // an ATX heading line, e.g. "## Important Files"
+  line: string;
+}
+
+/** Shell lines run once in the project root: init when the part lands, uninit when it goes. */
+export interface Recipes {
+  init?: string[];
+  uninit?: string[];
+}
+
 export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 
 /** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
@@ -49,6 +63,10 @@ export interface Part {
   hooks?: HookConfig[];
   mcp?: McpConfig;
   settings?: Settings;
+  snippet?: Snippet;
+  recipes?: Recipes;
+  /** Defaults for `${name}` in hooks, mcp and recipes. `~/.factory/config.yaml` wins. */
+  vars?: Record<string, string>;
 }
 
 export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict' | 'skipped';
@@ -75,6 +93,12 @@ export interface ManifestPart {
   hooks?: HookConfig[];
   mcp?: { serverName: string; config: object };
   settings?: Settings;
+  /** Resolved at install time: uninstall removes this line from this file, no fresh guess. */
+  snippet?: Required<Snippet>;
+  /** Resolved uninit lines, kept here so a part the registry dropped can still clean up. */
+  uninit?: string[];
+  /** Set once `recipes.init` succeeded. Its absence is what makes `update` run init. */
+  initAt?: string;
 }
 
 export interface EnvWarning {

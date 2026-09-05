@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdir, symlink, unlink, readdir, readlink, rmdir, readFile, lstat } from 'node:fs/promises';
-import type { Part, HookConfig, McpConfig, ManifestPart, Settings } from '../types.js';
+import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet } from '../types.js';
 import { hashFile } from './scanner.js';
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
@@ -61,7 +61,97 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
     entry.settings = part.settings;
   }
 
+  // Kept resolved in the manifest so the part can still be uninstalled after the registry drops it.
+  if (part.recipes?.uninit) {
+    entry.uninit = part.recipes.uninit;
+  }
+
   return entry;
+}
+
+// ── Snippets ─────────────────────────────────────────────────────────────────
+
+const AGENT_FILES = ['AGENTS.md', 'CLAUDE.md'];
+
+/** AGENTS.md when it exists, else CLAUDE.md when it exists, else AGENTS.md is the one we create. */
+async function agentFile(targetDir: string): Promise<string> {
+  for (const name of AGENT_FILES) {
+    if (await lstat(path.join(targetDir, name)).catch(() => null)) return name;
+  }
+  return AGENT_FILES[0]!;
+}
+
+const readLines = async (filePath: string): Promise<string[]> => {
+  const raw = await readFile(filePath, 'utf-8').catch(() => '');
+  return raw === '' ? [] : raw.replace(/\n$/, '').split('\n');
+};
+
+const writeLines = (filePath: string, lines: string[]): Promise<number> =>
+  Bun.write(filePath, lines.length === 0 ? '' : lines.join('\n') + '\n');
+
+/** Where the section ends: the next heading of the same or higher level, or EOF. */
+function sectionEnd(lines: string[], at: number): number {
+  const level = /^#+/.exec(lines[at]!)![0].length;
+  for (let i = at + 1; i < lines.length; i++) {
+    const heading = /^(#+)\s/.exec(lines[i]!);
+    if (heading && heading[1]!.length <= level) return i;
+  }
+  return lines.length;
+}
+
+/**
+ * Adds the part's line under its section, creating the section at the end of the file when it is
+ * missing. Idempotent: the exact line anywhere in the section is enough. Returns what to record.
+ */
+export async function writeSnippet(
+  snippet: Snippet,
+  targetDir: string,
+): Promise<{ record: Required<Snippet>; changed: boolean }> {
+  const file = snippet.file ?? (await agentFile(targetDir));
+  const record = { file, section: snippet.section, line: snippet.line };
+  const filePath = path.join(targetDir, file);
+  const lines = await readLines(filePath);
+
+  let at = lines.findIndex((l) => l.trimEnd() === snippet.section);
+  if (at === -1) {
+    if (lines.length > 0) lines.push('');
+    at = lines.push(snippet.section) - 1;
+  }
+
+  const end = sectionEnd(lines, at);
+  if (lines.slice(at + 1, end).some((l) => l === snippet.line)) return { record, changed: false };
+
+  let insert = end;
+  while (insert > at + 1 && lines[insert - 1]!.trim() === '') insert--;
+  lines.splice(insert, 0, snippet.line);
+
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeLines(filePath, lines);
+  return { record, changed: true };
+}
+
+/**
+ * Takes the recorded line back out of the recorded file. A section left with nothing but blank
+ * lines goes too, together with the blank the install put in front of it. Nothing else is touched.
+ */
+export async function removeSnippet(record: Required<Snippet>, targetDir: string): Promise<boolean> {
+  const filePath = path.join(targetDir, record.file);
+  const lines = await readLines(filePath);
+
+  const at = lines.findIndex((l) => l.trimEnd() === record.section);
+  if (at === -1) return false;
+
+  const end = sectionEnd(lines, at);
+  const body = lines.slice(at + 1, end).filter((l) => l !== record.line);
+  if (body.length === end - at - 1) return false;
+
+  // An emptied section that ran to EOF was appended by an install: its leading blank goes with it.
+  const empty = body.every((l) => l.trim() === '');
+  const from = empty && end === lines.length && at > 0 && lines[at - 1] === '' ? at - 1 : at;
+  lines.splice(from, end - from, ...(empty ? [] : [lines[at]!, ...body]));
+
+  await writeLines(filePath, lines);
+  return true;
 }
 
 /** A target we may remove: a symlink into the Factory. Dangling counts, a dropped part leaves those. */

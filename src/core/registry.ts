@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
-import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType } from '../types.js';
+import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType, Recipes, Snippet } from '../types.js';
 import { HOOK_EVENTS } from '../types.js';
 
 // Resolve FACTORY_ROOT from this file's location: src/core/ -> project root
@@ -75,6 +75,33 @@ function parsePart(name: string, raw: unknown): Part {
   if (raw.settings !== undefined) {
     if (!isRecord(raw.settings)) fail('settings must be a mapping');
     part.settings = raw.settings;
+  }
+
+  if (raw.snippet !== undefined) {
+    const snippet = raw.snippet;
+    if (!isRecord(snippet)) fail('snippet must be a mapping');
+    const { file, section, line } = snippet as Record<string, unknown>;
+    if (typeof section !== 'string' || !section.startsWith('#')) fail('snippet.section must be a heading line starting with #');
+    if (typeof line !== 'string' || line.includes('\n')) fail('snippet.line must be a single line');
+    if (file !== undefined && typeof file !== 'string') fail('snippet.file must be a string');
+    part.snippet = { ...(file === undefined ? {} : { file: file as string }), section, line } as Snippet;
+  }
+
+  if (raw.recipes !== undefined) {
+    if (!isRecord(raw.recipes)) fail('recipes must be a mapping');
+    const recipes: Recipes = {};
+    for (const key of ['init', 'uninit'] as const) {
+      const list = raw.recipes[key];
+      if (list === undefined) continue;
+      if (!Array.isArray(list) || list.some((l) => typeof l !== 'string')) fail(`recipes.${key} must be a list of strings`);
+      recipes[key] = list as string[];
+    }
+    part.recipes = recipes;
+  }
+
+  if (raw.vars !== undefined) {
+    if (!isRecord(raw.vars) || Object.values(raw.vars).some((v) => typeof v !== 'string')) fail('vars must be a mapping of strings');
+    part.vars = raw.vars as Record<string, string>;
   }
 
   if (raw.envVars !== undefined) {

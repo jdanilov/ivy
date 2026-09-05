@@ -2,12 +2,13 @@ import path from 'node:path';
 import { access } from 'node:fs/promises';
 import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
-import { linkPart, injectHooks, injectMcp, injectSettings } from '../core/linker.js';
+import { linkPart, injectHooks, injectMcp, injectSettings, writeSnippet } from '../core/linker.js';
+import { resolvePart, runInit } from '../core/recipes.js';
 import { FACTORY_ROOT } from '../core/registry.js';
 import { checkEnvVars } from '../core/env.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
-import { printPartResult, printHookInfo, formatEnvWarnings } from '../ui/format.js';
+import { printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
 
 export async function install(targetDir: string): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
@@ -116,11 +117,14 @@ export async function install(targetDir: string): Promise<void> {
 
   let newCount = 0;
   let updateCount = 0;
+  // An init recipe that fails leaves the part linked and the manifest written, so `update` retries it.
+  let failure: unknown = null;
 
   for (const name of filteredNames) {
     const ps = states.find((s) => s.part.name === name)!;
-    const part = ps.part;
+    const part = await resolvePart(ps.part);
     const wasInstalled = ps.status === 'installed' || ps.status === 'modified';
+    const previous = manifest.parts[name];
 
     // Link files (create symlinks)
     const manifestPart = await linkPart(part, resolvedDir, FACTORY_ROOT);
@@ -140,6 +144,14 @@ export async function install(targetDir: string): Promise<void> {
       await injectSettings(part.settings, resolvedDir);
     }
 
+    // Add the part's line to the agent file, recording where it went.
+    let snippetAdded = false;
+    if (part.snippet) {
+      const { record, changed } = await writeSnippet(part.snippet, resolvedDir);
+      manifestPart.snippet = record;
+      snippetAdded = changed;
+    }
+
     // Update manifest. Picking a part here takes it back off the skip list.
     manifest.parts[name] = manifestPart;
     if (manifest.skipped) manifest.skipped = manifest.skipped.filter((n) => n !== name);
@@ -157,10 +169,22 @@ export async function install(targetDir: string): Promise<void> {
     if (part.hooks) {
       printHookInfo();
     }
+
+    if (snippetAdded) {
+      printSnippetInfo(manifestPart.snippet!.file, 'added');
+    }
+
+    try {
+      await runInit(part, previous, manifestPart, resolvedDir);
+    } catch (err) {
+      failure = err;
+      break;
+    }
   }
 
   // Write manifest
   await writeManifest(resolvedDir, manifest);
+  if (failure) throw failure;
 
   // Check env vars
   const installedParts = filteredNames

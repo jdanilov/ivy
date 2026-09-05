@@ -54,3 +54,29 @@ model.complete, model.classify, model.fork · audio.play, audio.speak · mcp.cal
 - Exact `e` fields per event. `claude plugin validate` reports misuse; the worker iterates against it.
 - `$.ui.ask` option shape. Start with an array of strings.
 - Types: `/plugin-types` writes `.claude/types/claude-code-mcp.d.ts` for MCP inputs only, referencing "the engine's claude-code module types" which are not shipped as a file. A local `types.d.ts` declares `$` loosely.
+
+## Corrections from W4, measured with `claude plugin validate --strict`
+
+The "Command-hook events" line above is wrong for modules. The validator rejects `SessionStart`,
+`UserPromptSubmit`, `Stop`, `SubagentStart`, `SubagentStop`, `Notification`, `PermissionRequest`,
+`PostToolUse`, `SessionEnd` and `PreCompact` with `"<name>" is not an event`. Of the settings
+names only `PreToolUse` is accepted. Everything else must come from the engine set.
+
+The validator only checks the verb when the namespace is one it knows: `tool`, `ui`, `agent`,
+`turn`, `prompt`, `engine`, `skill`, `attribution`, `session`. An unknown namespace such as
+`compact.pre`, `content.trim` or `foo.bar` passes validation and then never fires, so a green
+validate is not proof an event exists. Known-namespace names that validate include the op names
+(`ui.status`, `ui.toast`, `session.messages`), which are ops and not events; treat the engine
+event list as the only real one.
+
+No compaction event exists in the module API. `PreCompact` focus text stays a command hook.
+
+`$` may not be passed to another function, not even a local helper: `registerTools($)` fails with
+"$ itself is passed as an argument (bound, passed, spread, returned or read)". A closure declared
+inside a hook body that captures `$` and spells `$.noun.verb(...)` is fine, and one module-level
+function may serve as the hook for several `on(...)` registrations, which is how shared logic is
+reused. `options.signal` is never referenced by this plugin, so nothing tests it.
+
+`claude plugin details <name>` needs the flag on the root command,
+`claude --plugin-dir <dir> plugin details factory`. It reports `Hooks (0)` for a module-only
+plugin: the inventory counts command hooks, not function-hook modules.

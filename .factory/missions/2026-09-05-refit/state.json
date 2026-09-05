@@ -3,7 +3,7 @@
   "title": "Factory refit: retro skill, snippets, roadmap, token diet",
   "workflow": "story",
   "attention": "light",
-  "status": "open",
+  "status": "closed",
   "step": "merge",
   "round": 2,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
@@ -80,5 +80,5 @@
     }
   ],
   "created": "2026-09-05T18:04:36.435Z",
-  "updated": "2026-09-05T21:59:11.759Z"
+  "updated": "2026-09-05T21:59:12.014Z"
 }

@@ -28,10 +28,32 @@ export interface HookConfig {
 export interface McpConfig {
   serverName: string;
   config: {
+    type?: string;
     command: string;
     args: string[];
     env?: Record<string, string>;
   };
+}
+
+/** A line a part owns in the project's agent file, added on install and taken back on uninstall. */
+export interface Snippet {
+  /** Overrides the AGENTS.md / CLAUDE.md resolution. */
+  file?: string;
+  section: string;   // an ATX heading line, e.g. "## Important Files"
+  line: string;
+}
+
+/** Where the line actually went, plus the project's own line about the same path it displaced. */
+export interface SnippetRecord extends Required<Snippet> {
+  replaced?: string;
+  /** The install created the file to hold this line, so an uninstall that empties it may delete it. */
+  created?: true;
+}
+
+/** Shell lines run once in the project root: init when the part lands, uninit when it goes. */
+export interface Recipes {
+  init?: string[];
+  uninit?: string[];
 }
 
 export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
@@ -49,6 +71,12 @@ export interface Part {
   hooks?: HookConfig[];
   mcp?: McpConfig;
   settings?: Settings;
+  snippet?: Snippet;
+  recipes?: Recipes;
+  /** Defaults for `${name}` in hooks, mcp and recipes. `~/.factory/config.yaml` wins. */
+  vars?: Record<string, string>;
+  /** Parts this one needs: selected with it, installed for it, and not removable under it. */
+  requires?: string[];
 }
 
 export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict' | 'skipped';
@@ -72,9 +100,18 @@ export interface Manifest {
 export interface ManifestPart {
   files: string[];
   hashes: Record<string, string>;
+  /** target -> source under the Factory root: what makes a file ours without asking the symlink.
+   *  Absent in manifests written before it existed, and those fall back to `readlink`. */
+  sources?: Record<string, string>;
   hooks?: HookConfig[];
   mcp?: { serverName: string; config: object };
   settings?: Settings;
+  /** Resolved at install time: uninstall removes this line from this file, no fresh guess. */
+  snippet?: SnippetRecord;
+  /** Resolved uninit lines, kept here so a part the registry dropped can still clean up. */
+  uninit?: string[];
+  /** Set once `recipes.init` succeeded. Its absence is what makes `update` run init. */
+  initAt?: string;
 }
 
 export interface EnvWarning {
@@ -127,11 +164,12 @@ export interface MissionState {
   title: string;
   workflow: string;
   attention: Attention;
-  status: 'open' | 'closed';
+  /** A stub has intent and no branch: `mission open` promotes it. */
+  status: 'stub' | 'open' | 'closed';
   step: string;
   round: number;
   session: string | null;
-  branch: string;
+  branch: string | null;
   worktree: string | null;
   gates: Record<string, GateState>;
   steps: Record<string, StepState>;
@@ -160,7 +198,6 @@ export interface Preset {
   dir: string;
   model: string;
   effort: string;
-  plugins: string[];
   mcp: string[];
   sendMessage: boolean;
 }

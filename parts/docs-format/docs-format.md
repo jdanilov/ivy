@@ -1,37 +1,23 @@
 # Docs format
 
-Every doc the Factory writes is read by an agent. Short, reasoning-first, cheap in tokens.
-The one exception is `intent.md`, written for the human.
+Every doc the Factory writes is read by an agent first, and tokens are what reading it costs.
+`intent.md` is the exception: it is written for the human.
 
-## Rules
-
-- One idea per line. Never restate the line above in prose.
-- Reasoning first: the why, then the what. A rule without its reason is a rule that gets dropped.
-- Tables over prose for anything with more than two fields.
-- Symbol diagrams over prose for flow. Raw text, never inside a code fence.
-- File references as `@ path:line`. Code entities in backticks: `loadParts`, `.factory/claim`.
-- No em-dashes. A comma, a colon or a new line says it.
-- No box-drawing characters. Structure comes from indentation and glyphs.
-- No filler: no "in order to", no "it is important to note", no restating the prompt.
-- Names come from `docs/terminology.md`. No synonyms.
+- Reasoning before the conclusion. A rule without its reason is the first thing to get dropped.
+- A table when the thing has more than two fields, a glyph flow when it is a sequence. Prose
+  when neither shape carries more than a sentence would.
+- Structure from plain characters: headings, indentation, glyphs, backticks. Nothing decorative.
+- `@path` for a file, backticks for a code entity. Both are things the reader can go open.
+- Names from `docs/terminology.md`, so two docs about one thing use one word.
 
 ## Glyphs
 
-| Glyph | Meaning           | Glyph | Meaning            |
-|-------|-------------------|-------|--------------------|
-| `●`   | entity, running   | `↻`   | loop, retry        |
-| `○`   | pending, external | `✓`   | done, pass         |
-| `≋`   | store, state      | `✗`   | failed, conflict   |
-| `◇`   | decision          | `⊘`   | blocked, waiting   |
-| `→`   | flow, call        | `◈`   | warning, edge case |
-| `←`   | return            | `±`   | change             |
-| `⇢`   | async, side effect|       |                    |
-
-## Example
-
-`● Worker`
-  → reads `spec.md`, `acceptance.md`                  @ .factory/missions/x/spec.md
-  ◇ blocked? → `mcp__factory__ask` ← answer
-  → implements the step
-  ⇢ SubagentStop saves `handoffs/<step>.md`
-  ← handoff
+| Glyph | Meaning            | Glyph | Meaning            |
+|-------|--------------------|-------|--------------------|
+| `●`   | entity, running    | `↻`   | loop, retry        |
+| `○`   | pending, external  | `✓`   | done, pass         |
+| `≋`   | store, state       | `✗`   | failed, conflict   |
+| `◇`   | decision           | `⊘`   | blocked, waiting   |
+| `→`   | flow, call         | `◈`   | warning, edge case |
+| `←`   | return             | `±`   | change             |
+| `⇢`   | async, side effect |       |                    |

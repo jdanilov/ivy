@@ -3,12 +3,12 @@ import * as p from '@clack/prompts';
 import type { Attention, Mission, MissionState } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import {
-  Refusal, closeMission, createMission, currentBranch, currentCheckout, git, listMissions,
-  listWorktrees, mainCheckout, missionRowState, missionWorkflow, readClaim, resolveMission,
-  sessionLive, writeClaim, writeState,
+  Refusal, closeMission, createMission, currentBranch, currentCheckout, ensureClaimIgnored, git,
+  listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, promoteMission,
+  readClaim, resolveMission, sessionLive, writeClaim, writeState,
 } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
-import { loadProjects } from '../core/projects.js';
+import { existingProjects } from '../core/projects.js';
 import { field, headerRow, missionRow, rule } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
 import { CancelError } from '../ui/prompts.js';
@@ -30,23 +30,25 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
     case 'resume':
       return resume(args[0], cwd);
     case 'close':
-      return close(args[0], cwd);
+      return close(args[0], flags, cwd);
     default:
       throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, list, status, adopt, resume, close`);
   }
 }
 
 async function create(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
-  if (!name) throw new Refusal('mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]');
+  if (!name) throw new Refusal('mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]');
 
   const attention = (str(flags, 'attention') ?? 'light') as Attention;
   if (!ATTENTION.includes(attention)) throw new Refusal(`attention must be one of ${ATTENTION.join(', ')}`);
 
+  const stub = flags.stub === true;
   const main = await mainCheckout(cwd);
   const claim = await readClaim(main);
   let worktree = flags.worktree === true;
 
-  if (claim && claim.mission !== name && !worktree && flags['no-worktree'] !== true) {
+  // A stub touches no branch, so a claim held by someone else is none of its business.
+  if (!stub && claim && claim.mission !== name && !worktree && flags['no-worktree'] !== true) {
     console.log(`${I}${colors.yellow}⊘${colors.reset} ${main} is claimed by mission ${colors.bold}${claim.mission}${colors.reset}`);
     const answer = await p.confirm({ message: `Work ${name} in a worktree at ../${path.basename(main)}-${name}?`, initialValue: true });
     if (p.isCancel(answer)) throw new CancelError();
@@ -59,23 +61,34 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
     workflow: str(flags, 'workflow') ?? 'story',
     attention,
     worktree,
+    stub,
   });
+
+  // A stub has no branch to commit on: `mission open` promotes it and takes care of the ignore then.
+  const workdir = created.state.worktree ?? (await currentCheckout(cwd));
+  const ignored = created.state.branch ? await ensureClaimIgnored(workdir) : null;
 
   console.log('');
   headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${created.state.name}${colors.reset}`, `${colors.dim}${created.state.workflow} · ${created.state.attention}${colors.reset}`);
   rule();
   field('folder', created.dir);
-  field('branch', created.state.branch);
+  field('branch', created.state.branch ?? `${colors.dim}stub — open it to branch${colors.reset}`);
   if (created.state.worktree) field('worktree', created.state.worktree);
   field('step', created.state.step);
+  if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log('');
 
-  if (flags['no-open'] !== true) await open(created.state.name, flags, cwd);
+  if (!stub && flags['no-open'] !== true) await open(created.state.name, flags, cwd);
 }
 
 /** Writes the Warp tab config and opens it. The session id reaches state.json first. */
 async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
+  let ignored: 'added' | 'committed' | null = null;
+  if (m.state.status === 'stub') {
+    await promoteMission(cwd, m);
+    ignored = await ensureClaimIgnored(await currentCheckout(cwd));
+  }
   const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
   const dry = flags['dry-run'] === true;
   const spawn = await openSession(cwd, m, preset, dry);
@@ -92,6 +105,7 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   field('cwd', spawn.cwd);
   field('config', dry ? `would write ${spawn.configPath}` : spawn.configPath);
   field('uri', spawn.uri);
+  if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log(`${I}${colors.dim}command${colors.reset}`);
   console.log(`${I}${spawn.command}`);
   console.log('');
@@ -102,9 +116,10 @@ async function list(flags: Flags): Promise<void> {
   let shown = 0;
 
   console.log('');
-  for (const project of await loadProjects()) {
+  for (const project of await existingProjects()) {
     const missions = await listMissions(project).catch(() => []);
-    const rows = all ? missions : missions.filter((m) => m.state.status === 'open');
+    const rows = (all ? missions : missions.filter((m) => m.state.status !== 'closed'))
+      .sort((a, b) => Number(a.state.status === 'stub') - Number(b.state.status === 'stub'));
     if (rows.length === 0) continue;
 
     console.log(`${I}${colors.dim}${project}${colors.reset}`);
@@ -171,6 +186,7 @@ async function adopt(name: string | undefined, flags: Flags, cwd: string): Promi
 
   const m = await resolveMission(cwd, name);
   const state = m.state;
+  notStub(state);
 
   if (state.session === session) {
     console.log(`${I}${colors.dim}${state.name} is already bound to ${session}.${colors.reset}`);
@@ -197,6 +213,7 @@ async function adopt(name: string | undefined, flags: Flags, cwd: string): Promi
 async function resume(name: string | undefined, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
   const state = m.state;
+  notStub(state);
   const checkout = await currentCheckout(cwd);
   const branch = await currentBranch(checkout);
 
@@ -224,9 +241,10 @@ async function resume(name: string | undefined, cwd: string): Promise<void> {
   console.log('');
 }
 
-async function close(name: string | undefined, cwd: string): Promise<void> {
+async function close(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m: Mission = await resolveMission(cwd, name);
-  const log = await closeMission(cwd, m);
+  notStub(m.state);
+  const log = await closeMission(cwd, m, flags['keep-branch'] === true);
 
   console.log('');
   headerRow(`${colors.green}✓${colors.reset} ${colors.bold}${m.state.name}${colors.reset} ${colors.dim}closed${colors.reset}`, '');

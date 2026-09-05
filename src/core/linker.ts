@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdir, symlink, unlink, readdir, readlink, rmdir, readFile, lstat } from 'node:fs/promises';
-import type { Part, HookConfig, McpConfig, ManifestPart, Settings } from '../types.js';
+import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet, SnippetRecord } from '../types.js';
 import { hashFile } from './scanner.js';
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
@@ -15,10 +15,12 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
 export async function linkPart(part: Part, targetDir: string, factoryRoot: string): Promise<ManifestPart> {
   const files: string[] = [];
   const hashes: Record<string, string> = {};
+  const sources: Record<string, string> = {};
 
   for (const pf of part.files) {
     const sourcePath = path.join(factoryRoot, pf.source);
     const targetPath = path.join(targetDir, pf.target);
+    sources[pf.target] = pf.source;
 
     // A template is a copy, seeded once: the project edits it, and whatever is already there stays.
     if (pf.skipIfExists) {
@@ -47,7 +49,7 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
     hashes[pf.target] = await hashFile(sourcePath);
   }
 
-  const entry: ManifestPart = { files, hashes };
+  const entry: ManifestPart = { files, hashes, sources };
 
   if (part.hooks) {
     entry.hooks = part.hooks;
@@ -61,13 +63,137 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
     entry.settings = part.settings;
   }
 
+  // Kept resolved in the manifest so the part can still be uninstalled after the registry drops it.
+  if (part.recipes?.uninit) {
+    entry.uninit = part.recipes.uninit;
+  }
+
   return entry;
 }
 
-/** A target we may remove: a symlink into the Factory. Dangling counts, a dropped part leaves those. */
-async function isFactoryLink(targetPath: string, factoryRoot: string): Promise<boolean> {
+// ── Snippets ─────────────────────────────────────────────────────────────────
+
+const AGENT_FILES = ['AGENTS.md', 'CLAUDE.md'];
+
+/** AGENTS.md when it exists, else CLAUDE.md when it exists, else AGENTS.md is the one we create. */
+async function agentFile(targetDir: string): Promise<string> {
+  for (const name of AGENT_FILES) {
+    if (await lstat(path.join(targetDir, name)).catch(() => null)) return name;
+  }
+  return AGENT_FILES[0]!;
+}
+
+const readLines = async (filePath: string): Promise<string[]> => {
+  const raw = await readFile(filePath, 'utf-8').catch(() => '');
+  return raw === '' ? [] : raw.replace(/\n$/, '').split('\n');
+};
+
+const writeLines = (filePath: string, lines: string[]): Promise<number> =>
+  Bun.write(filePath, lines.length === 0 ? '' : lines.join('\n') + '\n');
+
+/** Where the section ends: the next heading of the same or higher level, or EOF. */
+function sectionEnd(lines: string[], at: number): number {
+  const level = /^#+/.exec(lines[at]!)![0].length;
+  for (let i = at + 1; i < lines.length; i++) {
+    const heading = /^(#+)\s/.exec(lines[i]!);
+    if (heading && heading[1]!.length <= level) return i;
+  }
+  return lines.length;
+}
+
+/**
+ * The path a snippet line points at, whether it includes the file with `@` or only names it in
+ * backticks: what a line about the same file must contain to count as the same line.
+ */
+const snippetPath = (line: string): string | undefined => {
+  const hit = /@(\S+)|`([^`]+)`/.exec(line);
+  return hit?.[1] ?? hit?.[2];
+};
+
+/**
+ * Adds the part's line under its section, creating the section at the end of the file when it is
+ * missing. A line the project already wrote about the same path is rewritten in place instead, and
+ * kept in the record so uninstall can put it back. Idempotent. Returns what to record.
+ */
+export async function writeSnippet(
+  snippet: Snippet,
+  targetDir: string,
+  prev?: SnippetRecord,
+): Promise<{ record: SnippetRecord; changed: boolean }> {
+  const file = snippet.file ?? (await agentFile(targetDir));
+  const record: SnippetRecord = { file, section: snippet.section, line: snippet.line };
+  if (prev?.replaced !== undefined) record.replaced = prev.replaced;
+  const filePath = path.join(targetDir, file);
+  // Whoever brings the file into existence records it, so an uninstall knows the file is ours.
+  if (prev?.created || !(await lstat(filePath).catch(() => null))) record.created = true;
+  const lines = await readLines(filePath);
+
+  let at = lines.findIndex((l) => l.trimEnd() === snippet.section);
+  if (at === -1) {
+    if (lines.length > 0) lines.push('');
+    at = lines.push(snippet.section) - 1;
+  }
+
+  const end = sectionEnd(lines, at);
+  const body = lines.slice(at + 1, end);
+  if (body.some((l) => l === snippet.line)) return { record, changed: false };
+
+  const target = snippetPath(snippet.line);
+  const hit = target === undefined ? -1 : body.findIndex((l) => l.includes(target));
+  if (hit !== -1) {
+    // Our own line from a past install is not the project's: only a line we never wrote is restorable.
+    if (record.replaced === undefined && body[hit] !== prev?.line) record.replaced = body[hit]!;
+    lines[at + 1 + hit] = snippet.line;
+  } else {
+    let insert = end;
+    while (insert > at + 1 && lines[insert - 1]!.trim() === '') insert--;
+    lines.splice(insert, 0, snippet.line);
+  }
+
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeLines(filePath, lines);
+  return { record, changed: true };
+}
+
+/**
+ * Takes the recorded line back out of the recorded file, or puts the displaced line back where it
+ * was. A section left with nothing but blank lines goes too, together with the blank the install
+ * put in front of it. Nothing else is touched.
+ */
+export async function removeSnippet(record: SnippetRecord, targetDir: string): Promise<boolean> {
+  const filePath = path.join(targetDir, record.file);
+  const lines = await readLines(filePath);
+
+  const at = lines.findIndex((l) => l.trimEnd() === record.section);
+  if (at === -1) return false;
+
+  const end = sectionEnd(lines, at);
+  const hit = lines.slice(at + 1, end).indexOf(record.line);
+  if (hit === -1) return false;
+
+  if (record.replaced !== undefined) {
+    lines[at + 1 + hit] = record.replaced;
+    await writeLines(filePath, lines);
+    return true;
+  }
+
+  const body = lines.slice(at + 1, end).filter((l) => l !== record.line);
+
+  // An emptied section that ran to EOF was appended by an install: its leading blank goes with it.
+  const empty = body.every((l) => l.trim() === '');
+  const from = empty && end === lines.length && at > 0 && lines[at - 1] === '' ? at - 1 : at;
+  lines.splice(from, end - from, ...(empty ? [] : [lines[at]!, ...body]));
+
+  await writeLines(filePath, lines);
+  return true;
+}
+
+/** A target we may remove: a symlink the manifest records as ours, else one pointing into the Factory. */
+async function isFactoryLink(targetPath: string, factoryRoot: string, source?: string): Promise<boolean> {
   try {
     if (!(await lstat(targetPath)).isSymbolicLink()) return false;
+    // The manifest says we linked it, so where it points now is not the question. Dangling counts.
+    if (source !== undefined) return true;
     const dest = path.resolve(path.dirname(targetPath), await readlink(targetPath));
     return dest.startsWith(factoryRoot + path.sep);
   } catch {
@@ -87,7 +213,7 @@ export async function unlinkPart(
   for (const file of entry.files) {
     const targetPath = path.join(targetDir, file);
 
-    if (!(await isFactoryLink(targetPath, factoryRoot))) {
+    if (!(await isFactoryLink(targetPath, factoryRoot, entry.sources?.[file]))) {
       if (await lstat(targetPath).catch(() => null)) left.push(file);
       continue;
     }
@@ -261,6 +387,54 @@ export async function injectMcp(mcp: McpConfig, targetDir: string): Promise<void
   mcpConfig.mcpServers[mcp.serverName] = mcp.config;
 
   await Bun.write(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+}
+
+const EMPTIABLE = ['.claude/settings.json', '.claude/settings.local.json', '.mcp.json'];
+
+/**
+ * Deletes a settings or mcp file the Factory just emptied — `{}` or a bare `{"mcpServers": {}}`.
+ * A file still holding anything of the project's own stays. Returns what went, for the report.
+ */
+export async function dropEmptied(targetDir: string): Promise<string[]> {
+  const gone: string[] = [];
+
+  for (const rel of EMPTIABLE) {
+    const filePath = path.join(targetDir, rel);
+    const json = await readJson<Record<string, unknown> | null>(filePath, null);
+    if (!isObject(json)) continue;
+
+    const keys = Object.keys(json);
+    const servers = json.mcpServers;
+    const empty = keys.length === 0
+      || (keys.length === 1 && isObject(servers) && Object.keys(servers).length === 0);
+    if (!empty) continue;
+
+    await unlink(filePath).catch(() => {});
+    gone.push(rel);
+  }
+
+  return gone;
+}
+
+/**
+ * The counterpart of the install's file creation: an agent file the Factory made and the snippet
+ * removals just emptied, and a `.claude/` with nothing left in it. Anything holding content stays.
+ */
+export async function dropCreated(files: string[], targetDir: string): Promise<string[]> {
+  const gone: string[] = [];
+
+  for (const rel of new Set(files)) {
+    const filePath = path.join(targetDir, rel);
+    const raw = await readFile(filePath, 'utf-8').catch(() => null);
+    if (raw === null || raw.trim() !== '') continue;
+    await unlink(filePath).catch(() => {});
+    gone.push(rel);
+  }
+
+  // rmdir refuses a directory with anything in it, so this only fires once the last part is gone.
+  if (await rmdir(path.join(targetDir, '.claude')).then(() => true, () => false)) gone.push('.claude/');
+
+  return gone;
 }
 
 export async function removeMcp(serverName: string, targetDir: string): Promise<void> {

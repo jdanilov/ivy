@@ -24,7 +24,9 @@ export function headerRow(left: string, right: string): void {
 export function missionRow(state: MissionState, row: string, live: boolean): void {
   const glyph = `${rowColor(row)}${rowSymbol(row)}${colors.reset}`;
   const detail = `${colors.dim}${state.workflow} · ${state.step || '—'} · r${state.round}${colors.reset}`;
-  const session = state.status === 'closed'
+  const session = state.status === 'stub'
+    ? `${colors.dim}stub${colors.reset}`
+    : state.status === 'closed'
     ? `${colors.dim}closed${colors.reset}`
     : live
       ? `${colors.cyan}session${colors.reset}`
@@ -67,6 +69,11 @@ export function printPartResult(
  */
 export function printHookInfo(): void {
   console.log(`${pad()}.claude/settings.local.json → hook added`);
+}
+
+/** One line under the part result for the agent-file line a snippet added or removed. */
+export function printSnippetInfo(file: string, action: 'added' | 'removed'): void {
+  console.log(`${pad()}${file} \u2192 line ${action}`);
 }
 
 /**

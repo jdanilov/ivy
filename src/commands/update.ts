@@ -1,12 +1,42 @@
 import path from 'node:path';
-import { readlink } from 'node:fs/promises';
-import type { HookConfig, ManifestPart } from '../types.js';
+import { lstat } from 'node:fs/promises';
+import type { HookConfig, ManifestPart, Part, SnippetRecord } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
-import { loadParts, FACTORY_ROOT } from '../core/registry.js';
-import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings } from '../core/linker.js';
+import { loadParts, withRequires, FACTORY_ROOT } from '../core/registry.js';
+import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
+import { resolvePart, runInit, runUninit } from '../core/recipes.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
+// Where the line sits, not what it displaced: a recorded `replaced` must not read as a move.
+const snippetKey = (s?: SnippetRecord): string => (s ? `${s.file}|${s.section}|${s.line}` : '');
+
+/**
+ * The one sequence that puts a part in place: vars resolved (a changed ~/.factory/config.yaml
+ * re-points the project here), files linked, hooks, mcp and settings injected, snippet written,
+ * init run. The init error is returned, not thrown, because the caller still has a manifest to write.
+ */
+async function applyPart(
+  part: Part,
+  prev: ManifestPart | undefined,
+  targetDir: string,
+): Promise<{ next: ManifestPart; snippetAdded: boolean; failure: unknown }> {
+  const resolved = await resolvePart(part);
+  const next = await linkPart(resolved, targetDir, FACTORY_ROOT);
+  if (resolved.hooks) await injectHooks(resolved.hooks, targetDir);
+  if (resolved.mcp) await injectMcp(resolved.mcp, targetDir);
+  if (resolved.settings) await injectSettings(resolved.settings, targetDir);
+
+  let snippetAdded = false;
+  if (resolved.snippet) {
+    const { record, changed } = await writeSnippet(resolved.snippet, targetDir, prev?.snippet);
+    next.snippet = record;
+    snippetAdded = changed;
+  }
+
+  const failure = await runInit(resolved, prev, next, targetDir).then(() => null, (err: unknown) => err);
+  return { next, snippetAdded, failure };
+}
 
 /** Non-interactive refresh of an installed project: relink what stayed, unlink what the registry dropped. */
 export async function update(targetDir: string, skip: string[] = []): Promise<void> {
@@ -40,18 +70,27 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
   let relinked = 0;
   let removed = 0;
   let installed = 0;
+  // A failing init stops the run with everything written so far kept, so a rerun picks up where it broke.
+  let failure: unknown = null;
 
   for (const [name, entry] of Object.entries(manifest.parts)) {
     if (skipped.has(name)) continue;
     const part = registry.get(name);
 
     if (part) {
-      const links = () => Promise.all(part.files.map((f) => readlink(path.join(resolvedDir, f.target)).catch(() => '')));
-      const before = await links();
-      const next = await linkPart(part, resolvedDir, FACTORY_ROOT);
-      if (part.hooks) await injectHooks(part.hooks, resolvedDir);
-      if (part.mcp) await injectMcp(part.mcp, resolvedDir);
-      if (part.settings) await injectSettings(part.settings, resolvedDir);
+      // Where each file comes from is recorded in the manifest, so only its absence needs the disk.
+      const gone = await Promise.all(part.files.map((f) => lstat(path.join(resolvedDir, f.target)).then(() => false, () => true)));
+      const { next, snippetAdded, failure: initFailed } = await applyPart(part, entry, resolvedDir);
+      if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
+
+      // A var change rewrites the hook command, so the command we recorded last time has to go.
+      const stale = (entry.hooks ?? []).filter((h) => !(next.hooks ?? []).some((n) => hookKey(n) === hookKey(h)));
+      if (stale.length > 0) await removeHooks(stale, resolvedDir);
+
+      if (entry.snippet && snippetKey(entry.snippet) !== snippetKey(next.snippet)) {
+        if (await removeSnippet(entry.snippet, resolvedDir)) line('-', colors.yellow, displayName(part), `${entry.snippet.file} → line removed`);
+      }
+
       manifest.parts[name] = next;
 
       // A file the part stopped shipping leaves a dangling symlink behind unless someone else owns it.
@@ -64,12 +103,17 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
         }
       }
 
-      if (JSON.stringify(entry) !== JSON.stringify(next) || String(before) !== String(await links())) {
+      if (initFailed) failure = initFailed;
+
+      if (JSON.stringify(entry) !== JSON.stringify(next) || gone.includes(true)) {
         line(symbols.installed, colors.green, displayName(part), 'relinked');
         relinked++;
       }
+      if (failure) break;
       continue;
     }
+
+    await runUninit(name, entry.uninit, resolvedDir);
 
     const orphan: ManifestPart = { ...entry, files: entry.files.filter((f) => !liveFiles.has(f)) };
     const result = await unlinkPart(orphan, resolvedDir, FACTORY_ROOT);
@@ -97,22 +141,42 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       removed++;
     }
 
+    if (entry.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
+      line('-', colors.yellow, name, `${entry.snippet.file} → line removed`);
+      removed++;
+    }
+
     // Stop tracking the part either way: what the Factory will not remove it will not manage.
     delete manifest.parts[name];
     if (result.left.length > 0) line('!', colors.dim, name, `left in place: ${result.left.join(', ')}`);
   }
 
+  // What an installed part requires has to be there too, default or not.
+  const needed = new Set(withRequires(parts, Object.keys(manifest.parts)).added);
+
   // A part the Factory ships as a default reaches an already-installed project on the next update.
   for (const part of parts) {
-    if (!part.default || manifest.parts[part.name] || skipped.has(part.name)) continue;
+    if (manifest.parts[part.name] || skipped.has(part.name)) continue;
+    if (!part.default && !needed.has(part.name)) continue;
 
-    manifest.parts[part.name] = await linkPart(part, resolvedDir, FACTORY_ROOT);
-    if (part.hooks) await injectHooks(part.hooks, resolvedDir);
-    if (part.mcp) await injectMcp(part.mcp, resolvedDir);
-    if (part.settings) await injectSettings(part.settings, resolvedDir);
+    const { next, snippetAdded, failure: initFailed } = await applyPart(part, undefined, resolvedDir);
+    if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
+    manifest.parts[part.name] = next;
 
     line(symbols.installed, colors.green, displayName(part), 'installed');
     installed++;
+
+    if (initFailed) {
+      failure = initFailed;
+      break;
+    }
+  }
+
+  if (removed > 0) {
+    for (const file of await dropEmptied(resolvedDir)) {
+      line('-', colors.yellow, '', `${file} → removed, nothing left in it`);
+      removed++;
+    }
   }
 
   if (Object.keys(manifest.parts).length === 0) {
@@ -123,6 +187,8 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     if (skipped.size > 0) manifest.skipped = [...skipped];
     await writeManifest(resolvedDir, manifest);
   }
+
+  if (failure) throw failure;
 
   console.log('');
   if (relinked === 0 && removed === 0 && installed === 0) {

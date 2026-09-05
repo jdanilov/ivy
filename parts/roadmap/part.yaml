@@ -1,0 +1,10 @@
+type: fixture
+description: template docs/roadmap.md, the project's plain checklist
+default: true
+files:
+  - source: roadmap.md
+    target: docs/roadmap.md
+    skipIfExists: true
+snippet:
+  section: "## Important Files"
+  line: "- Roadmap: `docs/roadmap.md`"

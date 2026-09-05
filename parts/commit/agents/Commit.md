@@ -10,7 +10,7 @@ color: cyan
 
 # Commit changes
 
-Commit messages follow `.claude/docs-format.md`: one idea per line, why before what, no em-dashes.
+Commit messages say why before what, one idea per line.
 
 1. Review uncommitted changes and prepare one or more git commits.
 2. Follow the format structure below for every commit message.

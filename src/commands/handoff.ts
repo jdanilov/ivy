@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { str, type Flags } from '../core/args.js';
-import { Refusal, resolveMission } from '../core/mission.js';
+import { Refusal, notStub, resolveMission } from '../core/mission.js';
 import { field } from '../ui/format.js';
 import { I, colors } from '../ui/theme.js';
 
@@ -12,6 +12,7 @@ export async function handoff(sub: string, args: string[], flags: Flags, cwd: st
   if (!step) throw new Refusal('handoff save <step> < handoff.md');
 
   const mission = await resolveMission(cwd, str(flags, 'mission'));
+  notStub(mission.state);
   const text = await Bun.stdin.text();
   if (text.trim() === '') throw new Refusal('handoff save reads the handoff from stdin and got nothing');
 

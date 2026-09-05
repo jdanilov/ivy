@@ -43,6 +43,15 @@ export async function loadProjects(): Promise<string[]> {
   return text.split('\n').filter((l) => l.trim() !== '');
 }
 
+/** A project path can vanish. The list commands skip it silently, the projects file keeps it. */
+export async function existingProjects(): Promise<string[]> {
+  const live: string[] = [];
+  for (const project of await loadProjects()) {
+    if (await lstat(project).catch(() => null)) live.push(project);
+  }
+  return live;
+}
+
 export async function saveProject(projectPath: string): Promise<void> {
   if (!(await home())) return;
   const projects = await loadProjects();

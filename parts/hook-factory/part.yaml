@@ -5,17 +5,5 @@ files:
   - source: hook-factory.ts
     target: .claude/scripts/hook-factory.ts
 hooks:
-  - event: SessionStart
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts SessionStart
-  - event: UserPromptSubmit
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts UserPromptSubmit
-  - event: Stop
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts Stop
-  - event: SubagentStart
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts SubagentStart
-  - event: SubagentStop
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts SubagentStop
-  - event: Notification
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts Notification
-  - event: PreCompact
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts PreCompact
+  - events: [SessionStart, UserPromptSubmit, Stop, SubagentStart, SubagentStop, Notification, PreCompact]
+    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}

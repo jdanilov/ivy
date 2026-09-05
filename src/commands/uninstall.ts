@@ -1,13 +1,15 @@
 import path from 'node:path';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
-import { unlinkPart, removeHooks, removeMcp, removeSettings } from '../core/linker.js';
-import { FACTORY_ROOT } from '../core/registry.js';
+import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied, dropCreated } from '../core/linker.js';
+import { runUninit } from '../core/recipes.js';
+import { Refusal } from '../core/mission.js';
+import { FACTORY_ROOT, dependants } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
-import { printPartResult } from '../ui/format.js';
+import { printPartResult, printSnippetInfo } from '../ui/format.js';
 
-export async function uninstall(targetDir: string): Promise<void> {
+export async function uninstall(targetDir: string, yes = false): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 
   // Read manifest
@@ -60,8 +62,10 @@ export async function uninstall(targetDir: string): Promise<void> {
 
   console.log('');
 
-  // Select parts to uninstall
-  let selectedNames = await selectParts(installedStates, 'uninstall');
+  // Select parts to uninstall. `--yes` takes every installed part and asks nothing.
+  let selectedNames = yes
+    ? installedStates.map((s) => s.part.name)
+    : await selectParts(installedStates, 'uninstall');
 
   if (selectedNames.length === 0) {
     console.log('');
@@ -76,7 +80,7 @@ export async function uninstall(targetDir: string): Promise<void> {
     return ps && ps.status === 'modified';
   });
 
-  if (modifiedSelected.length > 0) {
+  if (modifiedSelected.length > 0 && !yes) {
     const ok = await confirmModified(modifiedSelected);
     if (!ok) {
       selectedNames = selectedNames.filter((n) => !modifiedSelected.includes(n));
@@ -90,33 +94,46 @@ export async function uninstall(targetDir: string): Promise<void> {
     return;
   }
 
+  // Taking a part out from under something that needs it leaves the dependant broken.
+  for (const name of selectedNames) {
+    const left = dependants(installedStates.map((s) => s.part), name, selectedNames);
+    if (left.length > 0) throw new Refusal(`${name} is required by ${left.join(', ')} — uninstall those too, or keep it`);
+  }
+
   // Perform uninstall
   console.log('');
   console.log(`${I}Uninstalling ${pluralize(selectedNames.length, 'part')}...`);
   console.log('');
 
+  // Agent files the install created: candidates for deletion once every snippet is out of them.
+  const created: string[] = [];
+
   for (const name of selectedNames) {
     const ps = installedStates.find((s) => s.part.name === name)!;
     const part = ps.part;
 
+    // The manifest holds what the install actually wrote, vars resolved; the part.yaml may have moved on.
     const entry = manifest.parts[name];
-    if (entry) await unlinkPart(entry, resolvedDir, FACTORY_ROOT);
-
-    if (part.hooks) {
-      await removeHooks(part.hooks, resolvedDir);
-    }
-
-    if (part.mcp) {
-      await removeMcp(part.mcp.serverName, resolvedDir);
-    }
-
-    if (part.settings) {
-      await removeSettings(part.settings, resolvedDir);
+    if (entry) {
+      await runUninit(name, entry.uninit, resolvedDir);
+      await unlinkPart(entry, resolvedDir, FACTORY_ROOT);
+      if (entry.hooks) await removeHooks(entry.hooks, resolvedDir);
+      if (entry.mcp) await removeMcp(entry.mcp.serverName, resolvedDir);
+      if (entry.settings) await removeSettings(entry.settings, resolvedDir);
     }
 
     delete manifest.parts[name];
 
     printPartResult(part, { verb: 'removed' });
+
+    if (entry?.snippet?.created) created.push(entry.snippet.file);
+    if (entry?.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
+      printSnippetInfo(entry.snippet.file, 'removed');
+    }
+  }
+
+  for (const file of await dropEmptied(resolvedDir)) {
+    console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
   }
 
   // Write or delete manifest
@@ -126,6 +143,11 @@ export async function uninstall(targetDir: string): Promise<void> {
   } else {
     manifest.updatedAt = new Date().toISOString();
     await writeManifest(resolvedDir, manifest);
+  }
+
+  // Last, so the manifest is already gone and an untouched `.claude/` reads as empty.
+  for (const file of await dropCreated(created, resolvedDir)) {
+    console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
   }
 
   console.log('');

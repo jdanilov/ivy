@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
-import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType } from '../types.js';
+import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType, Recipes, Snippet } from '../types.js';
 import { HOOK_EVENTS } from '../types.js';
 
 // Resolve FACTORY_ROOT from this file's location: src/core/ -> project root
@@ -24,8 +24,31 @@ export async function loadParts(): Promise<Part[]> {
     parts.push(parsePart(entry.name, Bun.YAML.parse(await file.text())));
   }
 
+  for (const part of parts) {
+    for (const req of part.requires ?? []) {
+      if (!parts.some((p) => p.name === req)) throw new Error(`parts/${part.name}/part.yaml: requires "${req}", which is not a part`);
+    }
+  }
+
   cache = parts;
   return parts;
+}
+
+/**
+ * The selection plus everything it requires, transitively: a dependant without its requirement is
+ * broken, so install and update pull the requirement in rather than leave a half-part behind.
+ */
+export function withRequires(parts: Part[], selected: string[]): { names: string[]; added: string[] } {
+  const byName = new Map(parts.map((p) => [p.name, p]));
+  const names = new Set(selected);
+  // A Set iterated while it grows visits what the loop adds, so this closes over the whole chain.
+  for (const name of names) for (const req of byName.get(name)?.requires ?? []) names.add(req);
+  return { names: [...names], added: [...names].filter((n) => !selected.includes(n)) };
+}
+
+/** Installed parts that need `name` and are not going away with it. */
+export function dependants(parts: Part[], name: string, leaving: string[]): string[] {
+  return parts.filter((p) => !leaving.includes(p.name) && (p.requires ?? []).includes(name)).map((p) => p.name);
 }
 
 function parsePart(name: string, raw: unknown): Part {
@@ -56,11 +79,21 @@ function parsePart(name: string, raw: unknown): Part {
 
   if (raw.hooks !== undefined) {
     if (!Array.isArray(raw.hooks)) fail('hooks must be a list');
-    part.hooks = (raw.hooks as unknown[]).map((h): HookConfig => {
-      if (!isRecord(h) || typeof h.event !== 'string' || typeof h.command !== 'string') return fail('every hook needs event and command');
-      if (!HOOK_EVENTS.includes(h.event as HookEvent)) fail(`hook event must be one of ${HOOK_EVENTS.join(', ')}`);
-      if (h.matcher !== undefined && typeof h.matcher !== 'string') fail(`hook on ${h.event} has a non-string matcher`);
-      return { event: h.event as HookEvent, ...(h.matcher === undefined ? {} : { matcher: h.matcher }), command: h.command };
+    // `events: [A, B]` is sugar for one entry per event, `${event}` in the command naming each.
+    part.hooks = (raw.hooks as unknown[]).flatMap((h): HookConfig[] => {
+      if (!isRecord(h) || typeof h.command !== 'string') return fail('every hook needs a command');
+      const { command, matcher } = h as { command: string; matcher?: unknown };
+      const events = h.events === undefined ? [h.event] : h.events;
+      if (!Array.isArray(events) || events.length === 0) fail('a hook needs event, or events as a non-empty list');
+      if (matcher !== undefined && typeof matcher !== 'string') fail(`hook on ${events.join(', ')} has a non-string matcher`);
+      return events.map((event): HookConfig => {
+        if (!HOOK_EVENTS.includes(event as HookEvent)) fail(`hook event must be one of ${HOOK_EVENTS.join(', ')}`);
+        return {
+          event: event as HookEvent,
+          ...(matcher === undefined ? {} : { matcher: matcher as string }),
+          command: command.replaceAll('${event}', event as string),
+        };
+      });
     });
   }
 
@@ -75,6 +108,38 @@ function parsePart(name: string, raw: unknown): Part {
   if (raw.settings !== undefined) {
     if (!isRecord(raw.settings)) fail('settings must be a mapping');
     part.settings = raw.settings;
+  }
+
+  if (raw.snippet !== undefined) {
+    const snippet = raw.snippet;
+    if (!isRecord(snippet)) fail('snippet must be a mapping');
+    const { file, section, line } = snippet as Record<string, unknown>;
+    if (typeof section !== 'string' || !section.startsWith('#')) fail('snippet.section must be a heading line starting with #');
+    if (typeof line !== 'string' || line.includes('\n')) fail('snippet.line must be a single line');
+    if (file !== undefined && typeof file !== 'string') fail('snippet.file must be a string');
+    part.snippet = { ...(file === undefined ? {} : { file: file as string }), section, line } as Snippet;
+  }
+
+  if (raw.recipes !== undefined) {
+    if (!isRecord(raw.recipes)) fail('recipes must be a mapping');
+    const recipes: Recipes = {};
+    for (const key of ['init', 'uninit'] as const) {
+      const list = raw.recipes[key];
+      if (list === undefined) continue;
+      if (!Array.isArray(list) || list.some((l) => typeof l !== 'string')) fail(`recipes.${key} must be a list of strings`);
+      recipes[key] = list as string[];
+    }
+    part.recipes = recipes;
+  }
+
+  if (raw.vars !== undefined) {
+    if (!isRecord(raw.vars) || Object.values(raw.vars).some((v) => typeof v !== 'string')) fail('vars must be a mapping of strings');
+    part.vars = raw.vars as Record<string, string>;
+  }
+
+  if (raw.requires !== undefined) {
+    if (!Array.isArray(raw.requires) || raw.requires.some((r) => typeof r !== 'string')) fail('requires must be a list of part names');
+    part.requires = raw.requires as string[];
   }
 
   if (raw.envVars !== undefined) {

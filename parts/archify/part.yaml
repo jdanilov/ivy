@@ -1,0 +1,15 @@
+# Checked against github.com/tt-a1i/archify @ d8e4daf2610d512821365f41b139d874b29efe81 (skill lives in archify/)
+type: skill
+description: architecture diagrams from a typed spec, html and svg (cloned per project)
+default: false
+files: []
+recipes:
+  init:
+    - '[ -z "$(ls -A .claude/skills/archify 2>/dev/null)" ] || { echo "archify: .claude/skills/archify exists and is not empty, remove it to reinstall" >&2; exit 1; }'
+    - rm -rf .claude/skills/.archify-clone && git clone --depth 1 --quiet "${archify}" .claude/skills/.archify-clone && { rmdir .claude/skills/archify 2>/dev/null || true; } && mv .claude/skills/.archify-clone/archify .claude/skills/archify && rm -rf .claude/skills/.archify-clone .claude/skills/archify/test
+    - git check-ignore -q .claude/skills/archify || echo '.claude/skills/archify/' >> .gitignore
+    - node .claude/skills/archify/bin/archify.mjs doctor
+  uninit:
+    - rm -rf .claude/skills/archify .claude/skills/.archify-clone
+vars:
+  archify: "https://github.com/tt-a1i/archify"

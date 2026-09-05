@@ -2,7 +2,8 @@
 
 **Minimalistic portable agent harness for Claude Code.**
 
-- Factory manages an extendable set of `skills`, `tools`, `hooks` and `MCPs` for a fast, practical SDLC with Claude Code.
+- Factory manages an extendable set of `skills`, `tools`, `hooks` and `MCPs` for a fast, practical
+  SDLC with Claude Code.
 - One command installs them into any project, one updates, one removes.
 - Parts are symlinked, so updating the Factory updates every connected project.
 
@@ -21,7 +22,9 @@ bun start                                # interactive: pick a command and a pro
 bun src/cli.ts <command> [args]          # or run a command directly
 ```
 
-Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256 hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent projects live in `~/.factory/projects`.
+Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256
+hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent
+projects live in `~/.factory/projects`.
 
 ## Commands
 
@@ -35,12 +38,13 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
 | `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |
 | `mission new <name>`                           | Create the mission folder, workflow copy, `state.json`, branch and claim   |
-| `mission open [name]`                          | Spawn the mission's session in a Warp tab from a preset                    |
-| `mission list [--all]`                         | Every mission across `~/.factory/projects`                                 |
+| `mission new <name> --stub`                    | Folder and intent skeleton only: no branch, no claim, status `stub`        |
+| `mission open [name]`                          | Spawn the mission's session in a Warp tab; a stub is promoted first        |
+| `mission list [--all]`                         | Every mission across `~/.factory/projects`, stubs last                     |
 | `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness      |
 | `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                          |
 | `mission resume [name]`                        | Check the branch back out and print the current step and open gates        |
-| `mission close [name]`                         | Merge the branch, commit the folder on trunk, clear claim, drop worktree   |
+| `mission close [name] [--keep-branch]`         | Commit the folder, merge, commit on trunk, clear claim, delete the branch  |
 | `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                    |
 | `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                   |
 | `step loop <step>`                             | Record a round and send the mission back to the step's loop target         |
@@ -56,16 +60,20 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `/mission`       | skill   | fable  | Orchestrator's manual: workflow, steps, gates, triage, close  |
 | `/verify`        | skill   | sonnet | Verifier over the diff, the `verify` recipe and the contract  |
 | `/validate`      | skill   | opus   | Validator drives the running system, evidence per assertion   |
-| `/critic`        | skill   | sonnet | Verifier over the uncommitted diff, no contract               |
+| `/retro`         | skill   | opus   | Sweeps closed missions' `retro.md` into one table the human answers   |
 | `/commit`        | skill   | sonnet | Structured git commits                                        |
 | `/explain`       | skill   | sonnet | Explains and visualizes system flows                          |
 | `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`        |
 | `/browse`        | tool    | sonnet | Drives a real or headless browser through `agent-browser`     |
+| `/archify`       | skill   | opus   | Architecture diagrams from a typed spec, cloned per project (opt-in) |
+| `code-format`    | fixture | —      | How code is written, referenced by every agent                |
 | `docs-format`    | fixture | —      | How agent-facing docs are written, referenced by every agent  |
 | `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
+| `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
 | `permissions`    | fixture | —      | Baseline tool allow list merged into `.claude/settings.json`  |
 | `hook-factory`   | fixture | —      | Reports session events to `~/.factory/events`                 |
 | `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                              |
+| `codegraph`      | mcp     | —      | Code graph MCP plus prompt hook, per project index (opt-in)   |
 
 Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summarizer` with
 `/mission`, `Verifier` with `/verify`, `Validator` with `/validate`, `Commit` with `/commit`.
@@ -77,13 +85,36 @@ Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summar
 | **fixture** | —      | Project configuration: hooks, scripts, assets                     |
 | **mcp**     | —      | MCP server entry injected into `.mcp.json`                        |
 
+## Snippets and vars
+
+A part may own one line in the project's `AGENTS.md` (`CLAUDE.md` when that is the only agent file):
+`snippet: { section, line }` appends it under the named heading on install and takes it back out on
+uninstall, so `terminology`, `docs-format` and `code-format` reach every agent through one `@path`
+list instead of a sentence in every prompt. `roadmap` names its path in backticks instead: a file
+that grows with every retro is a pointer, not something to pull into every context. A section that
+already names the same path has that line rewritten in place, and gets it back on uninstall. A part
+may also declare `recipes.init` and `recipes.uninit`, shell lines run once in the project root when
+the part arrives and leaves, and `vars` defaults for `${name}` used in its hooks, MCP command and
+recipes. `~/.factory/config.yaml` overrides a var for the whole machine:
+
+```yaml
+vars:
+  codegraph: codegraph      # a local build on PATH instead of the pinned npx default
+  archify: ~/src/archify    # a local clone instead of the upstream GitHub URL
+```
+
+`archify` is that shape: it ships no files, its `init` clones `${archify}` into
+`.claude/skills/archify` and its `uninit` removes the folder again, so every project gets its own
+copy and `vars.archify` re-points them all at a fork.
+
 ## Adding a part
 
-1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`, `mcp`, `settings`, `envVars`).
+1. Create `parts/<name>/part.yaml` (`type`, `description`, `default`, `files`, optional `hooks`,
+   `mcp`, `settings`, `envVars`, `snippet`, `recipes`, `vars`).
 2. Put the files it installs beside it — `skill.md`, `agents/<Agent>.md`, `scripts/…`.
 3. Run `bun src/cli.ts install <project>`.
 
-See `CLAUDE.md` for the target rules and `docs/terminology.md` for the names.
+See `AGENTS.md` for the target rules and `docs/terminology.md` for the names.
 
 ## Environment variables
 

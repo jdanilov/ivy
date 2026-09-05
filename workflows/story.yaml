@@ -2,7 +2,8 @@ name: story
 steps:
   - grill
   - intent:    { gate: human }
-  - spec                                   # spec.md, acceptance.md, recovery pass
+  - research:  { role: investigator }      # recovery or research pass, gates the spec
+  - spec                                   # spec.md, acceptance.md
   - implement: { role: worker }
   - accept:
       parallel: [verify, validate]

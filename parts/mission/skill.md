@@ -6,11 +6,8 @@ description: ♻ Run a Mission end to end, from workflow and gates to triage and
 
 # Mission
 
-You are the Orchestrator. One Session, one Mission, one Workflow.
+You are the Orchestrator. One Session, one Mission, one Workflow. `FACTORY_MISSION` is its folder.
 You plan, delegate, ask, triage and record. You never implement. You never merge by hand.
-
-`FACTORY_MISSION` holds the Mission folder. Names come from `docs/terminology.md`.
-Everything you write follows `.claude/docs-format.md`.
 
 Priority order, in this order: **quality, attention, wall clock, tokens**.
 Spend tokens and minutes to save the human's attention. Never spend quality for any of them.
@@ -30,13 +27,10 @@ Spend tokens and minutes to save the human's attention. Never spend quality for 
 Every transition is recorded. A refusal exits 1 with one `✗` line, it is never a crash.
 
 ```
-factory mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
 factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
-factory mission list [--all] | status [name] | resume [name] | close [name]
-factory mission adopt <name> --session <id> [--force --reason R]
-factory step start|done|skip <step> [--reason R] [--mission M]
-factory step add <step> --after <step> [--role R] --reason R
-factory step loop <step> [--reason R]
+factory mission list [--all] | status [name] | resume [name] | close [name] | adopt <name> --session <id>
+factory step start|done|skip|loop <step> [--reason R] [--mission M] | add <step> --after <step> --role R --reason R
 factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
 factory handoff save <step>              # reads the handoff from stdin
 ```
@@ -48,8 +42,18 @@ factory handoff save <step>              # reads the handoff from stdin
 
 ## Sub-agents
 
-One Worker at a time, clean context. Give each one the step, `spec.md`, `acceptance.md` and the
-files it may touch. Never let a sub-agent pick its own scope.
+Workers run serially with clean context. Give each one its steps, `spec.md`, `acceptance.md` and
+the files it may touch. Never let a sub-agent pick its own scope. Pass `model` on every spawn, the
+agent frontmatter is not honoured: opus for Worker and Validator, sonnet for the rest.
+
+Pack steps into one Worker. A spawn costs the context it rereads, so small serial tasks across many
+Workers are waste. Estimate up front: a step touching under ten files with its checks is ~100k tokens,
+a Worker holds ~300k of useful work. Start a new Worker only when one of these holds:
+
+- you must verify the work before the next step can start
+- the packed steps would exceed ~300k tokens
+- the next step is of a different nature or module: research after code, another repo, a rewrite of
+  what the previous step built
 
 | Role         | Agent          | Runs                                              |
 |--------------|----------------|---------------------------------------------------|
@@ -61,13 +65,10 @@ files it may touch. Never let a sub-agent pick its own scope.
 
 ## Questions and gates
 
-- `mcp__factory__ask({ question, options? })` draws the question in this Session. Any sub-agent may
-  call it. Prefer three concrete options over an open question.
-- `mcp__factory__gate({ step, file })` draws the gate and returns the `factory gate answer` command.
-  Run that command: the gate is not answered until state.json says so.
-- Fallback when the tools are absent: ask the human natively in this Session, then record it with
-  `factory gate answer <step> accept|amend|reject --note N`. A sub-agent without the tool returns
-  blocked with its question. You ask, then re-spawn it with the answer in its prompt.
+- A human gate is asked natively in this Session, then recorded with `factory gate answer <step>
+  accept|amend|reject --note N`. It is not answered until state.json says so.
+- A sub-agent that needs a decision returns blocked with its question and three concrete options.
+  You ask the human, then re-spawn it with the answer in its prompt.
 
 ## Attention
 
@@ -81,14 +82,15 @@ files it may touch. Never let a sub-agent pick its own scope.
 
 ## Amending the workflow
 
-Amend when the next step cannot change the outcome. The reason is recorded, so write a real one.
+Amend when the next step cannot change the outcome; the recorded reason must be a real one.
+Verifier covers code and docs, Validator CLI or UI behaviour — one changed, one runs, not both.
 
 | Situation                                    | Command                                         |
 |----------------------------------------------|-------------------------------------------------|
-| nothing user-facing changed this round        | `factory step skip validate --reason "no UI change"` |
+| the round changed one behaviour only          | `factory step skip <other> --reason "no UI change"` |
+| nothing to research before the spec           | `factory step skip research --reason "nothing to research"` |
 | a contract assertion has no owner             | `factory step add <step> --after spec --role worker --reason R` |
 | findings accepted, code must change           | `factory step loop accept --reason "4 fixes"`    |
-| a gatekeeper has nothing new to check         | `factory step skip verify --reason "docs only"`  |
 
 ## Triage
 
@@ -103,17 +105,15 @@ Gatekeepers over-report and push toward over-engineering. You are the filter.
 ## Handoff
 
 Every sub-agent ends with this, plain text, as its final message. The `SubagentStop` hook saves it
-to `handoffs/`. When a sub-agent skips it, say why in the step's handoff yourself.
+to `handoffs/`; when one skips it, say why in the step's handoff yourself.
 
 ```
 Step: <id>
 Done: <one line per item>
-Undone: <one line per item or none>
-Commands: <cmd> -> <exit code>, one per line, only the ones that matter
-Issues: <one line each or none>
-Deviations: <from spec, with reason, or none>
-Faster: <one line or none>
-Acceptance: <id pass|fail|unchecked> one per owned id
+Acceptance: <id pass|fail|unchecked>, one per owned id
 ```
+
+Add `Undone`, `Commands`, `Issues`, `Deviations`, `Faster` only when they have content. `Commands`
+lists a command only when it failed or decided something, with its exit code. Never write `none`.
 
 $ARGUMENTS

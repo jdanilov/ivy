@@ -7,6 +7,7 @@ import {
   listWorktrees, mainCheckout, missionRowState, missionWorkflow, readClaim, resolveMission,
   sessionLive, writeClaim, writeState,
 } from '../core/mission.js';
+import { loadPreset, openSession } from '../core/spawn.js';
 import { loadProjects } from '../core/projects.js';
 import { field, headerRow, missionRow, rule } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
@@ -20,6 +21,8 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
       return create(args[0], flags, cwd);
     case 'list':
       return list(flags);
+    case 'open':
+      return open(args[0], flags, cwd);
     case 'status':
       return show(args[0], cwd);
     case 'adopt':
@@ -29,7 +32,7 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
     case 'close':
       return close(args[0], cwd);
     default:
-      throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, list, status, adopt, resume, close`);
+      throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, list, status, adopt, resume, close`);
   }
 }
 
@@ -65,6 +68,32 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   field('branch', created.state.branch);
   if (created.state.worktree) field('worktree', created.state.worktree);
   field('step', created.state.step);
+  console.log('');
+
+  if (flags['no-open'] !== true) await open(created.state.name, flags, cwd);
+}
+
+/** Writes the Warp tab config and opens it. The session id reaches state.json first. */
+async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
+  const m = await resolveMission(cwd, name);
+  const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
+  const dry = flags['dry-run'] === true;
+  const spawn = await openSession(cwd, m, preset, dry);
+  const opened = spawn.warp ? 'tab opened' : 'no warp — run it yourself';
+  const note = dry ? `dry run${spawn.warp ? '' : ' · no warp'}` : opened;
+
+  console.log('');
+  headerRow(
+    `${colors.cyan}●${colors.reset} ${colors.bold}${m.state.name}${colors.reset} ${colors.dim}${preset.name}${colors.reset}`,
+    `${colors.dim}${note}${colors.reset}`,
+  );
+  rule();
+  field('session', spawn.session);
+  field('cwd', spawn.cwd);
+  field('config', spawn.configPath);
+  field('uri', spawn.uri);
+  console.log(`${I}${colors.dim}command${colors.reset}`);
+  console.log(`${I}${spawn.command}`);
   console.log('');
 }
 

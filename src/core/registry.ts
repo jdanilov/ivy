@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
-import type { EnvVar, HookConfig, McpConfig, Part, PartFile, PartType } from '../types.js';
+import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType } from '../types.js';
+import { HOOK_EVENTS } from '../types.js';
 
 // Resolve FACTORY_ROOT from this file's location: src/core/ -> project root
 export const FACTORY_ROOT = path.resolve(import.meta.dir, '..', '..');
@@ -54,10 +55,10 @@ function parsePart(name: string, raw: unknown): Part {
   if (raw.hooks !== undefined) {
     if (!Array.isArray(raw.hooks)) fail('hooks must be a list');
     part.hooks = (raw.hooks as unknown[]).map((h): HookConfig => {
-      if (!isRecord(h) || typeof h.event !== 'string' || typeof h.matcher !== 'string' || typeof h.command !== 'string') {
-        return fail('every hook needs event, matcher and command');
-      }
-      return { event: h.event as HookConfig['event'], matcher: h.matcher, command: h.command };
+      if (!isRecord(h) || typeof h.event !== 'string' || typeof h.command !== 'string') return fail('every hook needs event and command');
+      if (!HOOK_EVENTS.includes(h.event as HookEvent)) fail(`hook event must be one of ${HOOK_EVENTS.join(', ')}`);
+      if (h.matcher !== undefined && typeof h.matcher !== 'string') fail(`hook on ${h.event} has a non-string matcher`);
+      return { event: h.event as HookEvent, ...(h.matcher === undefined ? {} : { matcher: h.matcher }), command: h.command };
     });
   }
 

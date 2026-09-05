@@ -100,7 +100,7 @@ export async function unlinkPart(
   return { removed, left };
 }
 
-type HookEntry = { matcher: string; hooks: Array<{ type: string; command: string }> };
+type HookEntry = { matcher?: string; hooks: Array<{ type: string; command: string }> };
 
 export async function injectHooks(hooks: HookConfig[], targetDir: string): Promise<void> {
   const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
@@ -116,8 +116,9 @@ export async function injectHooks(hooks: HookConfig[], targetDir: string): Promi
       settings.hooks[eventKey] = [];
     }
 
+    // UserPromptSubmit and Stop take no matcher, so the key is left out entirely.
     const hookEntry: HookEntry = {
-      matcher: hook.matcher,
+      ...(hook.matcher === undefined ? {} : { matcher: hook.matcher }),
       hooks: [{ type: 'command', command: hook.command }],
     };
 

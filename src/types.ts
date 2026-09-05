@@ -9,9 +9,17 @@ export interface EnvVar {
   url: string;      // where to get the key
 }
 
+export const HOOK_EVENTS = [
+  'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop',
+  'SubagentStart', 'SubagentStop', 'PreCompact', 'SessionStart', 'SessionEnd',
+] as const;
+
+export type HookEvent = (typeof HOOK_EVENTS)[number];
+
 export interface HookConfig {
-  event: 'PreToolUse' | 'PostToolUse' | 'Stop';
-  matcher: string;
+  event: HookEvent;
+  /** Omitted for events Claude Code does not match on (UserPromptSubmit, Stop). */
+  matcher?: string;
   command: string;
 }
 
@@ -133,4 +141,17 @@ export interface Claim {
 export interface Mission {
   dir: string;
   state: MissionState;
+}
+
+// ── Presets ──────────────────────────────────────────────────────────────────
+
+/** A spawn-time bundle: presets/<name>/{preset.yaml,prompt.md,settings.json,mcp.json}. */
+export interface Preset {
+  name: string;
+  dir: string;
+  model: string;
+  effort: string;
+  plugins: string[];
+  mcp: string[];
+  sendMessage: boolean;
 }

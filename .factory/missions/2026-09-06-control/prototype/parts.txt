@@ -1,0 +1,42 @@
+ ● Mission Control  /opt/ed/ivy                                                        TIME 14m · Input 310.2K · Cached 4.1M · Output 48.0K 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ● RUNNING  ███████████████████████████████████████████████████████████████████████████████████████████                           3/10 [+5] 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ Missions                                                      │ Parts  ivy                                                           15/17 
+ ──────────────────────────────────────────────────────────────│ ────────────────────────────────────────────────────────────────────────── 
+ ivy                                                           │  archify         skill    ○ available  .claude/skills/archify/skill.md     
+ ›● refit  story  implement r2                        14m  4.5M│  browse          tool     ● installed  .claude/skills/browse/skill.md      
+    wt ../ivy-refit · caffeinate on                            │  code-format     fixture  ● installed  .claude/code-format.md              
+  ○ memory  stub                                               │  codegraph       mcp      ○ available  .claude/scripts/codegraph-gate.sh   
+ igs                                                           │  commit          skill    ● installed  .claude/skills/commit/skill.md      
+  ⊘ auth  fix  merge r2                             2h 4m  1.2M│  docs-format     fixture  ● installed  .claude/docs-format.md              
+    quick  unbound  #8a9e6b42  idle 12m                        │  explain         skill    ● installed  .claude/skills/explain/skill.md     
+ cut                                                           │  hook-factory    fixture  ● installed  .claude/scripts/hook-factory.ts     
+  ✓ intro  closed 2d ago                                       │  hook-safe-bash  fixture  ● installed  .claude/scripts/safe-bash.sh        
+                                                               │  mission         skill    ● installed  .claude/skills/mission/skill.md     
+                                                               │  permissions     fixture  ● installed  .claude/settings.json               
+                                                               │  research        tool     ● installed  .claude/skills/research/skill.md    
+                                                               │  retro           skill    ● installed  .claude/skills/retro/skill.md       
+                                                               │  roadmap         fixture  ● installed  docs/roadmap.md                     
+                                                               │  terminology     fixture  ● installed  docs/terminology.md                 
+                                                               │  validate        skill    ● installed  .claude/skills/validate/skill.md    
+                                                               │  verify          skill    ● installed  .claude/skills/verify/skill.md      
+                                                               │ ────────────────────────────────────────────────────────────────────────── 
+                                                               │ part archify · type skill · file .claude/skills/archify/skill.md           
+                                                               │ pending nothing                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ↑↓ Select  Space Toggle  ↵ Apply  Tab Mode  q Quit                                                                                         

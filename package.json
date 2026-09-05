@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/xai": "^3.0.88",
     "@clack/prompts": "^0.9.1",
+    "@opentui/core": "0.5.10",
     "ai": "^6.0.175"
   },
   "devDependencies": {

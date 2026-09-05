@@ -56,7 +56,7 @@ async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<v
       return update(targetDir, skip ? skip.split(',') : []);
     }
     default:
-      throw new Refusal(`unknown command: ${cmd} — install, uninstall, status, update, mission, step, gate, handoff`);
+      throw new Refusal(`unknown command: ${cmd} — install, uninstall, status, update, mission, step, gate, handoff, control`);
   }
 }
 
@@ -64,6 +64,12 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args[0] && MISSION_COMMANDS.includes(args[0])) return runMissionCommand(args[0], args.slice(1));
+
+  // Mission Control owns the screen: no banner, no project picker.
+  if (args[0] === 'control') {
+    const { control } = await import('./commands/control.js');
+    return control(parseArgs(args.slice(1)).flags);
+  }
 
   console.log(`\n${colors.bold}Factory${colors.reset} ${colors.dim}— portable development harness${colors.reset}\n`);
 

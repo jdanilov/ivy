@@ -1,0 +1,33 @@
+{
+  "name": "refit",
+  "title": "Factory refit: retro skill, snippets, roadmap, token diet",
+  "workflow": "story",
+  "attention": "light",
+  "status": "open",
+  "step": "intent",
+  "round": 0,
+  "session": null,
+  "branch": "mission/refit",
+  "worktree": null,
+  "gates": {
+    "intent": {
+      "status": "open",
+      "file": "intent.md",
+      "at": "2026-09-05T18:04:36.705Z"
+    }
+  },
+  "steps": {
+    "grill": {
+      "status": "done",
+      "startedAt": "2026-09-05T18:04:36.507Z",
+      "endedAt": "2026-09-05T18:04:36.580Z"
+    },
+    "intent": {
+      "status": "running",
+      "startedAt": "2026-09-05T18:04:36.641Z"
+    }
+  },
+  "deviations": [],
+  "created": "2026-09-05T18:04:36.435Z",
+  "updated": "2026-09-05T18:04:36.705Z"
+}

@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "condense",
+  "step": "merge",
   "round": 2,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/refit",
@@ -16,6 +16,11 @@
       "answer": "accept",
       "note": "Accepted 2026-09-05. Added: codegraph package source configurable per project, default @colbymchenry/codegraph",
       "at": "2026-09-05T18:14:11.935Z"
+    },
+    "merge": {
+      "status": "open",
+      "file": ".factory/missions/2026-09-05-refit/retro.md",
+      "at": "2026-09-05T21:58:01.499Z"
     }
   },
   "steps": {
@@ -55,8 +60,13 @@
       "endedAt": "2026-09-05T21:24:48.904Z"
     },
     "condense": {
+      "status": "done",
+      "startedAt": "2026-09-05T21:24:49.009Z",
+      "endedAt": "2026-09-05T21:58:01.388Z"
+    },
+    "merge": {
       "status": "running",
-      "startedAt": "2026-09-05T21:24:49.009Z"
+      "startedAt": "2026-09-05T21:58:01.444Z"
     }
   },
   "deviations": [
@@ -67,5 +77,5 @@
     }
   ],
   "created": "2026-09-05T18:04:36.435Z",
-  "updated": "2026-09-05T21:24:49.009Z"
+  "updated": "2026-09-05T21:58:01.499Z"
 }

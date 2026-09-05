@@ -18,7 +18,9 @@ settings:
     allow:
       - "mcp__codegraph__*"
 recipes:
-  init: ["${codegraph} init"]
+  init:
+    - git check-ignore -q .codegraph || echo '.codegraph/' >> .gitignore
+    - ${codegraph} init
   uninit: ["${codegraph} uninit --force"]
 vars:
   codegraph: "npx -y @colbymchenry/codegraph@1.6.0"

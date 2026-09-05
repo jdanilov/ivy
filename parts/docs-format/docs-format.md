@@ -17,15 +17,15 @@ The one exception is `intent.md`, written for the human.
 
 ## Glyphs
 
-| Glyph | Meaning           | Glyph | Meaning            |
-|-------|-------------------|-------|--------------------|
-| `●`   | entity, running   | `↻`   | loop, retry        |
-| `○`   | pending, external | `✓`   | done, pass         |
-| `≋`   | store, state      | `✗`   | failed, conflict   |
-| `◇`   | decision          | `⊘`   | blocked, waiting   |
-| `→`   | flow, call        | `◈`   | warning, edge case |
-| `←`   | return            | `±`   | change             |
-| `⇢`   | async, side effect|       |                    |
+| Glyph | Meaning            | Glyph | Meaning            |
+|-------|--------------------|-------|--------------------|
+| `●`   | entity, running    | `↻`   | loop, retry        |
+| `○`   | pending, external  | `✓`   | done, pass         |
+| `≋`   | store, state       | `✗`   | failed, conflict   |
+| `◇`   | decision           | `⊘`   | blocked, waiting   |
+| `→`   | flow, call         | `◈`   | warning, edge case |
+| `←`   | return             | `±`   | change             |
+| `⇢`   | async, side effect |       |                    |
 
 ## Example
 

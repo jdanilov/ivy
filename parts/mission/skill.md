@@ -19,7 +19,8 @@ Spend tokens and minutes to save the human's attention. Never spend quality for 
 - `intent.md` is the only doc written for the human. Grill until the why is sharp, then gate it.
 - `acceptance.md` is the contract, written with the spec, before any code. One assertion per line:
   `id | kind | claim | check | owner`, kind `verify` or `validate`. Every assertion ends the Mission
-  pass, fail or unchecked.
+  pass, fail or unchecked, and states an invariant: never a count, a created-file name or a blanket
+  line limit a project's own state can break.
 - A step is done when its handoff exists and its owned assertions are accounted for.
 
 ## CLI
@@ -45,6 +46,7 @@ factory handoff save <step>              # reads the handoff from stdin
 Workers run serially with clean context. Give each one its steps, `spec.md`, `acceptance.md` and
 the files it may touch. Never let a sub-agent pick its own scope. Pass `model` on every spawn, the
 agent frontmatter is not honoured: opus for Worker and Validator, sonnet for the rest.
+Never commit while a Worker or gatekeeper runs: between spawns, or by pathspec if you cannot wait.
 
 Pack steps into one Worker. A spawn costs the context it rereads, so small serial tasks across many
 Workers are waste. Estimate up front: a step touching under ten files with its checks is ~100k tokens,
@@ -52,8 +54,7 @@ a Worker holds ~300k of useful work. Start a new Worker only when one of these h
 
 - you must verify the work before the next step can start
 - the packed steps would exceed ~300k tokens
-- the next step is of a different nature or module: research after code, another repo, a rewrite of
-  what the previous step built
+- the next step is a different nature or module: research after code, another repo, a rewrite
 
 | Role         | Agent          | Runs                                              |
 |--------------|----------------|---------------------------------------------------|

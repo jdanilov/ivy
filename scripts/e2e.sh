@@ -3,7 +3,9 @@
 set -euo pipefail
 
 FACTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TMP="$(mktemp -d)"
+# macOS mktemp hands back /var/folders/..., a symlink to /private/var/...; the linker
+# builds relative symlink targets, so a logical path leaves every link dangling.
+TMP="$(cd "$(mktemp -d)" && pwd -P)"
 REPO="$TMP/repo"
 export HOME="$TMP/home"
 trap 'rm -rf "$TMP"' EXIT
@@ -21,6 +23,7 @@ git -C "$REPO" add -A && git -C "$REPO" commit -qm 'init'
 
 f install "$REPO" --yes
 [ -L "$REPO/.claude/skills/commit/skill.md" ] || die 'install left no symlink'
+[ -e "$REPO/.claude/skills/commit/skill.md" ] || die 'install left a dangling symlink'
 grep -q 'Docs format: @.claude/docs-format.md' "$REPO/AGENTS.md" || die 'install wrote no snippet'
 git -C "$REPO" add -A && git -C "$REPO" commit -qm 'install factory'
 

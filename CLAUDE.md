@@ -15,14 +15,17 @@ Factory is a CLI that installs a curated set of Claude Code skills, scripts and 
 ```
 src/           CLI source (entry: src/cli.ts)
 ├── core/      Business logic — registry, scanner, manifest, linker, env, projects,
-│              args, workflow (YAML load + transitions), mission (folder, state, claim, branch)
+│              args, workflow (YAML load + transitions), mission (folder, state, claim, branch),
+│              spawn (preset, Warp tab config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── commands/  install, uninstall, status, update, mission, step, gate, handoff
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
-~/.factory/    Home dir: projects list, events/<session>.jsonl, later mission state
+presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
+~/.factory/    Home dir: projects list, events/<session>.jsonl, caffeinate/<session>.pid
+~/.warp/tab_configs/factory-<mission>.toml   written by `mission open`, opened by URI
 ```
 
 ### Key principle
@@ -39,7 +42,7 @@ files:
   - source: skill.md         # relative to the part folder
   - source: agents/Critic.md
 hooks:               # optional, merged into .claude/settings.local.json
-  - { event: PreToolUse, matcher: Bash, command: ... }
+  - { event: PreToolUse, matcher: Bash, command: ... }   # matcher omitted where the event takes none
 mcp:                 # optional, written to .mcp.json
 envVars:             # optional, checked against process.env and the project .env
 ```
@@ -74,7 +77,8 @@ Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`,
 one-line `✗ …` on a refusal.
 
 ```
-factory mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]
+factory mission new <name> [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
+factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name]
 factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
 factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
@@ -91,6 +95,9 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission close` checks its own postconditions, so a rerun after a crash finishes the remaining work.
 - The mission folder always resolves through `git worktree list`, so worktrees find it in the main checkout.
 - Any transition that disagrees with `workflow.yaml` appends a `deviations` entry with a reason.
+- `mission open` writes the session id to `state.json` before the tab exists, so the first hook
+  event the new session emits already finds a mission bound to it.
+- `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
 
 ## Conventions
 

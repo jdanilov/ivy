@@ -24,8 +24,31 @@ export async function loadParts(): Promise<Part[]> {
     parts.push(parsePart(entry.name, Bun.YAML.parse(await file.text())));
   }
 
+  for (const part of parts) {
+    for (const req of part.requires ?? []) {
+      if (!parts.some((p) => p.name === req)) throw new Error(`parts/${part.name}/part.yaml: requires "${req}", which is not a part`);
+    }
+  }
+
   cache = parts;
   return parts;
+}
+
+/**
+ * The selection plus everything it requires, transitively: a dependant without its requirement is
+ * broken, so install and update pull the requirement in rather than leave a half-part behind.
+ */
+export function withRequires(parts: Part[], selected: string[]): { names: string[]; added: string[] } {
+  const byName = new Map(parts.map((p) => [p.name, p]));
+  const names = new Set(selected);
+  // A Set iterated while it grows visits what the loop adds, so this closes over the whole chain.
+  for (const name of names) for (const req of byName.get(name)?.requires ?? []) names.add(req);
+  return { names: [...names], added: [...names].filter((n) => !selected.includes(n)) };
+}
+
+/** Installed parts that need `name` and are not going away with it. */
+export function dependants(parts: Part[], name: string, leaving: string[]): string[] {
+  return parts.filter((p) => !leaving.includes(p.name) && (p.requires ?? []).includes(name)).map((p) => p.name);
 }
 
 function parsePart(name: string, raw: unknown): Part {
@@ -112,6 +135,11 @@ function parsePart(name: string, raw: unknown): Part {
   if (raw.vars !== undefined) {
     if (!isRecord(raw.vars) || Object.values(raw.vars).some((v) => typeof v !== 'string')) fail('vars must be a mapping of strings');
     part.vars = raw.vars as Record<string, string>;
+  }
+
+  if (raw.requires !== undefined) {
+    if (!Array.isArray(raw.requires) || raw.requires.some((r) => typeof r !== 'string')) fail('requires must be a list of part names');
+    part.requires = raw.requires as string[];
   }
 
   if (raw.envVars !== undefined) {

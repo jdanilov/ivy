@@ -3,7 +3,8 @@ import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js
 import { scanProject } from '../core/scanner.js';
 import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied, dropCreated } from '../core/linker.js';
 import { runUninit } from '../core/recipes.js';
-import { FACTORY_ROOT } from '../core/registry.js';
+import { Refusal } from '../core/mission.js';
+import { FACTORY_ROOT, dependants } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
 import { printPartResult, printSnippetInfo } from '../ui/format.js';
@@ -91,6 +92,12 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
     console.log(`${I}${colors.dim}Nothing to uninstall.${colors.reset}`);
     console.log('');
     return;
+  }
+
+  // Taking a part out from under something that needs it leaves the dependant broken.
+  for (const name of selectedNames) {
+    const left = dependants(installedStates.map((s) => s.part), name, selectedNames);
+    if (left.length > 0) throw new Refusal(`${name} is required by ${left.join(', ')} — uninstall those too, or keep it`);
   }
 
   // Perform uninstall

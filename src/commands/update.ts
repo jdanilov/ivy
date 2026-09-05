@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readlink } from 'node:fs/promises';
 import type { HookConfig, ManifestPart, Part, SnippetRecord } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
-import { loadParts, FACTORY_ROOT } from '../core/registry.js';
+import { loadParts, withRequires, FACTORY_ROOT } from '../core/registry.js';
 import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
 import { resolvePart, runInit, runUninit } from '../core/recipes.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
@@ -151,9 +151,13 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     if (result.left.length > 0) line('!', colors.dim, name, `left in place: ${result.left.join(', ')}`);
   }
 
+  // What an installed part requires has to be there too, default or not.
+  const needed = new Set(withRequires(parts, Object.keys(manifest.parts)).added);
+
   // A part the Factory ships as a default reaches an already-installed project on the next update.
   for (const part of parts) {
-    if (!part.default || manifest.parts[part.name] || skipped.has(part.name)) continue;
+    if (manifest.parts[part.name] || skipped.has(part.name)) continue;
+    if (!part.default && !needed.has(part.name)) continue;
 
     const { next, snippetAdded, failure: initFailed } = await applyPart(part, undefined, resolvedDir);
     if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);

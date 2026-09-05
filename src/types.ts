@@ -75,6 +75,8 @@ export interface Part {
   recipes?: Recipes;
   /** Defaults for `${name}` in hooks, mcp and recipes. `~/.factory/config.yaml` wins. */
   vars?: Record<string, string>;
+  /** Parts this one needs: selected with it, installed for it, and not removable under it. */
+  requires?: string[];
 }
 
 export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict' | 'skipped';

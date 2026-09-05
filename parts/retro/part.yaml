@@ -3,3 +3,5 @@ description: sweep closed missions' retro.md into one table the human answers (o
 default: true
 files:
   - source: skill.md
+requires:
+  - mission

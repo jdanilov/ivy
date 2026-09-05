@@ -77,6 +77,7 @@ recipes:             # optional, shell lines run in the project root
   uninit: ["${codegraph} uninit --force"]   # once, when it is uninstalled or dropped
 vars:                # optional, defaults for ${name}
   codegraph: "npx -y @colbymchenry/codegraph@1.6.0"
+requires: [mission]  # optional, parts selected and installed with this one, never removable under it
 ```
 
 Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else →

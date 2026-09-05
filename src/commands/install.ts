@@ -4,7 +4,7 @@ import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
 import { linkPart, injectHooks, injectMcp, injectSettings, writeSnippet } from '../core/linker.js';
 import { resolvePart, runInit } from '../core/recipes.js';
-import { FACTORY_ROOT } from '../core/registry.js';
+import { FACTORY_ROOT, withRequires } from '../core/registry.js';
 import { checkEnvVars } from '../core/env.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
@@ -60,10 +60,17 @@ export async function install(targetDir: string, yes = false): Promise<void> {
     ? states.filter((s) => s.status !== 'conflict' && (s.part.default || s.status === 'installed' || s.status === 'modified')).map((s) => s.part.name)
     : await selectParts(states, 'install');
 
-  // Filter out conflicts that user doesn't want to overwrite
-  let filteredNames = [...selectedNames];
+  // A part without what it requires is broken, so the requirement comes along unasked.
+  const { names: withDeps, added } = withRequires(states.map((s) => s.part), selectedNames);
+  if (added.length > 0) {
+    const names = added.map((n) => displayName(states.find((s) => s.part.name === n)!.part));
+    console.log(`${I}${colors.dim}Also selected${colors.reset}  ${names.join(', ')} ${colors.dim}— required${colors.reset}`);
+  }
 
-  for (const name of yes ? [] : selectedNames) {
+  // Filter out conflicts that user doesn't want to overwrite
+  let filteredNames = [...withDeps];
+
+  for (const name of yes ? [] : withDeps) {
     const ps = states.find((s) => s.part.name === name);
     if (ps && ps.status === 'conflict') {
       const conflictFiles = ps.part.files

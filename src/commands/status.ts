@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { scanProject } from '../core/scanner.js';
+import { missionsBlock } from './mission.js';
 import { I, nameCol, colors, statusColor, statusSymbol, statusLabel, displayName, typeLabel } from '../ui/theme.js';
 
 function printHeader(targetDir: string): void {
@@ -53,5 +54,7 @@ export async function status(targetDir: string): Promise<void> {
 
   console.log('');
   console.log(`${I}${installed} installed, ${modified} modified, ${available} available`);
+
+  await missionsBlock(resolvedDir);
   console.log('');
 }

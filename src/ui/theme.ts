@@ -56,6 +56,48 @@ export function statusSymbol(status: string): string {
   }
 }
 
+// Row states from docs/design.md: pending ○, running ●, done ✓, failed ✗, blocked ⊘.
+export function rowSymbol(state: string): string {
+  switch (state) {
+    case 'running':
+      return symbols.installed;
+    case 'done':
+      return symbols.check;
+    case 'failed':
+      return symbols.cross;
+    case 'blocked':
+      return '⊘';
+    default:
+      return symbols.notInstalled;
+  }
+}
+
+export function rowColor(state: string): string {
+  switch (state) {
+    case 'running':
+      return colors.cyan;
+    case 'done':
+      return colors.green;
+    case 'failed':
+      return colors.red;
+    case 'blocked':
+      return colors.yellow;
+    default:
+      return colors.dim;
+  }
+}
+
+/** `23m 25s`, or just `10s` under a minute. */
+export function duration(fromISO?: string, toISO?: string): string {
+  if (!fromISO) return '';
+  const ms = new Date(toISO ?? Date.now()).getTime() - new Date(fromISO).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  const total = Math.round(ms / 1000);
+  const seconds = total % 60;
+  const minutes = Math.floor(total / 60);
+  return minutes === 0 ? `${seconds}s` : `${minutes}m ${seconds}s`;
+}
+
 export function typeLabel(part: Part): string {
   return part.type;
 }

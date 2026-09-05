@@ -1,5 +1,36 @@
-import type { Part, EnvWarning } from '../types.js';
-import { I, nameCol, colors, symbols, displayName } from './theme.js';
+import type { Part, EnvWarning, MissionState } from '../types.js';
+import { I, nameCol, colors, symbols, displayName, rowColor, rowSymbol } from './theme.js';
+
+const ROW_WIDTH = 62;
+const visible = (text: string): number => text.replace(/\x1b\[[0-9;]*m/g, '').length;
+
+/** Dim label, bright value, one per line. */
+export function field(label: string, value: string): void {
+  console.log(`${I}${colors.dim}${label.padEnd(9)}${colors.reset}${value}`);
+}
+
+export function rule(): void {
+  console.log(`${I}${colors.dim}${'─'.repeat(ROW_WIDTH)}${colors.reset}`);
+}
+
+/** Left text, right-aligned metrics, padded by visible width so colors do not shift it. */
+export function headerRow(left: string, right: string): void {
+  if (right === '') return console.log(`${I}${left.trimEnd()}`);
+  const gap = Math.max(1, ROW_WIDTH - visible(left) - visible(right));
+  console.log(`${I}${left}${' '.repeat(gap)}${right}`);
+}
+
+/** One mission line: glyph, name, workflow · step · round, then session liveness. */
+export function missionRow(state: MissionState, row: string, live: boolean): void {
+  const glyph = `${rowColor(row)}${rowSymbol(row)}${colors.reset}`;
+  const detail = `${colors.dim}${state.workflow} · ${state.step || '—'} · r${state.round}${colors.reset}`;
+  const session = state.status === 'closed'
+    ? `${colors.dim}closed${colors.reset}`
+    : live
+      ? `${colors.cyan}session${colors.reset}`
+      : `${colors.dim}no session${colors.reset}`;
+  headerRow(`${glyph} ${state.name.padEnd(20)}${detail}`, session);
+}
 
 // indent + "✓ " + name column
 function pad(): string {

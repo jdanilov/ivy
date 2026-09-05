@@ -3,14 +3,36 @@
 import { pickCommand, pickProject, CancelError } from './ui/prompts.js';
 import { loadProjects, saveProject } from './core/projects.js';
 import { loadParts } from './core/registry.js';
-import { colors, setNameCol } from './ui/theme.js';
+import { parseArgs } from './core/args.js';
+import { Refusal } from './core/mission.js';
+import { I, colors, setNameCol } from './ui/theme.js';
 
-const args = process.argv.slice(2);
+// Mission work happens in the checkout you are standing in; only the part commands pick a project.
+const MISSION_COMMANDS = ['mission', 'step', 'gate', 'handoff'];
 
-async function resolveProject(argPath?: string): Promise<string> {
-  if (argPath) return argPath;
-  const recent = await loadProjects();
-  return pickProject(recent);
+async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(argv);
+  const [sub, ...rest] = positionals;
+  const cwd = process.cwd();
+
+  switch (cmd) {
+    case 'mission': {
+      const { mission } = await import('./commands/mission.js');
+      return mission(sub!, rest, flags, cwd);
+    }
+    case 'step': {
+      const { step } = await import('./commands/step.js');
+      return step(sub!, rest, flags, cwd);
+    }
+    case 'gate': {
+      const { gate } = await import('./commands/gate.js');
+      return gate(sub!, rest, flags, cwd);
+    }
+    default: {
+      const { handoff } = await import('./commands/handoff.js');
+      return handoff(sub!, rest, flags, cwd);
+    }
+  }
 }
 
 async function dispatch(cmd: string, targetDir: string): Promise<void> {
@@ -32,18 +54,21 @@ async function dispatch(cmd: string, targetDir: string): Promise<void> {
       return update(targetDir);
     }
     default:
-      console.log(`   ${colors.red}Unknown command: ${cmd}${colors.reset}`);
-      process.exit(1);
+      throw new Refusal(`unknown command: ${cmd} — install, uninstall, status, update, mission, step, gate, handoff`);
   }
 }
 
 async function main() {
+  const args = process.argv.slice(2);
+
+  if (args[0] && MISSION_COMMANDS.includes(args[0])) return runMissionCommand(args[0], args.slice(1));
+
   console.log(`\n${colors.bold}Factory${colors.reset} ${colors.dim}— portable development harness${colors.reset}\n`);
 
   setNameCol(await loadParts());
 
   const cmd = args[0] || await pickCommand();
-  const targetDir = await resolveProject(args[1]);
+  const targetDir = args[1] ?? await pickProject(await loadProjects());
   await saveProject(targetDir);
 
   await dispatch(cmd, targetDir);
@@ -51,6 +76,10 @@ async function main() {
 
 main().catch((err) => {
   if (err instanceof CancelError) process.exit(0);
+  if (err instanceof Refusal) {
+    console.log(`${I}${colors.red}✗${colors.reset} ${err.message}`);
+    process.exit(1);
+  }
   console.error(err);
   process.exit(1);
 });

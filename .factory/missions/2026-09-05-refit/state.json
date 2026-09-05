@@ -4,8 +4,8 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "accept",
-  "round": 1,
+  "step": "implement",
+  "round": 2,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/refit",
   "worktree": null,
@@ -35,13 +35,12 @@
       "endedAt": "2026-09-05T18:19:25.591Z"
     },
     "implement": {
-      "status": "done",
-      "startedAt": "2026-09-05T19:29:23.241Z",
-      "endedAt": "2026-09-05T19:57:15.892Z"
+      "status": "running",
+      "startedAt": "2026-09-05T21:10:46.401Z"
     },
     "accept": {
-      "status": "running",
-      "startedAt": "2026-09-05T19:57:15.949Z"
+      "status": "pending",
+      "reason": "round 1: 3 fixes, 2 roadmap, 2 skips, human accepted"
     },
     "verify": {
       "status": "pending"
@@ -52,5 +51,5 @@
   },
   "deviations": [],
   "created": "2026-09-05T18:04:36.435Z",
-  "updated": "2026-09-05T19:57:15.949Z"
+  "updated": "2026-09-05T21:10:46.402Z"
 }

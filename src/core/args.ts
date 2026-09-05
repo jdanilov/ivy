@@ -1,7 +1,7 @@
 export type Flags = Record<string, string | true>;
 
 // Flags that never take a value, so `--worktree name` still reads `name` as a positional.
-const BOOLEAN = new Set(['worktree', 'no-worktree', 'all', 'force', 'no-open', 'dry-run', 'stub', 'yes']);
+const BOOLEAN = new Set(['worktree', 'no-worktree', 'all', 'force', 'no-open', 'dry-run', 'stub', 'yes', 'keep-branch']);
 
 /** `--flag`, `--key value` and `--key=value`. Everything else is a positional. */
 export function parseArgs(argv: string[]): { positionals: string[]; flags: Flags } {

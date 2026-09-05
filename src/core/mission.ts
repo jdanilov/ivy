@@ -338,7 +338,7 @@ export async function promoteMission(cwd: string, mission: Mission): Promise<voi
 // ── mission close ────────────────────────────────────────────────────────────
 
 /** Every action checks its own postcondition, so a rerun after a crash finishes the job. */
-export async function closeMission(cwd: string, mission: Mission): Promise<string[]> {
+export async function closeMission(cwd: string, mission: Mission, keepBranch = false): Promise<string[]> {
   const state = mission.state;
   notStub(state);
   const main = await mainCheckout(cwd);
@@ -415,6 +415,12 @@ export async function closeMission(cwd: string, mission: Mission): Promise<strin
       log.push(removed ? `worktree removed ${state.worktree}` : `worktree left in place ${state.worktree} — remove it by hand`);
       if (removed) await rm(state.worktree, { recursive: true, force: true }).catch(() => {});
     }
+  }
+
+  // Merged, and the folder is on the trunk: the branch holds nothing the mission still needs.
+  if (!keepBranch && (await gitOk(main, 'rev-parse', '--verify', '--quiet', `refs/heads/${state.branch}`))) {
+    const gone = await gitOk(main, 'branch', '-d', state.branch);
+    log.push(gone ? `branch ${state.branch} deleted` : `branch ${state.branch} left in place — delete it by hand`);
   }
 
   return log;

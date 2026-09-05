@@ -44,7 +44,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness      |
 | `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                          |
 | `mission resume [name]`                        | Check the branch back out and print the current step and open gates        |
-| `mission close [name]`                         | Commit the folder on the branch, merge, commit on trunk, clear claim       |
+| `mission close [name] [--keep-branch]`         | Commit the folder, merge, commit on trunk, clear claim, delete the branch  |
 | `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                    |
 | `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                   |
 | `step loop <step>`                             | Record a round and send the mission back to the step's loop target         |

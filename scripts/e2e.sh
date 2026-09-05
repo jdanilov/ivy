@@ -39,6 +39,7 @@ done
 
 f mission close x
 [ "$(git -C "$REPO" rev-parse --abbrev-ref HEAD)" = 'main' ] || die 'close left the mission branch'
+! git -C "$REPO" show-ref --verify --quiet refs/heads/mission/x || die 'close kept the branch'
 [ -z "$(git -C "$REPO" status --porcelain)" ] || die "close left the tree dirty: $(git -C "$REPO" status --porcelain | tr '\n' ' ')"
 grep -q 'close mission x' <(git -C "$REPO" log --format=%s main) || die 'close did not land on main'
 

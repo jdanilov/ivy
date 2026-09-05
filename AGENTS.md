@@ -119,7 +119,7 @@ one-line `✗ …` on a refusal.
 ```
 factory mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
 factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
-factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name]
+factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
 factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
 factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
 factory handoff save <step>            # reads the handoff from stdin
@@ -147,6 +147,8 @@ factory handoff save <step>            # reads the handoff from stdin
   landing in the same state `mission new` would have.
 - `mission close` commits a dirty mission folder on the mission branch before it leaves the branch,
   and refuses when anything outside the folder is dirty, naming the paths.
+- `mission close` deletes `mission/<name>` last, after the worktree is gone and the merge landed;
+  `--keep-branch` keeps it, and a branch git will not delete is reported, never forced.
 - `mission list` and `gate list` skip a registered project whose path is gone. The projects file keeps it.
 
 ## Conventions

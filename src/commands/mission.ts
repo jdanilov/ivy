@@ -30,7 +30,7 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
     case 'resume':
       return resume(args[0], cwd);
     case 'close':
-      return close(args[0], cwd);
+      return close(args[0], flags, cwd);
     default:
       throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, list, status, adopt, resume, close`);
   }
@@ -241,10 +241,10 @@ async function resume(name: string | undefined, cwd: string): Promise<void> {
   console.log('');
 }
 
-async function close(name: string | undefined, cwd: string): Promise<void> {
+async function close(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m: Mission = await resolveMission(cwd, name);
   notStub(m.state);
-  const log = await closeMission(cwd, m);
+  const log = await closeMission(cwd, m, flags['keep-branch'] === true);
 
   console.log('');
   headerRow(`${colors.green}✓${colors.reset} ${colors.bold}${m.state.name}${colors.reset} ${colors.dim}closed${colors.reset}`, '');

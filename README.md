@@ -17,15 +17,37 @@ git clone git@github.com:jdanilov/ivy.git factory && cd factory && bun install
 ```
 
 ```bash
-bun start                                     # interactive: pick a command and a project
-
-bun src/cli.ts install   /path/to/project     # pick parts to install
-bun src/cli.ts update    /path/to/project     # relink installed parts, add new defaults, drop retired ones
-bun src/cli.ts status    /path/to/project     # what is installed
-bun src/cli.ts uninstall /path/to/project     # pick parts to remove
+bun start                                # interactive: pick a command and a project
+bun src/cli.ts <command> [args]          # or run a command directly
 ```
 
 Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256 hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent projects live in `~/.factory/projects`.
+
+## Commands
+
+`install`, `uninstall`, `status` and `update` take a project path and fall back to a picker.
+Everything else acts on the checkout you are standing in and never prompts.
+
+| Command                                        | Purpose                                                                    |
+|------------------------------------------------|----------------------------------------------------------------------------|
+| `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
+| `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
+| `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
+| `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |
+| `mission new <name>`                           | Create the mission folder, workflow copy, `state.json`, branch and claim   |
+| `mission open [name]`                          | Spawn the mission's session in a Warp tab from a preset                    |
+| `mission list [--all]`                         | Every mission across `~/.factory/projects`                                 |
+| `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness      |
+| `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                          |
+| `mission resume [name]`                        | Check the branch back out and print the current step and open gates        |
+| `mission close [name]`                         | Merge the branch, commit the folder on trunk, clear claim, drop worktree   |
+| `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                    |
+| `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                   |
+| `step loop <step>`                             | Record a round and send the mission back to the step's loop target         |
+| `gate open <step> --file F`                    | Put a gate's content up for an answer                                      |
+| `gate answer <step> accept\|amend\|reject`     | Answer a gate once; a conflicting second answer is refused                 |
+| `gate list`                                    | Every open gate across projects                                            |
+| `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
 
 ## Parts
 

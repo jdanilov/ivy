@@ -24,6 +24,7 @@ src/           CLI source (entry: src/cli.ts)
 parts/<name>/  One folder per part: part.yaml plus the files it installs
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
+plugins/factory/ function-hooks plugin: the ask and gate tools and the status line
 ~/.factory/    Home dir: projects list, events/<session>.jsonl, caffeinate/<session>.pid
 ~/.warp/tab_configs/factory-<mission>.toml   written by `mission open`, opened by URI
 ```
@@ -78,7 +79,8 @@ Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`,
 
 ### Two command families
 
-`install | uninstall | status | update [project]` act on a project and fall back to the picker.
+`install | uninstall | status | update [project] [--skip a,b]` act on a project and fall back to the
+picker. `--skip` records the part in the manifest, so the project keeps its own copy for good.
 `mission | step | gate | handoff <sub>` act on the checkout you are standing in, never prompt
 (the one exception is the worktree offer in `mission new` on a claimed checkout) and exit 1 with a
 one-line `✗ …` on a refusal.

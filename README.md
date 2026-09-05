@@ -63,6 +63,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`        |
 | `/browse`        | tool    | sonnet | Drives a real or headless browser through `agent-browser`     |
 | `/archify`       | skill   | opus   | Architecture diagrams from a typed spec, cloned per project (opt-in) |
+| `code-format`    | fixture | —      | How code is written, referenced by every agent                |
 | `docs-format`    | fixture | —      | How agent-facing docs are written, referenced by every agent  |
 | `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
 | `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
@@ -85,8 +86,10 @@ Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summar
 
 A part may own one line in the project's `AGENTS.md` (`CLAUDE.md` when that is the only agent file):
 `snippet: { section, line }` appends it under the named heading on install and takes it back out on
-uninstall, so `terminology`, `roadmap` and `docs-format` reach every agent through one `@path` list
-instead of a sentence in every prompt. A part may also declare `recipes.init` and `recipes.uninit`,
+uninstall, so `terminology`, `docs-format` and `code-format` reach every agent through one `@path`
+list instead of a sentence in every prompt. `roadmap` names its path in backticks instead: a file
+that grows with every retro is a pointer, not something to pull into every context. A section that
+already names the same path has that line rewritten in place, and gets it back on uninstall. A part may also declare `recipes.init` and `recipes.uninit`,
 shell lines run once in the project root when the part arrives and leaves, and `vars` defaults for
 `${name}` used in its hooks, MCP command and recipes. `~/.factory/config.yaml` overrides a var for
 the whole machine:

@@ -7,4 +7,4 @@ files:
     skipIfExists: true
 snippet:
   section: "## Important Files"
-  line: "- Roadmap: @docs/roadmap.md"
+  line: "- Roadmap: `docs/roadmap.md`"

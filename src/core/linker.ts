@@ -99,8 +99,14 @@ function sectionEnd(lines: string[], at: number): number {
   return lines.length;
 }
 
-/** The path a snippet line points at: what a line about the same file must contain to be its match. */
-const snippetPath = (line: string): string | undefined => /@(\S+)/.exec(line)?.[1];
+/**
+ * The path a snippet line points at, whether it includes the file with `@` or only names it in
+ * backticks: what a line about the same file must contain to count as the same line.
+ */
+const snippetPath = (line: string): string | undefined => {
+  const hit = /@(\S+)|`([^`]+)`/.exec(line);
+  return hit?.[1] ?? hit?.[2];
+};
 
 /**
  * Adds the part's line under its section, creating the section at the end of the file when it is
@@ -131,7 +137,8 @@ export async function writeSnippet(
   const target = snippetPath(snippet.line);
   const hit = target === undefined ? -1 : body.findIndex((l) => l.includes(target));
   if (hit !== -1) {
-    if (record.replaced === undefined) record.replaced = body[hit]!;
+    // Our own line from a past install is not the project's: only a line we never wrote is restorable.
+    if (record.replaced === undefined && body[hit] !== prev?.line) record.replaced = body[hit]!;
     lines[at + 1 + hit] = snippet.line;
   } else {
     let insert = end;

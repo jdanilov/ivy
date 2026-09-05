@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { readlink } from 'node:fs/promises';
-import type { HookConfig, ManifestPart, Part } from '../types.js';
+import type { HookConfig, ManifestPart, Part, SnippetRecord } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, FACTORY_ROOT } from '../core/registry.js';
 import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
@@ -8,6 +8,8 @@ import { resolvePart, runInit, runUninit } from '../core/recipes.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
+// Where the line sits, not what it displaced: a recorded `replaced` must not read as a move.
+const snippetKey = (s?: SnippetRecord): string => (s ? `${s.file}|${s.section}|${s.line}` : '');
 
 /**
  * The one sequence that puts a part in place: vars resolved (a changed ~/.factory/config.yaml
@@ -85,7 +87,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       const stale = (entry.hooks ?? []).filter((h) => !(next.hooks ?? []).some((n) => hookKey(n) === hookKey(h)));
       if (stale.length > 0) await removeHooks(stale, resolvedDir);
 
-      if (entry.snippet && JSON.stringify(entry.snippet) !== JSON.stringify(next.snippet)) {
+      if (entry.snippet && snippetKey(entry.snippet) !== snippetKey(next.snippet)) {
         if (await removeSnippet(entry.snippet, resolvedDir)) line('-', colors.yellow, displayName(part), `${entry.snippet.file} → line removed`);
       }
 

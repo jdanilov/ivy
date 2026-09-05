@@ -1,0 +1,9 @@
+type: fixture
+description: how code is written
+default: true
+files:
+  - source: code-format.md
+    target: .claude/code-format.md
+snippet:
+  section: "## Important Files"
+  line: "- Code format: @.claude/code-format.md"

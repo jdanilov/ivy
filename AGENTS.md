@@ -7,7 +7,8 @@ in a manifest.
 ## Important Files
 - Docs format: @.claude/docs-format.md
 - Terminology: @docs/terminology.md
-- Roadmap: @docs/roadmap.md
+- Roadmap: `docs/roadmap.md`
+- Code format: @.claude/code-format.md
 
 ## Tech Stack
 
@@ -27,6 +28,8 @@ src/           CLI source (entry: src/cli.ts)
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
+scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, uninstall --yes
+.factory/factory.yaml   the project's own recipes: verify, e2e
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
 ~/.factory/    Home dir: projects list, config.yaml (var overrides), events/<session>.jsonl,
@@ -86,16 +89,22 @@ the rest leads the args. Substitution happens as the manifest entry is built, so
 and the hooks hold resolved strings and `update` re-points a project after a config edit.
 
 The manifest records each part's `snippet: { file, section, line }` and, after `recipes.init` succeeded,
-`initAt`. Uninstall works from those records, not from a fresh resolution: it removes the recorded line
-from the recorded file and drops the section when only blank lines are left. `init` runs when `initAt` is
+`initAt`. A section that already carries a line naming the same path gets that line rewritten in place
+instead of a second one appended, and the original is kept as `snippet.replaced`. Uninstall works from
+those records, not from a fresh resolution: it puts a replaced line back, otherwise removes the recorded
+line from the recorded file and drops the section when only blank lines are left. A settings or mcp file
+the uninstall emptied is deleted. `init` runs when `initAt` is
 absent and refuses on a non-zero exit with the part left linked, so a fix plus `update` retries. `uninit`
 runs on uninstall and when `update` drops a part the registry no longer has; a failure prints `◈` and the
 unlink continues.
 
 ### Two command families
 
-`install | uninstall | status | update [project] [--skip a,b]` act on a project and fall back to the
-picker. `--skip` records the part in the manifest, so the project keeps its own copy for good.
+`install | uninstall | status | update [project]` act on a project and fall back to the picker.
+`install` and `uninstall` take `--yes`: the defaults plus what is already installed, no menu, no
+confirm. `update` alone takes `--skip a,b`, which records the part in the manifest, so the project
+keeps its own copy for good.
+
 `update` is the non-interactive install: relink, add parts the registry marks `default`, drop parts
 and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever removes a
 symlink pointing into the Factory.
@@ -126,6 +135,9 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission open` writes the session id to `state.json` before the tab exists, so the first hook
   event the new session emits already finds a mission bound to it.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
+- `mission new` and the promotion in `mission open` add `.factory/claim` to the project `.gitignore`
+  when nothing ignores it yet, committing that line when the file is otherwise clean, and `mission
+  close` never counts the claim as dirt: the Factory's own file cannot block the Factory.
 - A stub is a mission with `status: stub` and `branch: null`: folder, workflow copy and an
   `intent.md` skeleton, no branch and no claim. Every command that needs a branch refuses with
   `mission <name> is a stub, open it first`; `mission open` promotes it and then proceeds as usual,

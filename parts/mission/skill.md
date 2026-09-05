@@ -1,7 +1,7 @@
 ---
 name: mission
 model: fable
-description: ♻ Run a Mission end to end: workflow, steps, gates, sub-agents, triage, close
+description: ♻ Run a Mission end to end, from workflow and gates to triage and close
 ---
 
 # Mission

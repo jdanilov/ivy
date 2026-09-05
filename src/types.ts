@@ -51,7 +51,7 @@ export interface Part {
   settings?: Settings;
 }
 
-export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict';
+export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict' | 'skipped';
 
 export interface PartState {
   part: Part;
@@ -65,6 +65,8 @@ export interface Manifest {
   installedAt: string;
   updatedAt: string;
   parts: Record<string, ManifestPart>;
+  /** Parts this project owns itself: `update --skip` never installs or touches them again. */
+  skipped?: string[];
 }
 
 export interface ManifestPart {

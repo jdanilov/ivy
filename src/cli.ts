@@ -3,7 +3,7 @@
 import { pickCommand, pickProject, CancelError } from './ui/prompts.js';
 import { loadProjects, saveProject } from './core/projects.js';
 import { loadParts } from './core/registry.js';
-import { parseArgs } from './core/args.js';
+import { parseArgs, str, type Flags } from './core/args.js';
 import { Refusal } from './core/mission.js';
 import { I, colors, setNameCol } from './ui/theme.js';
 
@@ -35,7 +35,7 @@ async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
   }
 }
 
-async function dispatch(cmd: string, targetDir: string): Promise<void> {
+async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<void> {
   switch (cmd) {
     case 'install': {
       const { install } = await import('./commands/install.js');
@@ -51,7 +51,8 @@ async function dispatch(cmd: string, targetDir: string): Promise<void> {
     }
     case 'update': {
       const { update } = await import('./commands/update.js');
-      return update(targetDir);
+      const skip = str(flags, 'skip');
+      return update(targetDir, skip ? skip.split(',') : []);
     }
     default:
       throw new Refusal(`unknown command: ${cmd} — install, uninstall, status, update, mission, step, gate, handoff`);
@@ -67,11 +68,12 @@ async function main() {
 
   setNameCol(await loadParts());
 
-  const cmd = args[0] || await pickCommand();
-  const targetDir = args[1] ?? await pickProject(await loadProjects());
+  const { positionals, flags } = parseArgs(args);
+  const cmd = positionals[0] || await pickCommand();
+  const targetDir = positionals[1] ?? await pickProject(await loadProjects());
   await saveProject(targetDir);
 
-  await dispatch(cmd, targetDir);
+  await dispatch(cmd, targetDir, flags);
 }
 
 main().catch((err) => {

@@ -20,6 +20,7 @@ export const symbols = {
   modified: '▲',
   notInstalled: '○',
   conflict: '✗',   // docs/design.md: ▲ yellow is modified, ✗ red is conflict
+  skipped: '⊘',
   check: '✓',
   cross: '✗',
   selected: '◉',
@@ -36,6 +37,8 @@ export function statusColor(status: string): string {
       return colors.dim;
     case 'conflict':
       return colors.red;
+    case 'skipped':
+      return colors.dim;
     default:
       return colors.reset;
   }
@@ -51,6 +54,8 @@ export function statusSymbol(status: string): string {
       return symbols.notInstalled;
     case 'conflict':
       return symbols.conflict;
+    case 'skipped':
+      return symbols.skipped;
     default:
       return symbols.notInstalled;
   }
@@ -132,6 +137,8 @@ export function statusLabel(status: string): string {
       return 'not installed';
     case 'conflict':
       return 'conflict';
+    case 'skipped':
+      return 'skipped';
     default:
       return status;
   }

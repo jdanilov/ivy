@@ -18,9 +18,16 @@ export async function hashFile(filePath: string): Promise<string> {
 export async function scanProject(targetDir: string): Promise<PartState[]> {
   const manifest = await readManifest(targetDir);
   const parts = await loadParts();
+  const skipped = new Set(manifest?.skipped ?? []);
   const states: PartState[] = [];
 
   for (const part of parts) {
+    // A skipped part is the project's own business: whatever sits at its targets is not our conflict.
+    if (skipped.has(part.name)) {
+      states.push({ part, status: 'skipped', files: {} });
+      continue;
+    }
+
     const fileStates: PartState['files'] = {};
     let allExist = true;
     let anyExists = false;

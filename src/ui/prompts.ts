@@ -80,6 +80,7 @@ export async function selectParts(
       if (ps.status === 'installed') hint = 'no changes';
       else if (ps.status === 'modified') hint = 'will overwrite';
       else if (ps.status === 'conflict') hint = 'conflict — file exists';
+      else if (ps.status === 'skipped') hint = 'skipped — the project owns it';
     } else {
       if (ps.status === 'modified') hint = 'has local changes';
     }
@@ -87,7 +88,7 @@ export async function selectParts(
     const description = ps.part.description + (hint ? ` ${colors.dim}· ${hint}${colors.reset}` : '');
 
     const initialValue = mode === 'install'
-      ? ps.part.default && ps.status !== 'installed'
+      ? ps.part.default && ps.status !== 'installed' && ps.status !== 'skipped'
       : false;
 
     return {

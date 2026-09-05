@@ -140,8 +140,9 @@ export async function install(targetDir: string): Promise<void> {
       await injectSettings(part.settings, resolvedDir);
     }
 
-    // Update manifest
+    // Update manifest. Picking a part here takes it back off the skip list.
     manifest.parts[name] = manifestPart;
+    if (manifest.skipped) manifest.skipped = manifest.skipped.filter((n) => n !== name);
 
     if (wasInstalled) {
       updateCount++;

@@ -25,7 +25,7 @@ function printStatusMatrix(states: import('../types.js').PartState[]): void {
     const statusText = `${sym} ${label}`;
     const statusPad = statusText.padEnd(12);
 
-    if (ps.status === 'not-installed') {
+    if (ps.status === 'not-installed' || ps.status === 'skipped') {
       console.log(`${I}${name}${type}${col}${statusPad}${colors.reset}`);
     } else if (fileList.length > 0) {
       console.log(`${I}${name}${type}${col}${statusPad}${colors.reset} ${fileList[0]}`);
@@ -51,9 +51,11 @@ export async function status(targetDir: string): Promise<void> {
   const installed = states.filter((s) => s.status === 'installed').length;
   const modified = states.filter((s) => s.status === 'modified').length;
   const available = states.filter((s) => s.status === 'not-installed').length;
+  const skipped = states.filter((s) => s.status === 'skipped').length;
 
   console.log('');
-  console.log(`${I}${installed} installed, ${modified} modified, ${available} available`);
+  const counts = `${installed} installed, ${modified} modified, ${available} available`;
+  console.log(`${I}${counts}${skipped > 0 ? `, ${skipped} skipped` : ''}`);
 
   await missionsBlock(resolvedDir);
   console.log('');

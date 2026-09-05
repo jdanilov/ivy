@@ -9,12 +9,16 @@ import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
 
 /** Non-interactive refresh of an installed project: relink what stayed, unlink what the registry dropped. */
-export async function update(targetDir: string): Promise<void> {
+export async function update(targetDir: string, skip: string[] = []): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
   const manifest = await readManifest(resolvedDir);
+  // A skipped part is neither installed nor touched: the project owns whatever sits at its targets.
+  // The list sticks in the manifest, so a later bare `update` does not reinstall it.
+  const skipped = new Set([...(manifest?.skipped ?? []), ...skip]);
 
   console.log('');
   console.log(`${I}${colors.dim}Target${colors.reset}   ${resolvedDir}`);
+  if (skipped.size > 0) console.log(`${I}${colors.dim}Skipped${colors.reset}  ${[...skipped].join(', ')}`);
   console.log('');
 
   if (!manifest || Object.keys(manifest.parts).length === 0) {
@@ -38,6 +42,7 @@ export async function update(targetDir: string): Promise<void> {
   let installed = 0;
 
   for (const [name, entry] of Object.entries(manifest.parts)) {
+    if (skipped.has(name)) continue;
     const part = registry.get(name);
 
     if (part) {
@@ -100,7 +105,7 @@ export async function update(targetDir: string): Promise<void> {
 
   // A part the Factory ships as a default reaches an already-installed project on the next update.
   for (const part of parts) {
-    if (!part.default || manifest.parts[part.name]) continue;
+    if (!part.default || manifest.parts[part.name] || skipped.has(part.name)) continue;
 
     manifest.parts[part.name] = await linkPart(part, resolvedDir, FACTORY_ROOT);
     if (part.hooks) await injectHooks(part.hooks, resolvedDir);
@@ -116,6 +121,7 @@ export async function update(targetDir: string): Promise<void> {
   } else {
     manifest.updatedAt = new Date().toISOString();
     manifest.factory = FACTORY_ROOT;
+    if (skipped.size > 0) manifest.skipped = [...skipped];
     await writeManifest(resolvedDir, manifest);
   }
 

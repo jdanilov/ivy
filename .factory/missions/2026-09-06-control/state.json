@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "condense",
+  "step": "merge",
   "round": 1,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/control",
@@ -16,6 +16,11 @@
       "answer": "accept",
       "note": "Design confirmed in session 2026-09-06: three right-pane modes, opentui core, fixture first",
       "at": "2026-09-05T23:12:02.199Z"
+    },
+    "merge": {
+      "status": "open",
+      "file": "retro.md",
+      "at": "2026-09-06T13:55:45.918Z"
     }
   },
   "steps": {
@@ -71,8 +76,13 @@
       "endedAt": "2026-09-06T13:49:46.823Z"
     },
     "condense": {
+      "status": "done",
+      "startedAt": "2026-09-06T13:49:46.938Z",
+      "endedAt": "2026-09-06T13:55:45.806Z"
+    },
+    "merge": {
       "status": "running",
-      "startedAt": "2026-09-06T13:49:46.938Z"
+      "startedAt": "2026-09-06T13:55:45.863Z"
     }
   },
   "deviations": [
@@ -108,5 +118,5 @@
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-06T13:49:46.938Z"
+  "updated": "2026-09-06T13:55:45.918Z"
 }

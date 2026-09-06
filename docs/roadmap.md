@@ -13,3 +13,5 @@ a human prunes it, nothing else reads it.
 - [ ] Directory `source` in a part's `files[]`, for vendors too large to list file by file (2026-09-05-refit)
 - [ ] `step add --after X` when X is done and the pointer sits on the next pending step: the pointer should move to the new step (2026-09-06-control)
 - [ ] `scripts/test.ts` in-process cases write scratch paths into the real `~/.factory/projects`: Bun fixes `os.homedir()` at start, so `FACTORY_HOME` must read `HOME` lazily or the cases must run as children (2026-09-06-control)
+- [ ] `failed` step state: nothing sets it; add `factory step fail <step> --reason` or drop it from `RunState` (2026-09-06-control)
+- [ ] `gate|step|mission` resolve from cwd, so a scratch HOME does not sandbox them; refuse when the resolved project is not in `$HOME/.factory/projects` (2026-09-06-control)

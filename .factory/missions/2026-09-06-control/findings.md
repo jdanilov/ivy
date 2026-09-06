@@ -20,3 +20,11 @@ unlisted findings, none blocking. Triage by the Orchestrator, attention light.
 | V5  | RSS warms 110 to 232 MB over the first 200 renders, then flat                             | skip | flat is the invariant; note for the retro, no code                         |
 
 Fix set goes to one Worker: hook-factory, linker, `src/tui`, README. Round 2 checks A-R1-*.
+
+## Round 2
+
+A-R1-1..8 all pass (`findings-validate-r2.md`), verify recipe green, Verifier skipped by the
+routing rule. Two unlisted findings, both roadmapped: `failed` is a `RunState` nothing produces;
+`factory gate|step|mission` resolve the mission from cwd, so a scratch HOME does not sandbox them
+and the Validator's two stray calls landed on this mission (repaired by hand, diff eyeballed).
+No round 3.

@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "implement",
+  "step": "accept",
   "round": 1,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/control",
@@ -51,14 +51,18 @@
       "endedAt": "2026-09-06T11:38:40.809Z"
     },
     "implement": {
-      "status": "running",
-      "startedAt": "2026-09-06T13:24:01.984Z"
+      "status": "done",
+      "startedAt": "2026-09-06T13:24:01.984Z",
+      "endedAt": "2026-09-06T13:36:32.893Z"
     },
     "accept": {
-      "status": "pending"
+      "status": "running",
+      "startedAt": "2026-09-06T13:36:32.950Z"
     },
     "verify": {
-      "status": "pending"
+      "status": "skipped",
+      "endedAt": "2026-09-06T13:36:52.663Z",
+      "reason": "round 2 is the eight round-1 fixes; the Validator runs the verify recipe and covers the three verify ids"
     },
     "validate": {
       "status": "pending"
@@ -89,8 +93,13 @@
       "at": "2026-09-06T11:36:19.510Z",
       "what": "skipped step research",
       "reason": "design settled in ai-factory and four prototype rounds; transcript format checked in session"
+    },
+    {
+      "at": "2026-09-06T13:36:52.663Z",
+      "what": "skipped step verify",
+      "reason": "round 2 is the eight round-1 fixes; the Validator runs the verify recipe and covers the three verify ids"
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-06T13:24:01.984Z"
+  "updated": "2026-09-06T13:36:52.663Z"
 }

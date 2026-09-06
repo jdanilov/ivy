@@ -1,19 +1,17 @@
 #!/usr/bin/env bun
-// Plain-text frames of every Mission Control pane, so the screen can be reviewed without a tty.
-import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
-import { createTestRenderer } from '@opentui/core/testing';
+// Plain-text frames of the fixture, so the look can be reviewed without a tty.
+// Live data has its own frames: `factory --frames <dir>`.
 import { snapshot } from '../src/tui/fixture.js';
-import { leftItems, newUi, render, type Ui } from '../src/tui/screen.js';
+import { leftItems } from '../src/tui/screen.js';
+import { writeFrames, type Frame } from '../src/tui/frames.js';
 
 const out = process.argv[2] ?? '.factory/missions/2026-09-06-control/prototype';
-await mkdir(out, { recursive: true });
 
 const items = leftItems(snapshot);
 const at = (match: (i: (typeof items)[number]) => boolean): number => items.findIndex(match);
 
 // The right pane follows the left selection, so a frame is a row plus which pane has focus.
-const frames: { name: string; left: number; focus: Ui['focus']; set?: (ui: Ui) => void }[] = [
+const frames: Frame[] = [
   { name: 'messages', left: at((i) => i.kind === 'inbox'), focus: 'right' },
   { name: 'parts', left: at((i) => i.kind === 'project' && i.project.name === 'ivy'), focus: 'right' },
   { name: 'mission', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left' },
@@ -41,33 +39,4 @@ const frames: { name: string; left: number; focus: Ui['focus']; set?: (ui: Ui) =
   },
 ];
 
-const { renderer, renderOnce, captureCharFrame, captureSpans } = await createTestRenderer({ width: 140, height: 42 });
-
-/** The screen paints no background: the only coloured cells are the inverted selected row. */
-function chrome(): string {
-  const frame = captureSpans();
-  const backgrounds = new Set<string>();
-  for (const l of frame.lines) {
-    for (const span of l.spans) {
-      const [r, g, b, a] = span.bg.toInts();
-      if (a !== 0) backgrounds.add(`#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`);
-    }
-  }
-  // The key bar owns the last row: an empty one there is the blank line the human kept seeing.
-  const last = (frame.lines[frame.rows - 1]?.spans ?? []).map((span) => span.text).join('').trim();
-  return `bg ${[...backgrounds].join(' ') || 'none'} · last row ${last ? JSON.stringify(last.slice(0, 20)) : 'EMPTY'}`;
-}
-
-for (const frame of frames) {
-  const ui = newUi();
-  ui.left = frame.left;
-  ui.focus = frame.focus;
-  frame.set?.(ui);
-  render(renderer, snapshot, ui);
-  await renderOnce();
-  const file = path.join(out, `${frame.name}.txt`);
-  await Bun.write(file, captureCharFrame());
-  console.log(`✓ ${file}  ${chrome()}`);
-}
-
-renderer.destroy();
+await writeFrames(snapshot, out, frames);

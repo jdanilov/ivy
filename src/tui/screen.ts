@@ -4,9 +4,6 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { C, GLYPH, stateColor, stepColor } from './theme.js';
 import { ago, clock, dur, id, len, line, spread, tokens, wrap, type Cell } from './format.js';
-import { notify } from './notify.js';
-// Prototype only: `n` fakes an arrival so the bell and the notification can be tested. Goes with wiring.
-import { arrival } from './fixture.js';
 import type { Activity, Attention, Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from './model.js';
 
 const ANSWERS = ['accept', 'amend', 'reject'] as const;
@@ -62,7 +59,7 @@ export function leftItems(snap: Snapshot, hideClosed = false): LeftItem[] {
 }
 
 /** Identity of a row, so the selection survives a list that changed under it. */
-function itemKey(item: LeftItem): string {
+export function itemKey(item: LeftItem): string {
   return item.kind === 'inbox' ? 'inbox'
     : item.kind === 'project' ? `p ${item.project.name}`
     : item.kind === 'mission' ? `m ${item.project.name}/${item.mission.name}`
@@ -286,7 +283,8 @@ function missionPane(p: Pane, m: Mission): void {
       [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind, s.status)],
       ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
-    p.row(spread(cells, [[s.wall ? dur(s.wall) : s.status, C.dim]], p.width));
+    const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
+    p.row(spread(cells, [[spend ? `${tokens(spend)}  ` : '', C.dim], [s.wall ? dur(s.wall) : s.status, C.dim]], p.width));
   }
   if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
 
@@ -327,7 +325,7 @@ function pending(project: Project, ui: Ui): string[] {
 
 function partsPane(p: Pane, project: Project, ui: Ui): void {
   const parts = project.parts;
-  const installed = parts.filter((part) => partStatus(part.name, part.status, ui) === 'installed').length;
+  const installed = parts.filter((part) => partStatus(part.name, part.status, ui) !== 'not-installed').length;
   const changes = pending(project, ui);
   p.row([
     ['PARTS', C.bright], [`  ${project.name}`, C.dim], [`  ${installed}/${parts.length}`, C.dim],
@@ -336,12 +334,15 @@ function partsPane(p: Pane, project: Project, ui: Ui): void {
   p.rule();
 
   parts.forEach((part, i) => {
-    const on = partStatus(part.name, part.status, ui) === 'installed';
+    const status = partStatus(part.name, part.status, ui);
+    const on = status !== 'not-installed';
     const selected = i === ui.part;
-    const changed = on !== (part.status === 'installed');
+    const changed = on !== (part.status !== 'not-installed');
+    // A part whose files no longer match the Factory is neither installed nor available: `update` fixes it.
+    const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
     const cells: Cell[] = [
       marker(selected, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
-      [`${on ? '●' : '○'} ${(on ? 'installed' : 'available').padEnd(11)}`, on ? C.success : C.dim],
+      [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
       [part.files[0] ?? '', C.dim],
     ];
     p.row(spread(cells, [[changed ? '±' : ' ', C.accent]], p.width), selected && ui.focus === 'right');
@@ -357,7 +358,8 @@ function partsPane(p: Pane, project: Project, ui: Ui): void {
 // ── activity ──────────────────────────────────────────────────────────────────
 
 const VERB: Record<Activity['verb'], string> = {
-  Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.implement, Text: C.bright, Ask: C.warning, Stop: C.success,
+  Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.implement, Text: C.bright, Ask: C.warning,
+  Tool: C.dim, Stop: C.success,
 };
 
 /** Which sessions the selection covers, and what to call each one in the mission column. */
@@ -398,7 +400,7 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: b
 /** Every key the screen answers, by the pane it belongs to. One row per line of the panel. */
 const HELP: [group: string, keys: [string, string][]][] = [
   ['Global', [['↑↓', 'Select'], ['↵', 'Open'], ['→', 'Enter pane'], ['←esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']]],
-  ['', [['C', 'Caffeinate'], ['N', 'Simulate arrival (prototype)']]],
+  ['', [['C', 'Caffeinate']]],
   ['Projects', [['Z', 'Hide closed'], ['O', 'Open tab'], ['X', 'Kill']]],
   ['Messages', [['↑↓', 'Select'], ['←→', 'Choose answer'], ['↵', 'Confirm'], ['esc', 'Back']]],
   ['Parts', [['Space', 'Toggle'], ['↵', 'Apply'], ['R', 'Reset'], ['Y', 'Confirm'], ['N', 'Cancel']]],
@@ -571,13 +573,6 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
       m.attention = ATTENTION[(ATTENTION.indexOf(m.attention) + 1) % ATTENTION.length]!;
       return toast(r, snap, ui, `${m.name} attention ${m.attention}`);
     }
-    case 'n': {
-      // Stands in for the watcher the wiring step adds: the arrival path is the one being tested.
-      const item = arrival();
-      snap.inbox.push(item);
-      notify(item);
-      return toast(r, snap, ui, `arrival ${item.project}/${item.origin} ${item.label}`);
-    }
     case 'c':
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;
       return toast(r, snap, ui, `caffeinate ${snap.caffeinate.toUpperCase()} [${awake(snap) ? 'ON' : 'OFF'}]`);
@@ -610,20 +605,29 @@ export function onKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent): vo
   }
 }
 
+/** Files change under the screen: `apply` swaps the snapshot in, `close()` stops the watching. */
+export type Live = (apply: (next: Snapshot) => void) => { close(): void };
+
 /** Resolves when the human quits, so the CLI ends without an exit call. */
-export async function run(snap: Snapshot): Promise<void> {
+export async function run(snap: Snapshot, live?: Live): Promise<void> {
   const r = await createCliRenderer({ exitOnCtrlC: true, targetFps: 30 });
   const ui = newUi();
-  render(r, snap, ui);
-  r.on('resize', () => render(r, snap, ui));
+  let current = snap;
+  render(r, current, ui);
+  r.on('resize', () => render(r, current, ui));
+  const watcher = live?.((next) => {
+    current = next;
+    render(r, current, ui);
+  });
 
   await new Promise<void>((done) => {
     r.keyInput.on('keypress', (key: KeyEvent) => {
       if (key.name === 'q') {
+        watcher?.close();
         r.destroy();
         return done();
       }
-      onKey(r, snap, ui, key);
+      onKey(r, current, ui, key);
     });
   });
 }

@@ -135,6 +135,19 @@ await check('the hook rings only when the parent session waits on the human', as
   ok((await fire('Stop', {}, 'off')) === 2, 'SOUND=off rang');
 });
 
+await check('the transcript tail parses each line once', async () => {
+  const { readTranscript } = await import('../src/tui/transcript.js');
+  const file = path.join(TMP, 'tail.jsonl');
+  const row = (n: number): string => `${JSON.stringify({ type: 'assistant', timestamp: new Date(1e12 + n * 1000).toISOString(),
+    message: { id: `m${n}`, usage: { output_tokens: 1 }, content: [{ type: 'tool_use', name: 'Bash', input: { command: `cmd ${n}` } }] } })}\n`;
+  await writeFile(file, row(1) + row(2));
+  ok((await readTranscript(file, 's', TMP)).activity.length === 2, 'two rows on the first read');
+  await writeFile(file, row(3), { flag: 'a' });
+  const tail = await readTranscript(file, 's', TMP);
+  ok(tail.activity.map((a) => a.text).join() === 'cmd 1,cmd 2,cmd 3', `each line once, got ${tail.activity.map((a) => a.text).join()}`);
+  ok(tail.offset === Bun.file(file).size && tail.usage.length === 3, 'offset and usage follow the file');
+});
+
 await check('writeSnippet and removeSnippet round trip', async () => {
   const snippet = { section: '## Scratch', line: '- Scratch: @docs/scratch.md' };
   const { record } = await writeSnippet(snippet, main);

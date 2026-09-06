@@ -214,13 +214,4 @@ const inbox: InboxItem[] = [
   },
 ];
 
-/** `n` fakes the one thing a screenshot cannot show: something landing while you watch. */
-export function arrival(): InboxItem {
-  return {
-    kind: 'question', project: 'cut', origin: 'intro', label: 'asks', at: Date.now(),
-    text: 'The chore is done but retro.md is empty. Close the mission without a retro, or write one from the handoffs first?',
-    tab: 'factory-cut-intro',
-  };
-}
-
 export const snapshot: Snapshot = { projects, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto' };

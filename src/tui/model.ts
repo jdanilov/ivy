@@ -11,6 +11,8 @@ export interface StepRow {
   status: RunState;
   role?: string;
   wall?: number;
+  /** Transcript usage inside the step's own window. */
+  tokens?: { input: number; cached: number; output: number };
   gateOpen?: boolean;
 }
 
@@ -25,7 +27,7 @@ export interface EventRow {
 export interface Activity {
   at: number;
   session: string;
-  verb: 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Stop';
+  verb: 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Tool' | 'Stop';
   text: string;
 }
 

@@ -43,8 +43,28 @@ export function spread(left: Cell[], right: Cell[], width: number): Cell[] {
   return used >= width ? [...left, ...right] : [...left, [' '.repeat(width - used), C.dim], ...right];
 }
 
+/** Terminal cells a string takes. Emoji are two wide, and a live log is full of them. */
+export function cols(text: string): number {
+  let cells = 0;
+  for (const ch of text) cells += ch.codePointAt(0)! > 0xffff ? 2 : 1;
+  return cells;
+}
+
 export function len(cells: Cell[]): number {
-  return cells.reduce((n, [text]) => n + [...text].length, 0);
+  return cells.reduce((n, [text]) => n + cols(text), 0);
+}
+
+/** As much of `text` as fits in `cells`, in whole characters. */
+function fit(text: string, cells: number): [text: string, width: number] {
+  let out = '';
+  let used = 0;
+  for (const ch of text) {
+    const w = ch.codePointAt(0)! > 0xffff ? 2 : 1;
+    if (used + w > cells) break;
+    out += ch;
+    used += w;
+  }
+  return [out, used];
 }
 
 /** Word-wraps over at most `max` rows, splitting a word too long to fit. Never truncates. */
@@ -70,9 +90,10 @@ export function line(cells: Cell[], width: number, selected = false): StyledText
 
   for (const [text, color, invert] of cells) {
     if (left <= 0) break;
-    const chars = [...text];
-    const cut = chars.length > left ? chars.slice(0, Math.max(0, left - 1)).join('') + '…' : text;
-    left -= [...cut].length;
+    const w = cols(text);
+    const [head, used] = w > left ? fit(text, left - 1) : [text, w];
+    const cut = w > left ? `${head}…` : head;
+    left -= w > left ? used + 1 : used;
     chunks.push(selected || invert ? bg(C.selBg)(fg(C.selFg)(cut)) : fg(color)(cut));
   }
   if (left > 0) {

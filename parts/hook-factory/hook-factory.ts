@@ -214,12 +214,12 @@ async function lastAssistantText(transcript: string): Promise<string> {
   return out;
 }
 
-/** A handoff is never traded for a shorter one: the next free `-2`, `-3` name takes it instead. */
-async function freeName(dir: string, base: string, text: string): Promise<string> {
+/** A handoff already written is evidence: it is never overwritten, the next free `-2`, `-3` takes it. */
+async function freeName(dir: string, base: string): Promise<string> {
   for (let n = 1; ; n++) {
     const file = path.join(dir, n === 1 ? `${base}.md` : `${base}-${n}.md`);
     const existing = (await readFile(file, 'utf-8').catch(() => '')).trim();
-    if (existing.length <= text.length) return file;
+    if (existing === '') return file;
   }
 }
 
@@ -235,7 +235,7 @@ async function saveHandoff(mission: Bound, input: HookInput): Promise<string | n
   const round = mission.round > 0 ? `-r${mission.round}` : '';
   const dir = path.join(mission.dir, 'handoffs');
   await mkdir(dir, { recursive: true });
-  const file = await freeName(dir, `${mission.step}${agent === '' ? '' : `-${agent}`}${round}`, text);
+  const file = await freeName(dir, `${mission.step}${agent === '' ? '' : `-${agent}`}${round}`);
   await writeFile(file, `${text}\n`);
   return file;
 }

@@ -30,11 +30,11 @@
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ACTIVITY  quick                                                                                                                          5 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- 15:40:18  Text   Looking at how recall should be indexed before writing anything.                                                          
- 15:44:18  Read   docs/terminology.md                                                                                                       
- 15:48:18  Bash   rg -n "Recall" docs                                                                                                       
- 15:51:18  Text   Embeddings need a model on the box; a grep index is instant and dumb.                                                     
- 15:54:18  Ask    Which recall strategy for v1, embeddings or a grep index?                                                                 
+ 16:06:45  Text   Looking at how recall should be indexed before writing anything.                                                          
+ 16:10:45  Read   docs/terminology.md                                                                                                       
+ 16:14:45  Bash   rg -n "Recall" docs                                                                                                       
+ 16:17:45  Text   Embeddings need a model on the box; a grep index is instant and dumb.                                                     
+ 16:20:45  Ask    Which recall strategy for v1, embeddings or a grep index?                                                                 
                                                                                                                                             
                                                                                                                                             
                                                                                                                                             

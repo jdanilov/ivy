@@ -154,7 +154,7 @@ const projects: Project[] = [
     sessions: [
       {
         id: 'b3f21c07', preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
-        last: { at: now - 12 * M, verb: 'Notification', detail: 'waiting on the human', mark: '⊘' },
+        last: { at: now - 12 * M, verb: 'Notification', detail: 'waiting on the human' },
         question: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
       },
     ],

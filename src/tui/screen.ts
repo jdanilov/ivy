@@ -137,10 +137,9 @@ function summary(p: Pane, missions: Mission[]): void {
 function missionBar(p: Pane, m: Mission): void {
   const total = m.steps.length;
   const done = m.steps.filter((s) => s.status === 'done').length;
-  const queued = m.steps.filter((s) => s.status === 'pending').length;
   const word = m.status === 'stub' ? 'STUB' : m.status === 'closed' ? 'CLOSED' : m.state.toUpperCase();
   const left: Cell[] = [[`${GLYPH[m.state]} `, stateColor(m.state)], [word, C.bright]];
-  const count: Cell[] = total ? [['  ', C.dim], [`${done}/${total}`, C.bright], [` [+${queued}]`, C.dim]] : [];
+  const count: Cell[] = total ? [['  ', C.dim], [`${done}/${total}`, C.bright]] : [];
   const metrics: Cell[] = [
     ['attention ', C.dim], [m.attention, C.dim], ['   ', C.dim],
     ['TIME ', C.dim], [dur(m.wall), C.bright], [' · ', C.rule],
@@ -233,7 +232,16 @@ function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
       ? [['Inbox', C.bright], [` (${open})`, open ? C.warning : C.dim]]
       : [[item.project.name, C.bright]];
     p.row([marker(selected, focused), ...head], selected && focused);
+    // Nothing under a heading reads as a screen that failed to load: the hint names the way out,
+    // indented where the row it stands in for would be.
+    if (item.kind === 'project' && item.project.missions.length === 0) {
+      p.row([['    no missions · factory mission new <name>', C.dim]]);
+    }
   });
+  if (snap.projects.length === 0) {
+    p.row([]);
+    p.row([['   no projects · factory install <path>', C.dim]]);
+  }
 }
 
 // ── messages ──────────────────────────────────────────────────────────────────
@@ -317,7 +325,10 @@ function missionPane(p: Pane, m: Mission): void {
       ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
     const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
-    p.row(spread(cells, [[spend ? `${tokens(spend)}  ` : '', C.dim], [s.wall ? dur(s.wall) : s.status, C.dim]], p.width));
+    // A duration is only news for a step that is getting somewhere: skipped, failed and blocked
+    // all measure a time nobody wants, and the word is what the row is for.
+    const timed = s.status === 'running' || s.status === 'done';
+    p.row(spread(cells, [[spend ? `${tokens(spend)}  ` : '', C.dim], [timed && s.wall ? dur(s.wall) : s.status, C.dim]], p.width));
   }
   if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
 
@@ -581,9 +592,14 @@ function record(app: App, verdict: (typeof ANSWERS)[number], note: string): void
   const { snap, ui } = app;
   const item = snap.inbox[ui.msg];
   if (!item) return;
+  const row = ui.msg;
   ui.note = null;
-  ui.answered.add(ui.msg);
-  act(app, `${verdict} ${item.label}…`, () => answerGate(projectOf(snap, item.project), item, verdict, note));
+  // The tick is the record, not the attempt: a refused gate leaves the row open for another try.
+  act(app, `${verdict} ${item.label}…`, async () => {
+    const done = await answerGate(projectOf(snap, item.project), item, verdict, note);
+    ui.answered.add(row);
+    return done;
+  });
 }
 
 export function handleKey(app: App, key: KeyEvent): void {

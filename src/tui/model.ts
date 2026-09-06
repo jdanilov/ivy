@@ -42,7 +42,6 @@ export interface EventRow {
   at: number;
   verb: string;
   detail: string;
-  mark?: string;
 }
 
 /** One line of a session's progress log. Wiring reads these from Claude Code's transcript jsonl. */

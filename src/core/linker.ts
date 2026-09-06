@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { mkdir, symlink, unlink, readdir, readlink, rmdir, readFile, lstat } from 'node:fs/promises';
+import { mkdir, symlink, unlink, readdir, readlink, realpath, rmdir, readFile, lstat } from 'node:fs/promises';
 import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet, SnippetRecord } from '../types.js';
 import { hashFile } from './scanner.js';
 
@@ -42,7 +42,9 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
       // doesn't exist
     }
 
-    const relPath = path.relative(path.dirname(targetPath), sourcePath);
+    // Counted from where the link really lives: a project reached through a symlink (`/tmp` on
+    // macOS) is one hop shallower than its path reads, and lexical `..` would climb past the root.
+    const relPath = path.relative(await realpath(path.dirname(targetPath)), sourcePath);
     await symlink(relPath, targetPath);
 
     files.push(pf.target);

@@ -30,13 +30,13 @@
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ACTIVITY  all projects                                                                                                                  57 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- 15:59:18  auth     Text   The contract is green. Opening the merge gate on retro.md.                                                       
- 16:00:06  refit    Bash   bun src/cli.ts step done implement                                                                               
- 16:00:54  refit    Agent  Validator drive the screen at three sizes                                                                        
- 16:02:12  refit    Bash   bun scripts/tui-snapshot.ts                                                                                      
- 16:03:18  auth     Ask    Merge auth into main?                                                                                            
- 16:03:24  refit    Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                        
- 16:04:42  refit    Text   Frames read right at 140x42, the key bar sits on the last row.                                                   
- 16:05:54  refit    Ask    Round 2 accepted?                                                                                                
+ 16:25:45  auth     Text   The contract is green. Opening the merge gate on retro.md.                                                       
+ 16:26:33  refit    Bash   bun src/cli.ts step done implement                                                                               
+ 16:27:21  refit    Agent  Validator drive the screen at three sizes                                                                        
+ 16:28:39  refit    Bash   bun scripts/tui-snapshot.ts                                                                                      
+ 16:29:45  auth     Ask    Merge auth into main?                                                                                            
+ 16:29:51  refit    Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                        
+ 16:31:09  refit    Text   Frames read right at 140x42, the key bar sits on the last row.                                                   
+ 16:32:21  refit    Ask    Round 2 accepted?                                                                                                
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ↑↓ Select  ←→ Answer  ↵ Confirm  esc Back  F Activity  ? Help  Q Quit                                                                      

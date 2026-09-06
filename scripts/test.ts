@@ -136,6 +136,44 @@ await check('the hook rings only when the parent session waits on the human', as
   ok((await fire('Stop', {}, 'off')) === 2, 'SOUND=off rang');
 });
 
+await check('a handoff never overwrites the one before it', async () => {
+  const dir = path.join(TMP, 'handoff');
+  const home = path.join(dir, 'home');
+  const mission = path.join(dir, 'mission');
+  const handoffs = path.join(mission, 'handoffs');
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  await mkdir(mission, { recursive: true });
+  await writeFile(path.join(mission, 'state.json'), JSON.stringify({ name: 'h', session: 'S', step: 'implement' }));
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const save = async (message: string): Promise<void> => {
+    const proc = Bun.spawn(['bun', hook, 'SubagentStop'], {
+      cwd: dir,
+      env: { PATH: process.env.PATH, HOME: home, SOUND: 'off', FACTORY_MISSION: mission },
+      stdin: new TextEncoder().encode(JSON.stringify({
+        session_id: 'S', cwd: dir, agent_type: 'Worker',
+        agent_transcript_path: path.join(dir, 'agent.jsonl'), last_assistant_message: message,
+      })),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+  };
+  const body = (worker: number, lines: number): string =>
+    Array.from({ length: lines }, (_, i) => `W${worker} line ${i}`).join('\n');
+  const head = (file: string): Promise<string> => Bun.file(path.join(handoffs, file)).text().catch(() => '');
+
+  // The longest first: a rule that compares lengths would trade it for either of the next two.
+  await save(body(1, 12));
+  await save(body(2, 6));
+  await save(body(3, 20));
+  ok((await head('implement-Worker.md')).startsWith('W1 '), 'the first handoff was overwritten');
+  ok((await head('implement-Worker-2.md')).startsWith('W2 '), 'the second did not take -2');
+  ok((await head('implement-Worker-3.md')).startsWith('W3 '), 'the third did not take -3');
+  await save('Step: implement\nDone: nothing');
+  ok(!(await exists(path.join(handoffs, 'implement-Worker-4.md'))), 'a sign-off under five lines was saved');
+});
+
 await check('the hook holds the machine awake only as the caffeinate mode says', async () => {
   const dir = path.join(TMP, 'caff');
   const home = path.join(dir, 'home');

@@ -35,6 +35,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 |------------------------------------------------|----------------------------------------------------------------------------|
 | `factory`                                      | Open Mission Control: every project, mission, session and open gate        |
 | `factory menu`                                 | The interactive picker: a command, then a project                          |
+| `factory --fixture`, `factory --frames <dir>`  | Draw the demo snapshot; write the screen as text and exit, with no terminal |
 | `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
 | `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm     |
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
@@ -58,8 +59,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 
 Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` attention, `C`
 caffeinate, `Z` hide closed, `F` activity, `?` help, `Q` quit. Space toggles a part and `Y`
-applies the set. `--fixture` draws the demo snapshot, `--frames <dir>` writes the screen as text
-and exits, which is how it is reviewed without a terminal.
+applies the set.
 
 ## Parts
 

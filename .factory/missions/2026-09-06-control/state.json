@@ -3,7 +3,7 @@
   "title": "Mission Control: the OpenTUI screen",
   "workflow": "story",
   "attention": "light",
-  "status": "open",
+  "status": "closed",
   "step": "merge",
   "round": 1,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
@@ -121,5 +121,5 @@
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-06T19:09:15.444Z"
+  "updated": "2026-09-06T19:09:15.700Z"
 }

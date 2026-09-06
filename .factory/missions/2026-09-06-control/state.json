@@ -18,9 +18,11 @@
       "at": "2026-09-05T23:12:02.199Z"
     },
     "merge": {
-      "status": "open",
+      "status": "answered",
       "file": "retro.md",
-      "at": "2026-09-06T13:55:45.918Z"
+      "answer": "accept",
+      "note": "Accepted 2026-09-06, 39 assertions pass over two rounds",
+      "at": "2026-09-06T19:09:15.389Z"
     }
   },
   "steps": {
@@ -81,8 +83,9 @@
       "endedAt": "2026-09-06T13:55:45.806Z"
     },
     "merge": {
-      "status": "running",
-      "startedAt": "2026-09-06T13:55:45.863Z"
+      "status": "done",
+      "startedAt": "2026-09-06T13:55:45.863Z",
+      "endedAt": "2026-09-06T19:09:15.444Z"
     }
   },
   "deviations": [
@@ -118,5 +121,5 @@
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-06T13:55:45.918Z"
+  "updated": "2026-09-06T19:09:15.444Z"
 }

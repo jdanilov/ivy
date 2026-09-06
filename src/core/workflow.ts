@@ -86,11 +86,7 @@ export function parseWorkflow(name: string, raw: unknown, where: string): Workfl
     if (body.loop !== undefined) {
       const loop = body.loop;
       if (!isRecord(loop) || typeof loop.back !== 'string') fail(`step "${stepName}": loop needs a back step`);
-      step.loop = {
-        back: loop.back as string,
-        max: typeof loop.max === 'number' ? loop.max : 1,
-        human_from: typeof loop.human_from === 'number' ? loop.human_from : 1,
-      };
+      step.loop = { back: loop.back as string, max: typeof loop.max === 'number' ? loop.max : 1 };
     }
     return step;
   });
@@ -128,6 +124,28 @@ export function allStepNames(wf: Workflow): string[] {
   return wf.steps.flatMap((s) => [s.name, ...(s.parallel ?? [])]);
 }
 
+/**
+ * Who runs a step. The workflow's own `role` settles it; the two gatekeeping names carry their
+ * runner in the name; everything else is the Orchestrator's own work. One place, so the CLI, the
+ * screen and a spawn never disagree about who a step belongs to.
+ */
+export function stepRole(step: WorkflowStep): string {
+  if (step.role) return step.role;
+  if (step.name === 'verify') return 'verifier';
+  if (step.name === 'validate') return 'validator';
+  return 'orchestrator';
+}
+
+/** The model a role is spawned with. `model` is passed on every spawn: frontmatter is not honoured. */
+export const ROLE_MODEL: Record<string, string> = {
+  orchestrator: 'fable',
+  worker: 'opus',
+  validator: 'opus',
+  verifier: 'sonnet',
+  investigator: 'sonnet',
+  summarizer: 'sonnet',
+};
+
 export function findStep(wf: Workflow, name: string): WorkflowStep | undefined {
   return wf.steps.find((s) => s.name === name);
 }
@@ -154,7 +172,7 @@ export function dumpWorkflow(wf: Workflow): string {
     if (step.role) attrs.push(`role: ${step.role}`);
     if (step.gate) attrs.push(`gate: ${step.gate}`);
     if (step.parallel) attrs.push(`parallel: [${step.parallel.join(', ')}]`);
-    if (step.loop) attrs.push(`loop: { back: ${step.loop.back}, max: ${step.loop.max}, human_from: ${step.loop.human_from} }`);
+    if (step.loop) attrs.push(`loop: { back: ${step.loop.back}, max: ${step.loop.max} }`);
     lines.push(attrs.length === 0 ? `  - ${step.name}` : `  - ${step.name}: { ${attrs.join(', ')} }`);
   }
   return lines.join('\n') + '\n';

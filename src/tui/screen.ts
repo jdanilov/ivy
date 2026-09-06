@@ -7,12 +7,12 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { C, GLYPH, stateColor, stepColor } from './theme.js';
 import { ago, clock, dur, id, len, line, spread, tokens, wrap, type Cell } from './format.js';
-import { answerGate, applyParts, killSession, openTab, setAttention, setCaffeinate } from './actions.js';
-import type { Activity, Attention, Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from './model.js';
+import { answerGate, applyParts, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
+import type { Activity, Autonomy, Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from './model.js';
 
 const ANSWERS = ['accept', 'amend', 'reject'] as const;
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
-const ATTENTION: Attention[] = ['full', 'light', 'unattended'];
+const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 
 /** Chrome rows: blank, header, rule, status, rule — rule, key bar. The key bar sits on the last
  *  terminal row: a row left undrawn under it reads as a gap the screen forgot to fill. */
@@ -141,7 +141,7 @@ function missionBar(p: Pane, m: Mission): void {
   const left: Cell[] = [[`${GLYPH[m.state]} `, stateColor(m.state)], [word, C.bright]];
   const count: Cell[] = total ? [['  ', C.dim], [`${done}/${total}`, C.bright]] : [];
   const metrics: Cell[] = [
-    ['attention ', C.dim], [m.attention, C.dim], ['   ', C.dim],
+    ['autonomy ', C.dim], [m.autonomy, C.dim], ['   ', C.dim],
     ['TIME ', C.dim], [dur(m.wall), C.bright], [' · ', C.rule],
     ['In ', C.dim], [tokens(m.tokens.input), C.bright], [' · ', C.rule],
     ['Cached ', C.dim], [tokens(m.tokens.cached), C.bright], [' · ', C.rule],
@@ -335,7 +335,7 @@ function missionPane(p: Pane, m: Mission): void {
   p.rule();
   const step = m.steps.find((s) => s.name === m.step);
   p.row([['step ', C.dim], [m.step ?? '—', C.bright], [' · role ', C.dim], [step?.role ?? '—', C.bright],
-    [' · round ', C.dim], [`${m.round}`, C.bright], [' · attention ', C.dim], [m.attention, C.bright]]);
+    [' · round ', C.dim], [`${m.round}`, C.bright], [' · autonomy ', C.dim], [m.autonomy, C.bright]]);
   p.row([['branch ', C.dim], [m.branch ?? '—', C.bright], [' · wt ', C.dim], [m.worktree ?? '—', C.bright]]);
   p.row([['session ', C.dim], [m.session ? id(m.session) : '—', C.bright], [' · caffeinate ', C.dim], [m.caffeinate ? 'on' : 'off', C.bright]]);
   p.row([['deviations ', C.dim], [`${m.deviations}`, C.bright]]);
@@ -458,7 +458,7 @@ const HELP: [group: string, keys: [string, string][]][] = [
   ['Projects', [['Z', 'Hide closed'], ['O', 'Open tab'], ['X', 'Kill']]],
   ['Messages', [['↑↓', 'Select'], ['←→', 'Choose answer'], ['↵', 'Confirm'], ['esc', 'Back']]],
   ['Parts', [['Space', 'Toggle'], ['↵', 'Apply'], ['R', 'Reset'], ['Y', 'Confirm'], ['N', 'Cancel']]],
-  ['Mission', [['T', 'Attention full → light → unattended']]],
+  ['Mission', [['T', 'Autonomy full → partial → none']]],
   ['Activity', [['F', 'Full height'], ['↑↓', 'Scroll'], ['↵', 'Back to the columns']]],
 ];
 
@@ -712,8 +712,8 @@ export function handleKey(app: App, key: KeyEvent): void {
       if (here.kind !== 'mission') break;
       const m = here.mission;
       // Shown at once, written behind it: the rebuild that follows reads state.json back.
-      m.attention = ATTENTION[(ATTENTION.indexOf(m.attention) + 1) % ATTENTION.length]!;
-      return act(app, `${m.name} attention ${m.attention}…`, () => setAttention(here.project.path, m.name, m.attention));
+      m.autonomy = AUTONOMY[(AUTONOMY.indexOf(m.autonomy) + 1) % AUTONOMY.length]!;
+      return act(app, `${m.name} autonomy ${m.autonomy}…`, () => setAutonomy(here.project.path, m.name, m.autonomy));
     }
     case 'c': {
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;

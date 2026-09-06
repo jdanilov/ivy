@@ -11,12 +11,12 @@ Single source of names for the Factory. Agents and humans use these words and no
 | Part      | One installable unit: skill, tool, fixture, mcp, plugin, or global. Symlinked, tracked in a manifest.     |
 | Plugin    | A Claude Code plugin shipped by the Factory. `factory` holds the function hooks and the `ask` tool.       |
 | Preset    | Spawn-time bundle for a session: prompt file, settings overlay, MCP list, model, effort.                  |
-| Workflow  | An ordered YAML list of steps that says how a mission is run. Order is the sequence.                     |
+| Workflow  | An ordered YAML list of steps that says how a mission is run. Order is the sequence. A mission starts on `intent` and `mission shape <preset>` appends a preset behind that step. |
 | Step      | One node in a workflow. Has a role, optional `parallel` group, `gate`, `loop`.                            |
 | Gate      | A step that blocks until a decision. `human` gates are asked in the session and recorded by `factory gate answer`. `orchestrator` gates are recorded decisions with a reason. `factory step` refuses to pass a gate unanswered. |
-| Loop      | A step that returns to an earlier step while findings are accepted. `max` caps rounds, `human_from` names the first round the human sees. |
+| Loop      | A step that returns to an earlier step while findings are accepted. `max` caps the rounds.               |
 | Round     | One pass through a loop: gatekeepers check, orchestrator triages, human accepts or amends, implement resumes. |
-| Attention | Mission-level mode: `full`, `light`, `unattended`. Decides which gates and rounds reach the human.        |
+| Autonomy  | Mission-level dial: `full`, `partial`, `none`. Decides which decisions wait on the human. Set at shape time, moved with `mission autonomy L`. |
 | Recipe    | A project command list in `factory.yaml`: `verify`, `e2e`, `deliver`.                                     |
 | Claim     | `.factory/claim` naming the mission that owns the main checkout. Other missions are offered a worktree.   |
 | Snippet   | One line a part owns in the project's `AGENTS.md`, under a section the part names. Installed and removed with the part's files. |

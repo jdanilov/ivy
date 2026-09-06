@@ -1,8 +1,8 @@
 name: fix
 steps:
-  - grill
+  - intent: { gate: human }
   - implement: { role: worker }
   - verify:
       role: verifier
-      loop: { back: implement, max: 2, human_from: 3 }   # orchestrator decides every round
+      loop: { back: implement, max: 2 }
   - merge

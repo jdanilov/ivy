@@ -41,8 +41,10 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
 | `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
 | `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |
-| `mission new <name>`                           | Create the mission folder, workflow copy, `state.json`, branch and claim   |
-| `mission new <name> --stub`                    | Folder and intent skeleton only: no branch, no claim, status `stub`        |
+| `mission new <name> [--autonomy L]`            | Create the folder, the `intent` workflow copy, `state.json`, branch, claim |
+| `mission new <name> --stub \| --quick`         | Intent skeleton with no branch, or the one-step `quick` workflow           |
+| `mission shape <preset> [--autonomy L]`        | Append a preset's steps behind `intent`, once, after the intent gate       |
+| `mission autonomy full\|partial\|none [name]`  | Move the dial that decides which decisions wait on the human               |
 | `mission open [name]`                          | Spawn the mission's session in a Warp tab; a stub is promoted first        |
 | `mission list [--all]`                         | Every mission across `~/.factory/projects`, stubs last                     |
 | `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness      |
@@ -57,7 +59,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `gate list`                                    | Every open gate across projects                                            |
 | `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
 
-Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` attention, `C`
+Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` autonomy, `C`
 caffeinate, `Z` hide closed, `F` activity, `?` help, `Q` quit. Space toggles a part and `Y`
 applies the set.
 

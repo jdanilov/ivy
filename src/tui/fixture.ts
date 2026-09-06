@@ -125,7 +125,7 @@ const ivyParts: PartRow[] = (
 /** Everything a mission needs but a fixture rarely varies. */
 function mission(m: Partial<Mission> & Pick<Mission, 'name' | 'workflow'>): Mission {
   return {
-    status: 'open', state: 'pending', attention: 'full', step: null, round: 0, session: null, branch: null, worktree: null,
+    status: 'open', state: 'pending', autonomy: 'full', step: null, round: 0, session: null, branch: null, worktree: null,
     caffeinate: false, wall: 0, tokens: { input: 0, cached: 0, output: 0 }, steps: [], deviations: 0,
     ...m,
   };
@@ -141,7 +141,7 @@ const projects: Project[] = [
       mission({
         name: 'refit', workflow: 'story', state: 'running', step: 'implement', round: 2, session: '75cb46e1',
         branch: 'mission/refit', worktree: '../ivy-refit', caffeinate: true, wall: 14 * M, deviations: 1,
-        attention: 'light', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
+        autonomy: 'partial', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
         diff: { added: 412, removed: 96 },
       }),
       mission({ name: 'memory', workflow: 'story', status: 'stub' }),
@@ -173,7 +173,7 @@ const projects: Project[] = [
     sessions: [],
     missions: [
       mission({
-        name: 'intro', workflow: 'chore', status: 'closed', state: 'done', attention: 'light', wall: 41 * M,
+        name: 'intro', workflow: 'chore', status: 'closed', state: 'done', autonomy: 'partial', wall: 41 * M,
         tokens: { input: 44_000, cached: 820_000, output: 9_100 }, closedAt: now - 2 * D,
       }),
     ],

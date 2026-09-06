@@ -1,19 +1,27 @@
 import path from 'node:path';
 import * as p from '@clack/prompts';
-import type { Attention, Mission, MissionState } from '../types.js';
+import type { Autonomy, Mission, MissionState, WorkflowStep } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import {
   Refusal, closeMission, createMission, currentBranch, currentCheckout, ensureClaimIgnored, git,
-  listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, promoteMission,
-  readClaim, resolveMission, sessionLive, writeClaim, writeState,
+  listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, pointAtInserted,
+  promoteMission, readClaim, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
 } from '../core/mission.js';
+import { ROLE_MODEL, dumpWorkflow, loadWorkflow, stepRole } from '../core/workflow.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { existingProjects } from '../core/projects.js';
 import { field, headerRow, missionRow, rule } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
 import { CancelError } from '../ui/prompts.js';
 
-const ATTENTION: Attention[] = ['full', 'light', 'unattended'];
+const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
+
+/** Read on `mission new` and `mission shape`, the two commands that set the dial. */
+function autonomyOf(flags: Flags, fallback: Autonomy): Autonomy {
+  const value = (str(flags, 'autonomy') ?? fallback) as Autonomy;
+  if (!AUTONOMY.includes(value)) throw new Refusal(`autonomy must be one of ${AUTONOMY.join(', ')}`);
+  return value;
+}
 
 export async function mission(sub: string, args: string[], flags: Flags, cwd: string): Promise<void> {
   switch (sub) {
@@ -23,6 +31,10 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
       return list(flags);
     case 'open':
       return open(args[0], flags, cwd);
+    case 'shape':
+      return shape(args[0], flags, cwd);
+    case 'autonomy':
+      return autonomy(args[0], args[1], cwd);
     case 'status':
       return show(args[0], cwd);
     case 'adopt':
@@ -32,15 +44,14 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
     case 'close':
       return close(args[0], flags, cwd);
     default:
-      throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, list, status, adopt, resume, close`);
+      throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, shape, autonomy, list, status, adopt, resume, close`);
   }
 }
 
 async function create(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
-  if (!name) throw new Refusal('mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree]');
+  if (!name) throw new Refusal('mission new <name> [--stub] [--quick] [--workflow W] [--autonomy full|partial|none] [--title T] [--worktree]');
 
-  const attention = (str(flags, 'attention') ?? 'light') as Attention;
-  if (!ATTENTION.includes(attention)) throw new Refusal(`attention must be one of ${ATTENTION.join(', ')}`);
+  const autonomy = autonomyOf(flags, 'partial');
 
   const stub = flags.stub === true;
   const main = await mainCheckout(cwd);
@@ -58,8 +69,9 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   const created = await createMission(cwd, {
     name,
     title: str(flags, 'title'),
-    workflow: str(flags, 'workflow') ?? 'story',
-    attention,
+    // Nobody knows the shape before the intent gate: `mission shape` appends a preset after it.
+    workflow: str(flags, 'workflow') ?? (flags.quick === true ? 'quick' : 'intent'),
+    autonomy,
     worktree,
     stub,
   });
@@ -69,7 +81,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   const ignored = created.state.branch ? await ensureClaimIgnored(workdir) : null;
 
   console.log('');
-  headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${created.state.name}${colors.reset}`, `${colors.dim}${created.state.workflow} · ${created.state.attention}${colors.reset}`);
+  headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${created.state.name}${colors.reset}`, `${colors.dim}${created.state.workflow} · ${created.state.autonomy}${colors.reset}`);
   rule();
   field('folder', created.dir);
   field('branch', created.state.branch ?? `${colors.dim}stub — open it to branch${colors.reset}`);
@@ -111,6 +123,54 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   console.log('');
 }
 
+/**
+ * The graph is chosen after the intent gate, not before it: a mission starts on the `intent`
+ * workflow and `shape` appends a preset's own steps behind that step. Once anything follows
+ * intent the shape is settled, and asking for the same preset again is a no-op.
+ */
+async function shape(preset: string | undefined, flags: Flags, cwd: string): Promise<void> {
+  if (!preset) throw new Refusal(`mission shape <preset> [--autonomy ${AUTONOMY.join('|')}]`);
+
+  const m = await resolveMission(cwd);
+  const state = m.state;
+  const wanted = await loadWorkflow(preset, await mainCheckout(cwd));
+  if (wanted.steps[0]?.name !== 'intent') throw new Refusal(`${preset} has no intent step`);
+  if (wanted.steps.length === 1) throw new Refusal(`${preset} has nothing after intent`);
+
+  const workflow = await missionWorkflow(m);
+  if (workflow.steps.some((step) => step.name !== 'intent')) {
+    if (state.workflow !== wanted.name) throw new Refusal(`already shaped as ${state.workflow}`);
+    console.log(`${I}${colors.dim}${state.name} is already shaped as ${wanted.name} — nothing changed.${colors.reset}`);
+    return;
+  }
+
+  const appended = wanted.steps.slice(1);
+  workflow.name = wanted.name;
+  workflow.steps.push(...appended);
+  await Bun.write(path.join(m.dir, 'workflow.yaml'), dumpWorkflow(workflow));
+
+  for (const step of appended) for (const name of [step.name, ...(step.parallel ?? [])]) state.steps[name] ??= { status: 'pending' };
+  state.workflow = wanted.name;
+  state.autonomy = autonomyOf(flags, state.autonomy);
+  pointAtInserted(state, workflow, appended[0]!.name);
+  await writeState(m.dir, state);
+
+  console.log('');
+  headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${state.name}${colors.reset}`, `${colors.dim}${state.workflow} · ${state.autonomy}${colors.reset}`);
+  rule();
+  field('graph', workflow.steps.map((step) => step.name).join(' → '));
+  field('step', state.step);
+  console.log('');
+}
+
+/** The dial, moved mid-mission. Every move lands in `deviations` with where it came from. */
+async function autonomy(level: string | undefined, name: string | undefined, cwd: string): Promise<void> {
+  if (!level || !AUTONOMY.includes(level as Autonomy)) throw new Refusal(`mission autonomy ${AUTONOMY.join('|')} [name]`);
+  const m = await setAutonomy(cwd, name, level as Autonomy, 'set with factory mission autonomy');
+  field('mission', m.state.name);
+  field('autonomy', m.state.autonomy);
+}
+
 async function list(flags: Flags): Promise<void> {
   const all = flags.all === true;
   let shown = 0;
@@ -145,13 +205,13 @@ async function show(name: string | undefined, cwd: string): Promise<void> {
   console.log('');
   headerRow(
     `${colors.cyan}●${colors.reset} ${colors.bold}${state.name}${colors.reset} ${colors.dim}${state.workflow}${colors.reset}`,
-    `${colors.dim}${wall} · ${state.step || '—'} · r${state.round}${colors.reset}`,
+    `${colors.dim}${wall} · ${state.step || '—'} · r${state.round} · ${state.autonomy}${colors.reset}`,
   );
   rule();
 
   for (const step of workflow.steps) {
-    stepLine(state, step.name, step.role, 0);
-    for (const member of step.parallel ?? []) stepLine(state, member, undefined, 1);
+    stepLine(state, step, 0);
+    for (const member of step.parallel ?? []) stepLine(state, { name: member }, 1);
   }
 
   if (state.deviations.length > 0) {
@@ -162,14 +222,16 @@ async function show(name: string | undefined, cwd: string): Promise<void> {
   console.log('');
 }
 
-function stepLine(state: MissionState, name: string, role: string | undefined, depth: number): void {
+function stepLine(state: MissionState, definition: WorkflowStep, depth: number): void {
+  const name = definition.name;
+  const role = stepRole(definition);
   const step = state.steps[name];
   const row = step?.status === 'done' ? 'done' : step?.status === 'running' ? 'running' : step?.status === 'skipped' ? 'blocked' : 'pending';
   const indent = '  '.repeat(depth);
   const time = step?.startedAt ? duration(step.startedAt, step.endedAt) : '';
   const gate = state.gates[name];
 
-  const left = `${rowColor(row)}${rowSymbol(row)}${colors.reset} ${indent}${name.padEnd(14 - indent.length)}${role ? `${colors.dim}${role}${colors.reset}` : ''}`;
+  const left = `${rowColor(row)}${rowSymbol(row)}${colors.reset} ${indent}${name.padEnd(14 - indent.length)}${colors.dim}${role} · ${ROLE_MODEL[role] ?? '—'}${colors.reset}`;
   const notes = [
     step?.status === 'skipped' ? `${colors.dim}skipped: ${step.reason ?? ''}${colors.reset}` : '',
     gate?.status === 'open' ? `${colors.yellow}⊘ gate open${colors.reset}` : '',

@@ -4,7 +4,7 @@ import type { Caffeinate } from '../core/config.js';
 
 export type { Caffeinate };
 
-export type RunState = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'skipped';
+export type RunState = 'pending' | 'running' | 'done' | 'blocked' | 'skipped';
 
 /** Which colour family a step belongs to, independent of where it is in its life. */
 export type StepKind = 'human' | 'gatekeeper' | 'agent' | 'technical';
@@ -52,15 +52,15 @@ export interface Activity {
   text: string;
 }
 
-/** Which gates and rounds reach the human on this mission. */
-export type Attention = 'full' | 'light' | 'unattended';
+/** How much of what this mission decides waits on the human. */
+export type Autonomy = 'full' | 'partial' | 'none';
 
 export interface Mission {
   name: string;
   workflow: string;
   status: 'open' | 'stub' | 'closed';
   state: RunState;
-  attention: Attention;
+  autonomy: Autonomy;
   step: string | null;
   round: number;
   session: string | null;

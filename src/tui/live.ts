@@ -243,7 +243,7 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
     workflow: state.workflow,
     status: state.status,
     state: missionRowState(state) as RunState,
-    attention: state.attention,
+    autonomy: state.autonomy,
     step: state.step || null,
     round: state.round,
     session: state.session,

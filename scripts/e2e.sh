@@ -33,10 +33,10 @@ f mission open x --dry-run
 [ "$(git -C "$REPO" rev-parse --abbrev-ref HEAD)" = 'mission/x' ] || die 'open did not promote the stub'
 git -C "$REPO" check-ignore -q .factory/claim || die '.factory/claim is not ignored'
 
-# chore declares no gate, so the walk opens one by hand to exercise the gate path.
-for step in grill implement merge; do
+# intent is a human gate in every preset: the walk opens it and answers it.
+for step in intent implement merge; do
    f step start "$step"
-   if [ "$step" = grill ]; then f gate open grill --file intent.md; f gate answer grill accept; fi
+   if [ "$step" = intent ]; then f gate open intent --file intent.md; f gate answer intent accept; fi
    f step done "$step"
 done
 
@@ -45,6 +45,17 @@ f mission close x
 ! git -C "$REPO" show-ref --verify --quiet refs/heads/mission/x || die 'close kept the branch'
 [ -z "$(git -C "$REPO" status --porcelain)" ] || die "close left the tree dirty: $(git -C "$REPO" status --porcelain | tr '\n' ' ')"
 grep -q 'close mission x' <(git -C "$REPO" log --format=%s main) || die 'close did not land on main'
+
+# A mission starts unshaped: one intent step, and a preset appended behind it once.
+f mission new s --no-open
+grep -q '"workflow": "intent"' "$REPO"/.factory/missions/*-s/state.json || die 'mission new did not start on the intent workflow'
+f mission shape story
+grep -q '"workflow": "story"' "$REPO"/.factory/missions/*-s/state.json || die 'shape did not record the preset'
+[ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-s/workflow.yaml)" = 6 ] || die 'shape did not append the story steps'
+(cd "$REPO" && bun "$FACTORY/src/cli.ts" mission shape quick >/dev/null 2>&1) && die 'shape quick was not refused'
+
+f mission new q --quick --no-worktree --no-open
+[ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-q/workflow.yaml)" = 1 ] || die '--quick is not a single step'
 
 f uninstall "$REPO" --yes
 [ ! -e "$REPO/.claude/skills/commit" ] || die 'uninstall left a skill behind'

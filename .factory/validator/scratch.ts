@@ -92,7 +92,6 @@ if (import.meta.main && process.argv[2] === 'bulk') {
 
   cli(['mission', 'new', 'alpha', '--workflow', 'story', '--no-open'], alpha);
   for (const args of [
-    ['step', 'start', 'grill'], ['step', 'done', 'grill'],
     ['step', 'start', 'intent'], ['gate', 'open', 'intent', '--file', 'intent.md'],
     ['gate', 'answer', 'intent', 'accept'], ['step', 'done', 'intent'],
     ['step', 'skip', 'research', '--reason', 'nothing to research'],

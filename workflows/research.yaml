@@ -1,6 +1,6 @@
 name: research
 steps:
-  - grill
+  - intent: { gate: human }
   - investigate:
       role: investigator
       parallel: [sources, transcripts]

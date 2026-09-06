@@ -28,11 +28,11 @@ Feedback from the agents to the human. Not a status report, the Mission folder a
 
 | Section     | Content                                                              |
 |-------------|----------------------------------------------------------------------|
-| Worked      | What cut attention or wall clock, worth keeping                      |
+| Worked      | What cut human time or wall clock, worth keeping                     |
 | Cost        | Where tokens or rounds went and what they bought                     |
 | Tools       | Missing, broken or noisy tooling, one line each, from the handoffs   |
 | Context     | Prompts, memories or docs that were wrong, stale or bloated          |
-| Workflow    | Step, gate and attention defaults this Mission argues for changing   |
+| Workflow    | Step, gate and autonomy defaults this Mission argues for changing    |
 | Memories    | Proposed notes: title, the reason, and where it applies              |
 
 Every `Faster` line from a handoff lands in `Worked` or `Tools`. None is dropped silently.

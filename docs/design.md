@@ -109,7 +109,7 @@ Validator yellow, Summarizer magenta because Claude Code has no grey.
 | `Space` `↵` `Y` | Parts     | toggle a part, apply the set, confirm                          |
 | `O`      | mission row      | open the mission's Warp tab, or name the tab that is live      |
 | `X`      | mission, session | SIGTERM the session's process, SIGKILL on a second press       |
-| `T`      | mission row      | attention full → light → unattended                            |
+| `T`      | mission row      | autonomy full → partial → none                                 |
 | `C`      | any              | caffeinate auto → on → off                                     |
 | `Z`      | left             | hide closed missions                                           |
 | `F`      | any              | Activity at full height; header and status bar hidden          |

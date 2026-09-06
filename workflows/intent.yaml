@@ -1,0 +1,3 @@
+name: intent
+steps:
+  - intent: { gate: human }        # every mission starts here, then `mission shape` appends a preset

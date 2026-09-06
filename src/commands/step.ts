@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { MissionState, Workflow } from '../types.js';
 import { str, type Flags } from '../core/args.js';
-import { Refusal, deviate, missionWorkflow, notStub, now, resolveMission, writeState } from '../core/mission.js';
+import { Refusal, deviate, missionWorkflow, notStub, now, pointAtInserted, resolveMission, writeState } from '../core/mission.js';
 import { allStepNames, dumpWorkflow, findStep, nextStep, ownerStep, validate } from '../core/workflow.js';
 import { field } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
@@ -123,6 +123,7 @@ async function add(dir: string, state: MissionState, workflow: Workflow, name: s
   await Bun.write(path.join(dir, 'workflow.yaml'), dumpWorkflow(workflow));
 
   state.steps[name] = { status: 'pending' };
+  pointAtInserted(state, workflow, name);
   deviate(state, `added step ${name} after ${after}`, reason);
 }
 

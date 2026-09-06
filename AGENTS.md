@@ -22,8 +22,8 @@ in a manifest.
 src/           CLI source (entry: src/cli.ts)
 ├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env,
 │              projects, config (vars + caffeinate), recipes, args, workflow (YAML load +
-│              transitions), mission (folder, state, claim, branch), spawn (preset, Warp tab
-│              config, claude command)
+│              transitions, stepRole, ROLE_MODEL), mission (folder, state, claim, branch,
+│              autonomy, insert pointer), spawn (preset, Warp tab config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (render + keys), actions (what
@@ -36,7 +36,8 @@ scripts/test.ts In-process: the same walk plus worktree pairs, one line per case
 scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, uninstall --yes
 .factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run — a nested
                recipe reads back under its dotted path
-workflows/     story, fix, chore, research, quick — the shipped workflow YAML
+workflows/     intent, story, fix, chore, research, quick — the shipped workflow YAML: every
+               mission starts on intent and `mission shape` appends a preset behind that step
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
 ~/.factory/    Home dir: projects list, config.yaml (var overrides plus `caffeinate: auto|on|off`,
                which the hook reads per event and Mission Control's `c` rewrites),
@@ -127,7 +128,8 @@ symlink pointing into the Factory.
 one-line `✗ …` on a refusal.
 
 ```
-factory mission new <name> [--stub] [--workflow W] [--attention full|light|unattended] [--title T] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--quick] [--workflow W] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
+factory mission shape <preset> [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
 factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
@@ -164,6 +166,15 @@ factory handoff save <step>            # reads the handoff from stdin
   and refuses when anything outside the folder is dirty, naming the paths.
 - `mission close` deletes `mission/<name>` last, after the worktree is gone and the merge landed;
   `--keep-branch` keeps it, and a branch git will not delete is reported, never forced.
+- `mission new` without `--workflow` copies `intent.yaml`, one human-gated step and nothing after
+  it. `mission shape <preset>` appends that preset's own steps behind `intent`, adds their pending
+  `steps` entries and records the preset as `state.workflow`; it refuses once anything follows
+  `intent` (`already shaped as story`) unless the preset is the one already there, and refuses a
+  preset that does not start with `intent`. `--autonomy` on either sets the dial; `mission autonomy
+  L` moves it later, with a `deviations` entry.
+- One pointer rule serves `step add` and `mission shape`: after an insert, when the step before the
+  new one is done or skipped and the pointer stands on it or on the step the insert displaced, the
+  pointer moves to the new step. Anywhere else the pointer stays where it was.
 - `mission list` and `gate list` skip a registered project whose path is gone. The projects file keeps it.
 
 ## Conventions

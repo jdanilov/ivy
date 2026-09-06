@@ -3,12 +3,12 @@ import { readdir, readFile, unlink } from 'node:fs/promises';
 import { gate } from '../commands/gate.js';
 import { install } from '../commands/install.js';
 import { removeParts } from '../core/parts.js';
-import { deviate, resolveMission, sessionLive, writeState } from '../core/mission.js';
+import { resolveMission, sessionLive, setAutonomy as writeAutonomy, writeState } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { writeCaffeinate, type Caffeinate } from '../core/config.js';
 import { FACTORY_HOME } from '../core/projects.js';
 import { id } from './format.js';
-import type { Attention, InboxItem } from './model.js';
+import type { Autonomy, InboxItem } from './model.js';
 
 /**
  * What a key actually does. Every action goes through the same functions the CLI runs — `gate`,
@@ -136,12 +136,9 @@ export async function setCaffeinate(mode: Caffeinate): Promise<string> {
   return `caffeinate ${mode.toUpperCase()}`;
 }
 
-// ── attention ────────────────────────────────────────────────────────────────
+// ── autonomy ─────────────────────────────────────────────────────────────────
 
-export async function setAttention(project: string, name: string, attention: Attention): Promise<string> {
-  const mission = await resolveMission(project, name);
-  mission.state.attention = attention;
-  deviate(mission.state, `attention set to ${attention}`, 'set from Mission Control');
-  await writeState(mission.dir, mission.state);
-  return `${name} attention ${attention}`;
+export async function setAutonomy(project: string, name: string, autonomy: Autonomy): Promise<string> {
+  await writeAutonomy(project, name, autonomy, 'set from Mission Control');
+  return `${name} autonomy ${autonomy}`;
 }

@@ -19,7 +19,8 @@ const { update } = await import('../src/commands/update.js');
 const { uninstall } = await import('../src/commands/uninstall.js');
 const { step } = await import('../src/commands/step.js');
 const { gate } = await import('../src/commands/gate.js');
-const { closeMission, createMission, currentBranch, git, promoteMission, resolveMission } = await import('../src/core/mission.js');
+const { mission } = await import('../src/commands/mission.js');
+const { closeMission, createMission, currentBranch, git, missionWorkflow, promoteMission, resolveMission } = await import('../src/core/mission.js');
 const { removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, loadParts } = await import('../src/core/registry.js');
@@ -52,13 +53,13 @@ async function repo(name: string): Promise<string> {
   return dir;
 }
 
-/** chore start to finish, with the one gate it does not declare opened by hand. */
+/** chore start to finish: intent is a human gate, so the walk opens and answers it. */
 async function walk(dir: string, name: string): Promise<void> {
-  for (const s of ['grill', 'implement', 'merge']) {
+  for (const s of ['intent', 'implement', 'merge']) {
     await step('start', [s], { mission: name }, dir);
-    if (s === 'grill') {
-      await gate('open', ['grill'], { mission: name, file: 'intent.md' }, dir);
-      await gate('answer', ['grill', 'accept'], { mission: name }, dir);
+    if (s === 'intent') {
+      await gate('open', ['intent'], { mission: name, file: 'intent.md' }, dir);
+      await gate('answer', ['intent', 'accept'], { mission: name }, dir);
     }
     await step('done', [s], { mission: name }, dir);
   }
@@ -68,7 +69,7 @@ async function walk(dir: string, name: string): Promise<void> {
 async function worktreePair(order: string[]): Promise<void> {
   const dir = await repo(`wt-${order.join('')}`);
   for (const name of ['a', 'b']) {
-    await createMission(dir, { name, workflow: 'chore', attention: 'light', worktree: true, stub: false });
+    await createMission(dir, { name, workflow: 'chore', autonomy: 'partial', worktree: true, stub: false });
     await walk(dir, name);
   }
   for (const name of order) {
@@ -272,8 +273,7 @@ await check('a step is coloured by what kind of work it is', async () => {
   // The story workflow names all four kinds; `early` is what the live mapping computes per step.
   const work = story.steps.findIndex((step) => step.role === 'worker');
   const kinds = story.steps.map((step, i) => `${step.name}:${stepKind(step, i < work)}`);
-  const want = 'grill:human,intent:human,research:agent,spec:technical,implement:agent,'
-    + 'accept:gatekeeper,condense:technical,merge:technical';
+  const want = 'intent:human,research:agent,spec:technical,implement:agent,review:gatekeeper,merge:technical';
   ok(kinds.join() === want, `story reads ${kinds.join()}`);
   ok(stepKind({ name: 'verify' }) === 'gatekeeper' && stepKind({ name: 'validate' }) === 'gatekeeper',
     'a parallel gatekeeper row is not gatekeeping');
@@ -312,7 +312,7 @@ await check('update reinstalls a part its dependant requires', async () => {
 await git(main, 'add', '-A'); await git(main, 'commit', '-qm', 'install factory');
 
 await check('a stub takes no branch and promote gives it one', async () => {
-  const m = await createMission(main, { name: 'x', workflow: 'chore', attention: 'light', worktree: false, stub: true });
+  const m = await createMission(main, { name: 'x', workflow: 'chore', autonomy: 'partial', worktree: false, stub: true });
   ok(m.state.branch === null, 'the stub took a branch');
   ok((await currentBranch(main)) === 'main', 'the stub left the trunk');
   await promoteMission(main, m);
@@ -329,10 +329,56 @@ await check('close merges, cleans the tree and drops the branch', async () => {
 });
 
 await check('--keep-branch keeps it', async () => {
-  await createMission(main, { name: 'y', workflow: 'chore', attention: 'light', worktree: false, stub: false });
+  await createMission(main, { name: 'y', workflow: 'chore', autonomy: 'partial', worktree: false, stub: false });
   await walk(main, 'y');
   await closeMission(main, await resolveMission(main, 'y'), true);
   ok(!(await branchGone(main, 'mission/y')), '--keep-branch deleted the branch anyway');
+});
+
+/** The step names of a mission's own workflow copy, in order. */
+async function graph(dir: string, name: string): Promise<string[]> {
+  return (await missionWorkflow(await resolveMission(dir, name))).steps.map((s) => s.name);
+}
+
+await check('a mission starts unshaped and shape appends a preset once', async () => {
+  const dir = await repo('shape');
+  await mission('new', ['s'], { 'no-open': true }, dir);
+  ok((await graph(dir, 's')).join() === 'intent', `new took ${(await graph(dir, 's')).join()}, not intent alone`);
+  ok((await resolveMission(dir, 's')).state.workflow === 'intent', 'new did not record the intent workflow');
+
+  await mission('shape', ['story'], { autonomy: 'partial' }, dir);
+  const shaped = await resolveMission(dir, 's');
+  ok((await graph(dir, 's')).join() === 'intent,research,spec,implement,review,merge', `shape gave ${(await graph(dir, 's')).join()}`);
+  ok(shaped.state.workflow === 'story' && shaped.state.autonomy === 'partial', 'shape recorded neither the preset nor the dial');
+  ok(shaped.state.steps.research?.status === 'pending', 'an appended step has no pending entry');
+  ok(shaped.state.step === 'intent', `the pointer left an unfinished intent for ${shaped.state.step}`);
+
+  // Idempotent for the same preset: state.json is the same bytes, timestamp and all.
+  const file = path.join(shaped.dir, 'state.json');
+  const before = await Bun.file(file).text();
+  await mission('shape', ['story'], {}, dir);
+  ok((await Bun.file(file).text()) === before, 'a second shape story rewrote state.json');
+
+  const refused = await mission('shape', ['quick'], {}, dir).then(() => null, (e: Error) => e);
+  ok(refused?.name === 'Refusal', 'shape quick was not refused');
+
+  await mission('new', ['q'], { quick: true, 'no-open': true, 'no-worktree': true }, dir);
+  ok((await graph(dir, 'q')).join() === 'work', `--quick took ${(await graph(dir, 'q')).join()}`);
+});
+
+await check('an insert past a finished step takes the pointer with it', async () => {
+  const dir = await repo('pointer');
+  await mission('new', ['t'], { 'no-open': true }, dir);
+  await step('start', ['intent'], { mission: 't' }, dir);
+  await gate('open', ['intent'], { mission: 't', file: 'intent.md' }, dir);
+  await gate('answer', ['intent', 'accept'], { mission: 't' }, dir);
+  await step('done', ['intent'], { mission: 't' }, dir);
+
+  await mission('shape', ['story'], {}, dir);
+  ok((await resolveMission(dir, 't')).state.step === 'research', 'shape left the pointer on a finished intent');
+
+  await step('add', ['x'], { mission: 't', after: 'intent', reason: 'the pointer rule' }, dir);
+  ok((await resolveMission(dir, 't')).state.step === 'x', 'step add did not take the pointer');
 });
 
 await check('two worktree missions close a then b', () => worktreePair(['a', 'b']));

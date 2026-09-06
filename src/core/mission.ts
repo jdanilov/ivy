@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
-import type { Attention, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
+import type { Autonomy, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
 import { FACTORY_HOME, saveProject } from './projects.js';
 import { dumpWorkflow, loadWorkflow, readWorkflowFile } from './workflow.js';
 
@@ -87,7 +87,7 @@ export async function readState(dir: string): Promise<MissionState> {
     name,
     title: raw.title ?? name,
     workflow: raw.workflow ?? 'story',
-    attention: raw.attention ?? 'light',
+    autonomy: raw.autonomy ?? 'partial',
     status,
     step: raw.step ?? '',
     round: raw.round ?? 0,
@@ -114,6 +114,29 @@ export async function writeState(dir: string, state: MissionState): Promise<void
 export function deviate(state: MissionState, what: string, reason: string): void {
   const entry: Deviation = { at: now(), what, reason };
   state.deviations.push(entry);
+}
+
+/** The dial that decides which decisions wait. Moving it mid-mission is a deviation, with its source. */
+export async function setAutonomy(cwd: string, name: string | undefined, autonomy: Autonomy, from: string): Promise<Mission> {
+  const mission = await resolveMission(cwd, name);
+  mission.state.autonomy = autonomy;
+  deviate(mission.state, `autonomy set to ${autonomy}`, from);
+  await writeState(mission.dir, mission.state);
+  return mission;
+}
+
+/**
+ * The pointer follows work that was inserted into the graph, whether by `step add` or by `mission
+ * shape`: with the step before it finished, standing on that step or on the one the insert displaced
+ * means the new step is what runs next. Anywhere else the pointer is where the human put it.
+ */
+export function pointAtInserted(state: MissionState, workflow: Workflow, name: string): void {
+  const at = workflow.steps.findIndex((s) => s.name === name);
+  const before = workflow.steps[at - 1]?.name;
+  const displaced = workflow.steps[at + 1]?.name;
+  const status = before ? state.steps[before]?.status : undefined;
+  if (status !== 'done' && status !== 'skipped') return;
+  if (state.step === before || (displaced !== undefined && state.step === displaced)) state.step = name;
 }
 
 // ── claim ────────────────────────────────────────────────────────────────────
@@ -241,7 +264,7 @@ export interface NewMission {
   name: string;
   title?: string;
   workflow: string;
-  attention: Attention;
+  autonomy: Autonomy;
   worktree: boolean;
   stub: boolean;
 }
@@ -290,7 +313,7 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
     name: opts.name,
     title,
     workflow: workflow.name,
-    attention: opts.attention,
+    autonomy: opts.autonomy,
     status: opts.stub ? 'stub' : 'open',
     step: workflow.steps[0]!.name,
     round: 0,

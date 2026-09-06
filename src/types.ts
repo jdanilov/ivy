@@ -126,7 +126,7 @@ export interface WorkflowStep {
   role?: string;
   gate?: 'human' | 'orchestrator';
   parallel?: string[];
-  loop?: { back: string; max: number; human_from: number };
+  loop?: { back: string; max: number };
 }
 
 export interface Workflow {
@@ -134,7 +134,8 @@ export interface Workflow {
   steps: WorkflowStep[];
 }
 
-export type Attention = 'full' | 'light' | 'unattended';
+/** How much of what the mission decides waits on the human. Per mission, set at shape time. */
+export type Autonomy = 'full' | 'partial' | 'none';
 export type StepStatus = 'pending' | 'running' | 'done' | 'skipped';
 export type GateAnswer = 'accept' | 'amend' | 'reject';
 
@@ -163,7 +164,7 @@ export interface MissionState {
   name: string;
   title: string;
   workflow: string;
-  attention: Attention;
+  autonomy: Autonomy;
   /** A stub has intent and no branch: `mission open` promotes it. */
   status: 'stub' | 'open' | 'closed';
   step: string;

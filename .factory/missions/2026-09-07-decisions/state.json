@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "spec",
+  "step": "implement",
   "round": 0,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/decisions",
@@ -35,8 +35,13 @@
       "reason": "hook injection points confirmed during the grill by a guide agent"
     },
     "spec": {
+      "status": "done",
+      "startedAt": "2026-09-06T21:59:05.949Z",
+      "endedAt": "2026-09-06T22:03:46.668Z"
+    },
+    "implement": {
       "status": "running",
-      "startedAt": "2026-09-06T21:59:05.949Z"
+      "startedAt": "2026-09-06T22:03:46.728Z"
     }
   },
   "deviations": [
@@ -47,5 +52,5 @@
     }
   ],
   "created": "2026-09-06T21:54:30.499Z",
-  "updated": "2026-09-06T21:59:05.949Z"
+  "updated": "2026-09-06T22:03:46.728Z"
 }

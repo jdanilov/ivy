@@ -1,39 +1,45 @@
-Step: implement (W1, read side)
+Committed. Final state verified: `tsc` clean, `scripts/test.ts` exit 0 (17 cases), `scripts/e2e.sh` exit 0, `factory status` 17 installed / 0 modified.
 
+```
+Step: implement (W2, write side and docs)
 Done:
-- `/opt/ed/ivy/src/tui/live.ts` builds the whole `Snapshot` from disk: `existingProjects` (deduped by realpath), `listMissions`+`readState`+`missionRowState`+`missionWorkflow`, `scanProject` for parts, `~/.factory/events/*.jsonl` for sessions and Stop rows, `~/.factory/caffeinate/<session>.pid` for the pid, gates and `findings.md` for the Inbox, `~/.factory/config.yaml` for the caffeinate mode.
-- `/opt/ed/ivy/src/tui/transcript.ts` is the tail reader: byte offset per file, first read capped at the last 2 MB, activity mapping table, `sumUsage` for the mission total and per-step windows, last assistant text for questions, 400-row cap per session.
-- `/opt/ed/ivy/src/tui/watch.ts` `startLive()`: `fs.watch` on the events and caffeinate dirs, each project's `.factory/missions` (recursive) and every open transcript, one rebuild per 200 ms burst, a 2 s poll, watchers and timers closed on quit.
-- `/opt/ed/ivy/src/commands/control.ts`: live is the default, `--fixture` the demo, `--frames <dir>` writes the live screen as text and exits 0; `/opt/ed/ivy/src/tui/frames.ts` holds the frame writer that `scripts/tui-snapshot.ts` now calls too (no duplication).
-- `screen.ts`: `run(snap, live?)` swaps the snapshot under the screen, `itemKey` exported, `n` and the `arrival()` fixture gone, per-step tokens on the MISSION rows, `modified` parts rendered as such; `model.ts` gained `StepRow.tokens` and the `Tool` verb; `format.ts` counts emoji as two cells (a live Bash row with an emoji was wrapping and pushing the panes down).
-- `scripts/test.ts` gained one case: the tail parses each line once and its offset follows the file.
-- `src/tui/` + `src/commands/control.ts` = 1750 lines (budget 1700, over by 50; the read side is 600 new lines and the fixture is 217 of the total).
+- /opt/ed/ivy/src/tui/actions.ts — every key's write side through the CLI's own functions: answerGate (gate() with cwd = project), openTab (sessionLive + loadPreset + openSession), killSession (pgrep -f -- "--session-id <id>", SIGTERM then SIGKILL inside 5 s), applyParts (install --parts + removeParts), setCaffeinate, setAttention. Console silenced while a command runs, each returns the toast line, a refusal throws.
+- /opt/ed/ivy/src/core/parts.ts — removeParts(dir, names): uninit, unlink, hooks, mcp, settings, snippet, dropEmptied, manifest write-or-delete, dropCreated. /opt/ed/ivy/src/commands/uninstall.ts now prints around it instead of doing it.
+- /opt/ed/ivy/src/core/config.ts — Caffeinate type, readCaffeinate (uncached) and writeCaffeinate (one line rewritten in place, so vars survive); live.ts reads through it, model.ts re-exports the type. One reader, not two.
+- /opt/ed/ivy/src/tui/screen.ts — keys act: App {r, ui, snap} + draw(), toast re-renders from the current snapshot (W1's stale-toast issue), act() toasts start then outcome, amend/reject open an InputRenderable at the answer row with esc to cancel, `y` applies the pending part set, `c`/`t`/`o`/`x` call actions. A live rebuild does not redraw while the note is open, and `q` does not quit mid-note.
+- /opt/ed/ivy/src/tui/notify.ts — inboxKey, arrivals(prev, next), and the Warp 777;notify sequence beside the bell; /opt/ed/ivy/src/commands/control.ts diffs the inbox at the startLive call site and notifies once per new key.
+- /opt/ed/ivy/parts/hook-factory/hook-factory.ts — reads `caffeinate` from ~/.factory/config.yaml per event: off never starts, on starts at SessionStart and does not stop on Stop, auto unchanged.
+- /opt/ed/ivy/src/tui/live.ts, model.ts — InboxItem carries the step an answer is recorded against.
+- /opt/ed/ivy/scripts/test.ts — three cases: the hook's three caffeinate modes (fake caffeinate on PATH), `c` writing the mode and holding only its own pid, and arrivals.
+- Docs: docs/design.md gained a Mission Control section (pane grid, semantic step colours, #3a3a3a rule, key bar and key table); docs/terminology.md rewrote Mission Control and Inbox and added Messages, Activity, Caffeinate; README gained `factory`, `factory menu` and a keys line; AGENTS.md lists src/tui/ and names caffeinate in the config.yaml line; docs/roadmap.md dropped the three Mission Control lines and the tokens-per-step line.
 
 Acceptance:
-- A-SRC-1 pass — scratch HOME with p1 (`alpha`, implement running) and p2 (`beta` stub): `--frames` exit 0 with no tty, frames list both projects, `● alpha chore implement` and a dim `○ beta stub`.
-- A-SRC-2 pass — `gate open merge --file retro.md` → MESSAGES (1) `⊘ p1/alpha gate merge`, `retro.md (4 lines)` with the body; after `gate answer merge accept` the next frame reads MESSAGES (0).
-- A-SRC-3 pass — a dead path appended to `~/.factory/projects` is absent from the frames, exit 0, no error.
-- A-SRC-4 pass — three scratch events files (30 h old / cwd outside every project / fresh inside p1): only the fresh unbound one appears, and the session named by `alpha`'s `state.session` never shows as unbound.
-- A-SRC-5 pass — pid file naming a live `sleep` → `caffeinate: true`; the same file after the kill → `false`; a 999999 pid → `false`.
-- A-SRC-6 pass — rows come from one `scanProject` call; scratch p1 shows `PARTS 2/17` with `commit ● modified` against `factory status` "1 installed, 1 modified", ivy shows `17/17` against "17 installed, 0 modified, 0 available".
-- A-TRX-1 pass — 3 lines then 2 appended → 5 rows, `cmd 1..5` with no repeat, offset equals the file size; a 3.38 MB file parses 496 of 800 lines, exactly the last 2 MB; one case added to `scripts/test.ts`.
-- A-TRX-2 pass — scratch jsonl renders `Bash / Edit / Agent / Ask / Text` in timestamp order, the sidechain Bash line excluded, plus the hook's `Stop` row.
-- A-TRX-3 pass — mission tokens `600 / 9000 / 300` = six usages including the sidechain one; step `implement` between its `startedAt` and `endedAt` = `300 / 4500 / 150`.
-- A-TRX-4 pass — after `Stop`, MESSAGES shows `p1/quick asks` with the last assistant text; after appending a `UserPromptSubmit` event it reads MESSAGES (0).
-- A-RFR-1 pass — watchers cover the four sets; measured: 10 writes in 100 ms → 1 rebuild, 2.3 s idle → 1 poll rebuild, after `close()` → 0 rebuilds and 0 active handles.
-- A-RFR-2 pass — `render()` still destroys (renderer root children stays 1 across 150 renders); 300 s of rebuild+render every 2 s with the transcript growing: RSS 103–119 MB, spread 15.5 %, activity rows capped at 402.
+- A-ACT-1 pass — ↵ on the gate wrote {status: answered, file: intent.md, answer: accept}, identical to `gate answer`; a second, different answer toasted "✗ gate grill was already answered accept at …" and the stored answer stayed accept.
+- A-ACT-2 pass — amend drew "amend note" over the verdicts with a focused InputRenderable, typed text reached ui.note, esc left the gate open with nothing written, and a second pass recorded {answer: amend, note: "add the migration step"}.
+- A-ACT-3 pass — `o` with no live session wrote state.session and ~/.warp/tab_configs/factory-alpha.toml; with a fresh events file it only toasted "factory-alpha is already open — switch to that tab" and the session id was unchanged.
+- A-ACT-4 pass — against a script whose argv carries --session-id <id>: first press SIGTERM (process exited within 2 s), second within 5 s SIGKILL, an unknown id returned "no process for #…" and signalled nothing; process.pid is excluded from the pgrep hits.
+- A-ACT-5 pass — toggling commit off and docs-format on then ↵,y removed .claude/skills/commit/skill.md and installed .claude/docs-format.md; `bun src/cli.ts status <dir>` afterwards read "1 installed, 0 modified, 16 available" with docs-format the only installed row.
+- A-ACT-6 pass — scripts/test.ts case, scratch HOME with a fake caffeinate: `on` wrote caffeinate: "on" keeping vars and left a live pid in control.pid; `auto` killed control.pid only and left a session pid alone; `off` killed the session pid too and cleared the folder.
+- A-ACT-7 pass — scripts/test.ts case: off started nothing on SessionStart or UserPromptSubmit; on started at SessionStart and still held after Stop; auto started on the prompt and let go on Stop.
+- A-ACT-8 pass — `t` wrote attention: unattended and appended {what: "attention set to unattended", reason: "set from Mission Control"} to deviations.
+- A-NTF-1 pass — arrivals(null, [a]) = [], arrivals([a], [a aged]) = [], arrivals([a], [a, b]) = [b]; control.ts seeds `seen` with the first snapshot and announces once per rebuild before apply.
+- A-NTF-2 pass — notify() writes \x07 and \x1b]777;notify;Factory;<label>\x07 to stdout, then Bun.spawn(['osascript', …]).unref() behind a darwin guard, never awaited.
+- A-DOC-1 pass — docs/design.md "Mission Control" carries the row-by-row pane grid, the semantic colour table (human #a8a968, gatekeeper #d7af5f, agent #6b8fd9, technical #6e6e6e), the #3a3a3a rule note and the key bar plus a key table; docs/terminology.md rows Mission Control, Inbox, Activity, Caffeinate describe the screen as built.
+- A-DOC-2 pass — README rows `factory` and `factory menu` plus the keys paragraph; AGENTS.md src/ block lists tui/ and the ~/.factory line names `caffeinate: auto|on|off`; roadmap has neither Mission Control nor tokens-per-step lines.
+- A-DOC-3 pass — src/tui/ plus src/commands/control.ts = 2011 lines of 2200; `bun x tsc --noEmit` exit 0; `bun scripts/test.ts` exit 0, 17 cases; `bash scripts/e2e.sh` exit 0 ("e2e: ok").
 
 Deviations:
-- `buildSnapshot()` takes no `prev`: the transcript offsets live in `transcript.ts` and everything else is read fresh, so the parameter had no honest use. The arrival diff W2 needs belongs at the `startLive` call site in `control.ts`, which holds the previous snapshot.
-- `args.ts` unchanged: only value-less flags are declared (the `BOOLEAN` set); `--frames <dir>` already parses as a value flag.
-- Usage is counted once per `message.id` — Claude Code writes one line per content block carrying the same usage object, so summing every line multiplies a response by its block count.
-- `live.ts` reads `~/.factory/config.yaml` itself instead of `loadConfig()`, which caches for the process and drops unknown keys; `c` rewrites that file while the screen runs.
-- Line budget missed by 50 (1750 of 1700).
+- readCaffeinate/writeCaffeinate live in src/core/config.ts rather than beside live.ts's copy: the file is the core's, and the writer belongs with the reader. model.ts re-exports the Caffeinate type so the TUI still names it once.
+- `o` uses the orchestrator preset, the one `mission open` defaults to; state.json records no preset of its own.
+- `c off` kills the hook's session pids as well as control.pid, per the spec's "kill every pid in that folder"; OFF would otherwise not read as off until every session ended.
+- design.md documents the four-kind colour scheme from the spec's W3 section; theme.ts still carries the prototype's three, which is W3's change.
 
 Issues:
-- `toast()` closes over the snapshot it was called with, so its 2 s re-render can paint one stale frame under live data — W2 owns the actions that raise toasts.
-- `screen.ts` no longer imports `notify`; the `n` key and `fixture.arrival()` are gone, so W2 wires arrival where `startLive` is (control.ts).
-- Transcript slug is `cwd` with `/` → `-`, matching every folder in `~/.claude/projects`; a project path with a dot may not resolve, in which case that session shows no activity rather than failing.
+- Bun's os.homedir() is fixed at process start, so scripts/test.ts's `process.env.HOME` does not redirect FACTORY_HOME for in-process code — the existing in-process cases append scratch paths to the real ~/.factory/projects. My caffeinate case runs as a child with HOME in its env for that reason. Worth a roadmap line.
+- pgrep -f matches any process whose command line contains "--session-id <id>", a shell that spawned claude included; the id keeps it off anything unrelated, but a kill can hit two pids.
+- docs/factory-transcript.txt, docs/function-hooks-transcript.txt, docs/graph-engineering-transcript.txt and docs/screenshots/*.png were staged-but-uncommitted at mission start and are absent from disk and index now; nothing in this step touched them, and git fsck still lists dangling blobs.
 
-Faster ways:
-- An evidence script that imports `src/tui/` must live inside the repo: run from `/tmp` it loads a second `@opentui` copy from the bun cache and `destroyRecursively` throws `remove expects a renderable child object`.
+Faster:
+- The action loop is the test renderer plus onKey: render(app.r, app.snap, ui) + renderOnce() + captureCharFrame() for the look, and the InputRenderable found by walking renderer.root and driven with insertText() for the note.
+- A victim process for `x` must be a script (#!/bin/sh + sleep), not `sh -c 'sleep 60' --session-id X`: sh execs a lone command away and the argv pgrep needs goes with it.
+```

@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**
- * A scratch world for Mission Control: two registered git repos, one open story mission with a
- * running `implement`, one stub, a dead project path, a live unbound session and a stale one,
+ * A scratch world for Mission Control: three registered git repos, one open story mission with a
+ * running `implement`, one stub, one project with no missions at all, a dead project path, a live
+ * unbound session and a stale one,
  * each with a Claude Code transcript. Everything the read-side assertions need in one run.
  *
  *   HOME=$(mktemp -d) bun /opt/ed/ivy/.factory/validator/scratch.ts
@@ -103,6 +104,7 @@ if (import.meta.main && process.argv[2] === 'bulk') {
     if (r.code !== 0) console.log(`✗ ${args.join(' ')} → ${r.code}\n${r.out}`);
   }
   cli(['mission', 'new', 'bstub', '--stub', '--workflow', 'chore'], beta);
+  await repo('gamma'); // registered, never missioned: the empty-project hint has somewhere to draw
 
   await appendFile(path.join(HOME, '.factory', 'projects'), `${path.join(HOME, 'gone')}\n`);
 
@@ -113,5 +115,5 @@ if (import.meta.main && process.argv[2] === 'bulk') {
   await transcript(live, alpha);
   await transcript(stale, alpha);
 
-  console.log(JSON.stringify({ HOME, alpha, beta, live, stale }, null, 2));
+  console.log(JSON.stringify({ HOME, alpha, beta, gamma: path.join(HOME, 'gamma'), live, stale }, null, 2));
 }

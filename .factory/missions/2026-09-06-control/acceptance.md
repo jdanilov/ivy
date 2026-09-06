@@ -56,3 +56,14 @@ the fixture. Every id ends pass, fail or unchecked in `findings.md`.
 - A-UI-4 | verify | Each open mission row carries `+N −M` from `git diff --shortstat <trunk>...<branch>` in its checkout, refreshed on the poll and never awaited by the render | scratch mission with a committed change, read `live.ts` | W3
 - A-VAL-1 | verify | Validator.md instructs writing, indexing in `.factory/validator/scripts.md`, reusing and pruning short scripts under `.factory/validator/`; file under 80 lines; the two colour rows in agent prompts match the spec | read | W3
 - A-UI-5 | validate | An unbound session appears, and its question reaches MESSAGES, only while `sessionLive` says its process is alive; a session row and its inbox label carry the short id so two `quick` sessions in one project are told apart | scratch events for a dead and a live session, `--frames` | W3
+
+## Round 1
+
+- A-R1-1 | verify | hook-factory never overwrites an existing non-empty handoff file: a second save under the same base lands in `-2`, a third in `-3`, regardless of length | scratch mission, three `SubagentStop` inputs, `ls handoffs` | R1
+- A-R1-2 | validate | MISSION rows show `skipped`, `failed`, `blocked` for steps in those states, wall time only for running and done | scratch mission with a skipped step, `--frames` | R1
+- A-R1-3 | validate | The status bar reads `done/total` with no bracket | `--frames` | R1
+- A-R1-4 | validate | `install --parts x` into a project reached through a symlinked path leaves links that resolve, and `status` reads `installed` not `modified` | `/tmp/<dir>` on macOS, `readlink -f`, `status` | R1
+- A-R1-5 | validate | A refused gate answer leaves the row unanswered and shows the refusal in the toast | answer twice under the key driver | R1
+- A-R1-6 | verify | README names `--frames <dir>` and `--fixture` | read | R1
+- A-R1-7 | validate | A project with no missions shows a dim hint under its heading naming `factory mission new <name>`; an empty HOME shows one under PROJECTS naming `factory install` | scratch HOME, `--frames` | R1
+- A-R1-8 | verify | `EventRow.mark` is gone and nothing references it | grep | R1

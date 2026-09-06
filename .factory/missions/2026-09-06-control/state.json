@@ -5,7 +5,7 @@
   "attention": "light",
   "status": "open",
   "step": "implement",
-  "round": 0,
+  "round": 1,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/control",
   "worktree": null,
@@ -52,7 +52,16 @@
     },
     "implement": {
       "status": "running",
-      "startedAt": "2026-09-06T11:38:40.869Z"
+      "startedAt": "2026-09-06T13:24:01.984Z"
+    },
+    "accept": {
+      "status": "pending"
+    },
+    "verify": {
+      "status": "pending"
+    },
+    "validate": {
+      "status": "pending"
     }
   },
   "deviations": [
@@ -83,5 +92,5 @@
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-06T11:38:40.869Z"
+  "updated": "2026-09-06T13:24:01.984Z"
 }

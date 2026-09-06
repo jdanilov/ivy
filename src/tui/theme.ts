@@ -1,8 +1,8 @@
 import type { RunState, StepKind } from './model.js';
 
-/** Truecolor palette from docs/design.md. Weight is colour: nothing here is bold or italic. */
+/** Truecolor palette from docs/design.md. Weight is colour: nothing here is bold or italic.
+ *  No background: the screen draws on whatever the terminal already paints. */
 export const C = {
-  bg: '#0a0a0a',
   rule: '#232323',
   dim: '#6e6e6e',
   bright: '#e4e4e4',

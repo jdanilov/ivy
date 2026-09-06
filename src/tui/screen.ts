@@ -9,7 +9,8 @@ import type { Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from 
 const ANSWERS = ['accept', 'amend', 'reject'] as const;
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
 
-/** Chrome rows around the body: blank, header, rule, status, rule — rule, key bar, blank. */
+/** Chrome rows around the body: blank, header, rule, status, rule — rule, key bar. The last
+ *  terminal row is left undrawn, so the shell's own line sits under the screen. */
 const CHROME = 8;
 /** Factory's own mark. Single-width in a monospace font, unlike most of the geometric glyphs. */
 const BRAND = '⌬';
@@ -64,15 +65,26 @@ function column(r: CliRenderer, width: number, extra: Record<string, unknown> = 
 type Pane = ReturnType<typeof column>;
 
 function marker(selected: boolean, focused: boolean): Cell {
-  return [selected && !focused ? '›' : ' ', C.dim];
+  return [selected && !focused ? '›  ' : '   ', C.dim];
 }
 
 // ── header, status bar, key bar ───────────────────────────────────────────────
 
-function header(p: Pane, here: LeftItem, caffeinate: Caffeinate): void {
+/** The mode is what the human chose, the bracket what the machine is actually doing. */
+function awake(snap: Snapshot): boolean {
+  const running = snap.projects.some((project) => project.missions.some((m) => m.state === 'running'));
+  return snap.caffeinate === 'on' || (snap.caffeinate === 'auto' && running);
+}
+
+function caffeinateCells(snap: Snapshot): Cell[] {
+  const on = awake(snap);
+  return [['caffeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
+}
+
+function header(p: Pane, here: LeftItem, snap: Snapshot): void {
   const where = here.kind === 'inbox' ? 'all projects' : here.project.path;
-  const left: Cell[] = [[`${BRAND} `, C.accent], ['Mission Control', C.accent], ['  ', C.dim], [where, C.dim]];
-  p.row(spread(left, [['caffeinate ', C.dim], [caffeinate.toUpperCase(), C.bright]], p.width));
+  const left: Cell[] = [[`${BRAND} `, C.accent], ['FACTORY', C.accent], ['  ', C.dim], [where, C.dim]];
+  p.row(spread(left, caffeinateCells(snap), p.width));
 }
 
 /** Missions of one project, or of all of them when the Inbox is selected. */
@@ -119,11 +131,13 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const pairs: string[][] =
-    !right ? [['↑↓', 'Select'], ['↵→', 'Open'], ['a', 'Adopt'], ['x', 'Kill'], ['c', 'Caffeinate'], ['q', 'Quit']]
+    !right ? [['↑↓', 'Select'], ['↵', 'Open'], ['o', 'Tab'], ['x', 'Kill'], ['c', 'Caffeinate'], ['q', 'Quit']]
+    // ←→ pick the answer in Messages, so only esc leaves that one.
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←→', 'Answer'], ['↵', 'Confirm'], ['esc', 'Back'], ['q', 'Quit']]
     : here.kind === 'project' && ui.confirm ? [['y', 'Confirm'], ['n', 'Cancel'], ['esc', 'Back'], ['q', 'Quit']]
-    : here.kind === 'project' ? [['↑↓', 'Select'], ['space', 'Toggle'], ['↵', 'Apply'], ['esc', 'Back'], ['q', 'Quit']]
-    : [['esc', 'Back'], ['c', 'Caffeinate'], ['q', 'Quit']];
+    : here.kind === 'project' ? [['↑↓', 'Select'], ['space', 'Toggle'], ['↵', 'Apply'],
+      ...(pending(here.project, ui).length ? [['r', 'Reset']] : []), ['←esc', 'Back'], ['q', 'Quit']]
+    : [['←esc', 'Back'], ['c', 'Caffeinate'], ['q', 'Quit']];
   p.row(pairs.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]));
 }
 
@@ -134,17 +148,17 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
   const tail: Cell[] =
     m.status === 'stub' ? [['  stub', C.dim]]
     : m.status === 'closed' ? [[`  closed ${ago(m.closedAt ?? Date.now())}`, C.dim]]
-    : [['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright], [` r${m.round}`, C.dim]];
+    : [['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright], [m.round ? ` ↻${m.round}` : '', C.dim]];
   const right: Cell[] = m.status === 'open'
     ? [[dur(m.wall), C.dim], ['  ', C.dim], [tokens(m.tokens.input + m.tokens.cached + m.tokens.output), C.dim]]
     : [];
-  const cells: Cell[] = [marker(selected, focused), ['  ', C.dim], [`${GLYPH[m.state]} `, stateColor(m.state)], [m.name, quiet ? C.dim : C.bright]];
+  const cells: Cell[] = [marker(selected, focused), [' ', C.dim], [`${GLYPH[m.state]} `, stateColor(m.state)], [m.name, quiet ? C.dim : C.bright]];
   p.row(spread([...cells, ...tail], right, p.width), selected && focused);
 }
 
 function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): void {
   p.row([
-    marker(selected, focused), ['  ', C.dim], ['○ ', C.dim], [s.preset, C.bright], ['  unbound  ', C.dim],
+    marker(selected, focused), [' ', C.dim], ['○ ', C.dim], [s.preset, C.bright], ['  unbound  ', C.dim],
     [id(s.id), C.dim], [`  idle ${dur(Date.now() - s.idleSince)}`, C.dim],
   ], selected && focused);
 }
@@ -163,7 +177,7 @@ function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
     const head: Cell[] = item.kind === 'inbox'
       ? [['Inbox', C.bright], [` (${open})`, open ? C.warning : C.dim]]
       : [[item.project.name, C.bright]];
-    p.row([marker(selected, focused), [' ', C.dim], ...head], selected && focused);
+    p.row([marker(selected, focused), ...head], selected && focused);
   });
 }
 
@@ -324,17 +338,20 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const here = items[ui.left]!;
   const bodyH = Math.max(1, r.terminalHeight - CHROME);
 
-  const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 1, paddingRight: 1, backgroundColor: C.bg });
+  // One row short of the terminal: nothing is drawn on the last line, and no box carries a
+  // background, so every cell the screen does not colour keeps the terminal's own.
+  const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight - 1, paddingLeft: 1, paddingRight: 1 });
   root.row([]);
-  header(root, here, snap.caffeinate);
+  header(root, here, snap);
   root.rule();
   statusBar(root, snap, here, ui);
   root.rule();
 
-  const leftW = Math.max(30, Math.floor(w * 0.45));
+  const leftW = Math.max(30, Math.floor(w * 0.4));
   const rightW = w - leftW - 1;
   const body = new BoxRenderable(r, { flexDirection: 'row', flexGrow: 1, flexShrink: 1, overflow: 'hidden' });
-  const left = column(r, leftW, { width: leftW });
+  // Two cells of padding keep the left pane's right-aligned tokens off the divider.
+  const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
   const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
   leftPane(left, items, snap, ui);
   if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
@@ -350,7 +367,6 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
 
   root.rule();
   keyBar(root, here, ui);
-  root.row([]);
   r.root.add(root.box);
 }
 
@@ -387,9 +403,8 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
       break;
     }
     case 'right':
-      // In Messages ←→ walk the answer row, so only `esc` leaves that pane.
+      // In Messages ←→ walk the answer row; elsewhere ↵ is the only way in.
       if (inMessages) ui.answer = move(ui.answer, ANSWERS.length, 1);
-      else ui.focus = 'right';
       break;
     case 'left':
       if (inMessages) ui.answer = move(ui.answer, ANSWERS.length, -1);
@@ -417,14 +432,17 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
       }
       if (!right) ui.focus = 'right';
       break;
+    case 'r':
+      if (inParts) ui.toggles = {};
+      break;
     case 'c':
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;
-      return toast(r, snap, ui, `caffeinate ${snap.caffeinate.toUpperCase()}`);
-    case 'a':
-      if (!inParts) return toast(r, snap, ui, `adopt ${here.kind === 'mission' ? here.mission.name : '—'} (prototype: no-op)`);
+      return toast(r, snap, ui, `caffeinate ${snap.caffeinate.toUpperCase()} [${awake(snap) ? 'ON' : 'OFF'}]`);
+    case 'o':
+      if (!right) return toast(r, snap, ui, `open tab ${here.kind === 'mission' ? here.mission.name : here.kind === 'session' ? id(here.session.id) : '—'} (prototype: no-op)`);
       break;
     case 'x':
-      if (!inParts) return toast(r, snap, ui, `kill ${here.kind === 'session' ? here.session.id : '—'} (prototype: no-op)`);
+      if (!right) return toast(r, snap, ui, `kill ${here.kind === 'session' ? id(here.session.id) : '—'} (prototype: no-op)`);
       break;
     default:
       return;
@@ -451,7 +469,7 @@ export function onKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent): vo
 
 /** Resolves when the human quits, so the CLI ends without an exit call. */
 export async function run(snap: Snapshot): Promise<void> {
-  const r = await createCliRenderer({ exitOnCtrlC: true, targetFps: 30, backgroundColor: C.bg });
+  const r = await createCliRenderer({ exitOnCtrlC: true, targetFps: 30 });
   const ui = newUi();
   render(r, snap, ui);
   r.on('resize', () => render(r, snap, ui));

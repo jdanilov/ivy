@@ -1,42 +1,42 @@
                                                                                                                                             
- ⌬ Mission Control  all projects                                                                                            caffeinate AUTO 
+ ⌬ FACTORY  all projects                                                                                               caffeinate AUTO [ON] 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  1 running · 1 waiting · 1 stub · 1 closed                                                                                                  
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- PROJECTS                                                      │ MESSAGES (3)                                                               
- ──────────────────────────────────────────────────────────────│ ────────────────────────────────────────────────────────────────────────── 
- › Inbox (3)                                                   │  ⊘ igs/auth  gate merge                                             3m ago 
-                                                               │  ⊘ igs/quick  asks                                                  8m ago 
-   ivy                                                         │  ⊘ igs/auth  triage r2                                              1h ago 
-    ● refit  story  implement r2                      14m  4.5M│ ────────────────────────────────────────────────────────────────────────── 
-    ○ memory  stub                                             │ retro.md (41 lines)                                                        
-                                                               │ # Retro                                                                    
-   igs                                                         │                                                                            
-    ⊘ auth  fix  merge r2                           2h 4m  1.2M│ ## Tools                                                                   
-    ○ quick  unbound  #8a9e6b42  idle 12m                      │                                                                            
-                                                               │ The codegraph MCP paid for itself twice: both recovery designs came out of 
-   cut                                                         │ one query.                                                                 
-    ✓ intro  closed 2d ago                                     │ The browse tool timed out on the login flow, the Validator fell back to    
-                                                               │ curl and said so.                                                          
-                                                               │                                                                            
-                                                               │ ## Context                                                                 
-                                                               │                                                                            
-                                                               │ AGENTS.md is doing the work a spec should do. Three steps quoted it back   
-                                                               │ at me.                                                                     
-                                                               │ The Worker prompt is still under 40 lines and nobody complained.           
-                                                               │                                                                            
-                                                               │ ## Workflow                                                                
-                                                               │                                                                            
-                                                               │ Two rounds of verify on a copy change is one round too many, the second    
-                                                               │ found nothing.                                                             
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │  accept    amend    reject                                                 
+ PROJECTS                                               │ MESSAGES (3)                                                                      
+ ─────────────────────────────────────────────────────  │ ───────────────────────────────────────────────────────────────────────────────── 
+ ›  Inbox (3)                                           │    ⊘ igs/auth  gate merge                                                  3m ago 
+                                                        │    ⊘ igs/quick  asks                                                       8m ago 
+    ivy                                                 │    ⊘ igs/auth  triage r2                                                   1h ago 
+     ● refit  story  implement ↻2            14m  4.5M  │ ───────────────────────────────────────────────────────────────────────────────── 
+     ○ memory  stub                                     │ retro.md (41 lines)                                                               
+                                                        │ # Retro                                                                           
+    igs                                                 │                                                                                   
+     ⊘ auth  fix  merge ↻2                 2h 4m  1.2M  │ ## Tools                                                                          
+     ○ quick  unbound  #8a9e6b42  idle 12m              │                                                                                   
+                                                        │ The codegraph MCP paid for itself twice: both recovery designs came out of one    
+    cut                                                 │ query.                                                                            
+     ✓ intro  closed 2d ago                             │ The browse tool timed out on the login flow, the Validator fell back to curl and  
+                                                        │ said so.                                                                          
+                                                        │                                                                                   
+                                                        │ ## Context                                                                        
+                                                        │                                                                                   
+                                                        │ AGENTS.md is doing the work a spec should do. Three steps quoted it back at me.   
+                                                        │ The Worker prompt is still under 40 lines and nobody complained.                  
+                                                        │                                                                                   
+                                                        │ ## Workflow                                                                       
+                                                        │                                                                                   
+                                                        │ Two rounds of verify on a copy change is one round too many, the second found     
+                                                        │ nothing.                                                                          
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │  accept    amend    reject                                                        
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ↑↓ Select  ←→ Answer  ↵ Confirm  esc Back  q Quit                                                                                          
                                                                                                                                             

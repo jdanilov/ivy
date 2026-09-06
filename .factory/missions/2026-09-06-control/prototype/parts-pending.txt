@@ -23,8 +23,8 @@
                                                         │    validate        skill    ● installed  .claude/skills/validate/skill.md         
                                                         │    verify          skill    ● installed  .claude/skills/verify/skill.md           
                                                         │ ───────────────────────────────────────────────────────────────────────────────── 
-                                                        │ apply: uninstall browse, install codegraph   y confirm  n cancel                  
-                                                        │                                                                                   
+                                                        │ .claude/scripts/codegraph-gate.sh                                                 
+                                                        │ .mcp.json                                                                         
                                                         │                                                                                   
                                                         │                                                                                   
                                                         │                                                                                   
@@ -38,5 +38,5 @@
                                                         │                                                                                   
                                                         │                                                                                   
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- y Confirm  n Cancel  esc Back  q Quit                                                                                                      
+ ↑↓ Select  space Toggle  ↵ Apply  r Reset  ←esc Back  q Quit                                                                               
                                                                                                                                             

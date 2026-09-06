@@ -1,42 +1,42 @@
                                                                                                                                             
- ⌬ Mission Control  /opt/ed/ivy                                                                                             caffeinate AUTO 
+ ⌬ FACTORY  /opt/ed/ivy                                                                                                caffeinate AUTO [ON] 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ● RUNNING  █████████████████████████████████████████  3/10 [+5]                             TIME 14m · In 310.2K · Cached 4.1M · Out 48.0K 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- PROJECTS                                                      │ MISSION  refit                                                        3/10 
- ──────────────────────────────────────────────────────────────│ ────────────────────────────────────────────────────────────────────────── 
-   Inbox (3)                                                   │  ✓ grill                                                                3m 
-                                                               │  ✓ intent                                                              12m 
-   ivy                                                         │  · research                                                        skipped 
-    ● refit  story  implement r2                      14m  4.5M│  ✓ spec                                                                 8m 
-    ○ memory  stub                                             │  ● implement                                                            6m 
-                                                               │  ○ accept                                                          pending 
-   igs                                                         │  ○ verify                                                          pending 
-    ⊘ auth  fix  merge r2                           2h 4m  1.2M│  ○ validate                                                        pending 
-    ○ quick  unbound  #8a9e6b42  idle 12m                      │  ○ condense                                                        pending 
-                                                               │  ○ merge                                                           pending 
-   cut                                                         │ ────────────────────────────────────────────────────────────────────────── 
-    ✓ intro  closed 2d ago                                     │ step implement · role worker · round 2                                     
-                                                               │ branch mission/refit · wt ../ivy-refit                                     
-                                                               │ session #75cb46e1 · caffeinate on                                          
-                                                               │ deviations 1                                                               
-                                                               │ ────────────────────────────────────────────────────────────────────────── 
-                                                               │ Events                                                                     
-                                                               │  2m ago  SubagentStop     [Worker]  ✓                                      
-                                                               │  8m ago  SubagentStop     [Worker]  ✓                                      
-                                                               │ 11m ago  PreToolUse       Bash bun x tsc --noEmit                          
-                                                               │ 14m ago  UserPromptSubmit round 2, keep the linker                         
-                                                               │ 19m ago  Stop             triage r1 accepted  ✓                            
-                                                               │ 24m ago  SubagentStop     [Verifier]  ✗                                    
-                                                               │ 26m ago  SubagentStop     [Validator]  ✓                                   
-                                                               │ 38m ago  SubagentStop     [Worker]  ✓                                      
-                                                               │ 51m ago  Notification     gate intent open  ⊘                              
-                                                               │  1h ago  SessionStart     preset orchestrator                              
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
-                                                               │                                                                            
+ PROJECTS                                               │ MISSION  refit                                                               3/10 
+ ─────────────────────────────────────────────────────  │ ───────────────────────────────────────────────────────────────────────────────── 
+    Inbox (3)                                           │  ✓ grill                                                                       3m 
+                                                        │  ✓ intent                                                                     12m 
+    ivy                                                 │  · research                                                               skipped 
+     ● refit  story  implement ↻2            14m  4.5M  │  ✓ spec                                                                        8m 
+     ○ memory  stub                                     │  ● implement                                                                   6m 
+                                                        │  ○ accept                                                                 pending 
+    igs                                                 │  ○ verify                                                                 pending 
+     ⊘ auth  fix  merge ↻2                 2h 4m  1.2M  │  ○ validate                                                               pending 
+     ○ quick  unbound  #8a9e6b42  idle 12m              │  ○ condense                                                               pending 
+                                                        │  ○ merge                                                                  pending 
+    cut                                                 │ ───────────────────────────────────────────────────────────────────────────────── 
+     ✓ intro  closed 2d ago                             │ step implement · role worker · round 2                                            
+                                                        │ branch mission/refit · wt ../ivy-refit                                            
+                                                        │ session #75cb46e1 · caffeinate on                                                 
+                                                        │ deviations 1                                                                      
+                                                        │ ───────────────────────────────────────────────────────────────────────────────── 
+                                                        │ Events                                                                            
+                                                        │  2m ago  SubagentStop     [Worker]  ✓                                             
+                                                        │  8m ago  SubagentStop     [Worker]  ✓                                             
+                                                        │ 11m ago  PreToolUse       Bash bun x tsc --noEmit                                 
+                                                        │ 14m ago  UserPromptSubmit round 2, keep the linker                                
+                                                        │ 19m ago  Stop             triage r1 accepted  ✓                                   
+                                                        │ 24m ago  SubagentStop     [Verifier]  ✗                                           
+                                                        │ 26m ago  SubagentStop     [Validator]  ✓                                          
+                                                        │ 38m ago  SubagentStop     [Worker]  ✓                                             
+                                                        │ 51m ago  Notification     gate intent open  ⊘                                     
+                                                        │  1h ago  SessionStart     preset orchestrator                                     
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- ↑↓ Select  ↵→ Open  a Adopt  x Kill  c Caffeinate  q Quit                                                                                  
+ ↑↓ Select  ↵ Open  o Tab  x Kill  c Caffeinate  q Quit                                                                                     
                                                                                                                                             

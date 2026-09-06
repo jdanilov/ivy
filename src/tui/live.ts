@@ -2,12 +2,14 @@ import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { existingProjects, FACTORY_HOME } from '../core/projects.js';
 import { readCaffeinate } from '../core/config.js';
-import { listMissions, missionRowState, missionWorkflow } from '../core/mission.js';
+import { git, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
+import { id } from './format.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
+import { stepKind } from './model.js';
 import type {
-  Activity, InboxItem, Mission, PartRow, Project, RunState, Session, Snapshot, StepKind, StepRow, TriageLine,
+  Activity, InboxItem, Mission, PartRow, Project, RunState, Session, Snapshot, StepRow, TriageLine,
 } from './model.js';
 
 /**
@@ -88,19 +90,17 @@ const waiting = (ev: Ev | undefined): boolean => ev?.event === 'Stop' || ev?.eve
 
 // ── steps ────────────────────────────────────────────────────────────────────
 
-const KIND: Record<string, StepKind> = { implement: 'implement', verify: 'gatekeeper', validate: 'gatekeeper' };
-
-/** A step's colour family: what the workflow says it is, then what it is called. */
-function stepKind(step: WorkflowStep): StepKind {
-  if (step.gate) return 'gate';
-  if (step.role === 'worker') return 'implement';
-  if (step.role === 'verifier' || step.role === 'validator') return 'gatekeeper';
-  return KIND[step.name] ?? 'plain';
+/** A parallel group draws as its own rows; only the top-level ones can be the human's own gates,
+ *  and only the ones before the first worker step, which is where `early` comes from. */
+function flatten(steps: WorkflowStep[]): [step: WorkflowStep, early: boolean][] {
+  const work = steps.findIndex((s) => s.role === 'worker');
+  return steps.flatMap((step, i): [WorkflowStep, boolean][] =>
+    [[step, work < 0 || i < work], ...(step.parallel ?? []).map((name): [WorkflowStep, boolean] => [{ name }, false])]);
 }
 
 function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): StepRow[] {
-  return steps.flatMap((step): WorkflowStep[] => [step, ...(step.parallel ?? []).map((name) => ({ name }))])
-    .map((step): StepRow => {
+  return flatten(steps)
+    .map(([step, early]): StepRow => {
       const state = m.state.steps[step.name];
       const gateOpen = m.state.gates[step.name]?.status === 'open';
       const start = Date.parse(state?.startedAt ?? '');
@@ -109,7 +109,7 @@ function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): Ste
       const to = Number.isNaN(end) ? Date.now() : end;
       return {
         name: step.name,
-        kind: stepKind(step),
+        kind: stepKind(step, early),
         status: (gateOpen ? 'blocked' : state?.status ?? 'pending') as RunState,
         ...(step.role ? { role: step.role } : {}),
         ...(from ? { wall: to - from } : {}),
@@ -160,6 +160,43 @@ function question(project: string, origin: string, tab: string, text: string, at
   return { kind: 'question', project, origin, label: 'asks', at, text, tab };
 }
 
+// ── git ──────────────────────────────────────────────────────────────────────
+
+interface Diff { added: number; removed: number }
+
+const diffs = new Map<string, Diff>();
+const counting = new Map<string, Promise<void>>();
+
+/**
+ * Lines the branch adds and removes against the trunk. `git diff` on a large repo costs more than
+ * a frame does, so the count runs behind the snapshot: the row carries the last one until the next
+ * result lands, and nothing at all until the first. One run per checkout at a time.
+ */
+function diffCount(cwd: string, branch: string): Diff | undefined {
+  const key = `${cwd}:${branch}`;
+  if (!counting.has(key)) {
+    counting.set(key, (async () => {
+      try {
+        const out = await git(cwd, 'diff', '--shortstat', `${await trunkBranch(cwd)}...${branch}`);
+        diffs.set(key, {
+          added: Number(/(\d+) insertion/.exec(out)?.[1] ?? 0),
+          removed: Number(/(\d+) deletion/.exec(out)?.[1] ?? 0),
+        });
+      } catch {
+        // No trunk, no branch yet, a checkout mid-rebase: the row keeps the count it had.
+      } finally {
+        counting.delete(key);
+      }
+    })());
+  }
+  return diffs.get(key);
+}
+
+/** A frame is a still, not a stream: it waits for the counts in flight, then builds once more. */
+export async function settle(): Promise<void> {
+  await Promise.all([...counting.values()]);
+}
+
 // ── missions and sessions ────────────────────────────────────────────────────
 
 /** The hook records one pid per session; a stale file outlives the process that made it. */
@@ -198,6 +235,9 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
     ctx.inbox.push(question(project, state.name, `factory-${state.name}`, tail.text, ev!.at));
   }
 
+  // A worktree mission's diff is counted where that mission's commits are.
+  const diff = state.status === 'open' && state.branch ? diffCount(state.worktree || dir, state.branch) : undefined;
+
   return {
     name: state.name,
     workflow: state.workflow,
@@ -212,6 +252,7 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
     caffeinate: await caffeinated(state.session),
     wall: steps.reduce((n, s) => n + (s.wall ?? 0), 0),
     tokens: tail ? sumUsage(tail.usage) : { input: 0, cached: 0, output: 0 },
+    ...(diff ? { diff } : {}),
     steps,
     deviations: state.deviations.length,
     ...(state.status === 'closed' ? { closedAt: Date.parse(state.updated) || Date.now() } : {}),
@@ -222,7 +263,7 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   const tail = await readTranscript(transcriptPath(ev.cwd, ev.session), ev.session, ev.cwd);
   logRows(ctx, tail, ev, ev.session);
   const asks = waiting(ev) ? tail.text : '';
-  if (asks) ctx.inbox.push(question(project, ev.preset, ev.preset, asks, ev.at));
+  if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
   return {
     id: ev.session,
@@ -287,6 +328,8 @@ export async function buildSnapshot(): Promise<Snapshot> {
     const sessions: Session[] = [];
     for (const ev of events.values()) {
       if (bound.has(ev.session) || owner(dirs, ev.real) !== real) continue;
+      // A session the human can still answer. A dead one's question is a message nobody can reply to.
+      if (!(await sessionLive(ev.session))) continue;
       sessions.push(await sessionRow(ctx, name, ev));
     }
     projects.push({ name, path: dir, missions, sessions, parts: parts(await scanProject(dir)) });

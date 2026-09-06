@@ -227,6 +227,20 @@ await check('a new inbox key is news, the first snapshot and an ageing item are 
   ok(arrivals(first, [item('a', 9), item('b', 9)]).map((i) => i.origin).join() === 'b', 'the new item was missed');
 });
 
+await check('a step is coloured by what kind of work it is', async () => {
+  const { stepKind } = await import('../src/tui/model.js');
+  const { loadWorkflow } = await import('../src/core/workflow.js');
+  const story = await loadWorkflow('story', TMP);
+  // The story workflow names all four kinds; `early` is what the live mapping computes per step.
+  const work = story.steps.findIndex((step) => step.role === 'worker');
+  const kinds = story.steps.map((step, i) => `${step.name}:${stepKind(step, i < work)}`);
+  const want = 'grill:human,intent:human,research:agent,spec:technical,implement:agent,'
+    + 'accept:gatekeeper,condense:technical,merge:technical';
+  ok(kinds.join() === want, `story reads ${kinds.join()}`);
+  ok(stepKind({ name: 'verify' }) === 'gatekeeper' && stepKind({ name: 'validate' }) === 'gatekeeper',
+    'a parallel gatekeeper row is not gatekeeping');
+});
+
 await check('the transcript tail parses each line once', async () => {
   const { readTranscript } = await import('../src/tui/transcript.js');
   const file = path.join(TMP, 'tail.jsonl');

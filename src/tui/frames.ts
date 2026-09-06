@@ -16,7 +16,11 @@ export function liveFrames(snap: Snapshot): Frame[] {
     name: `${String(left).padStart(2, '0')}-${itemKey(item).replace(/[^a-z0-9]+/gi, '-')}`,
     left, focus: 'right',
   }));
-  return [...rows, { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; } }];
+  return [
+    ...rows,
+    { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; } },
+    { name: 'help', left: 0, focus: 'right', set: (ui) => { ui.help = true; } },
+  ];
 }
 
 /** The screen paints no background: the only coloured cells are the inverted selected row. */

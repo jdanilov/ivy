@@ -1,3 +1,4 @@
+import { stepKind } from './model.js';
 import type { Activity, InboxItem, Mission, PartRow, Project, Snapshot, StepRow } from './model.js';
 
 /** Fake data for the look-and-feel prototype. Ages are relative, so the screen reads right whenever it runs. */
@@ -7,17 +8,20 @@ const H = 60 * M;
 const D = 24 * H;
 const now = Date.now();
 
-function steps(spec: [name: string, kind: StepRow['kind'], status: StepRow['status'], wall?: number][]): StepRow[] {
-  return spec.map(([name, kind, status, wall]) => ({ name, kind, status, wall }));
+/** The kind is never spelled out here: the fixture reads its colours through the same mapping the
+ *  live snapshot does, so a look review is a review of what the screen will draw. */
+function steps(spec: [name: string, status: StepRow['status'], wall?: number, role?: string][]): StepRow[] {
+  return spec.map(([name, status, wall, role]) => ({
+    name, status, wall, kind: stepKind({ name, ...(role ? { role } : {}) }), ...(role ? { role } : {}),
+  }));
 }
 
 const refitSteps = steps([
-  ['grill', 'plain', 'done', 3 * M], ['intent', 'gate', 'done', 12 * M], ['research', 'plain', 'skipped'],
-  ['spec', 'plain', 'done', 8 * M], ['implement', 'implement', 'running', 6 * M], ['accept', 'plain', 'pending'],
-  ['verify', 'gatekeeper', 'pending'], ['validate', 'gatekeeper', 'pending'], ['condense', 'plain', 'pending'],
-  ['merge', 'gate', 'pending'],
+  ['grill', 'done', 3 * M], ['intent', 'done', 12 * M], ['research', 'skipped', undefined, 'investigator'],
+  ['spec', 'done', 8 * M], ['implement', 'running', 6 * M, 'worker'], ['accept', 'pending'],
+  ['verify', 'pending'], ['validate', 'pending'], ['condense', 'pending'],
+  ['merge', 'pending'],
 ]);
-refitSteps[4]!.role = 'worker';
 
 /** `minutes back|verb|text`, oldest first — the shape wiring will read out of the transcript. */
 function log(session: string, spec: string): Activity[] {
@@ -91,8 +95,8 @@ const quickLog = log('b3f21c07', `
 12|Ask|Which recall strategy for v1, embeddings or a grep index?`);
 
 const authSteps = steps([
-  ['grill', 'plain', 'done', 4 * M], ['implement', 'implement', 'done', 71 * M],
-  ['verify', 'gatekeeper', 'done', 22 * M], ['merge', 'gate', 'blocked'],
+  ['grill', 'done', 4 * M], ['implement', 'done', 71 * M, 'worker'],
+  ['verify', 'done', 22 * M], ['merge', 'blocked'],
 ]);
 authSteps[3]!.gateOpen = true;
 
@@ -138,6 +142,7 @@ const projects: Project[] = [
         name: 'refit', workflow: 'story', state: 'running', step: 'implement', round: 2, session: '75cb46e1',
         branch: 'mission/refit', worktree: '../ivy-refit', caffeinate: true, wall: 14 * M, deviations: 1,
         attention: 'light', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
+        diff: { added: 412, removed: 96 },
       }),
       mission({ name: 'memory', workflow: 'story', status: 'stub' }),
     ],
@@ -157,7 +162,7 @@ const projects: Project[] = [
       mission({
         name: 'auth', workflow: 'fix', state: 'blocked', step: 'merge', round: 2, session: '8a9e6b42',
         branch: 'mission/auth', wall: 2 * H + 4 * M, tokens: { input: 96_400, cached: 1_100_000, output: 22_800 },
-        steps: authSteps,
+        diff: { added: 120, removed: 34 }, steps: authSteps,
       }),
     ],
   },

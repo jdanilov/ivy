@@ -12,15 +12,11 @@ export const C = {
   success: '#a8a968',
   warning: '#d7af5f',
   error: '#cc5555',
-  // The one fill on the screen besides the selected row: an overlay that does not cover the
-  // rows under it is not an overlay, and spaces alone do not paint over what is already there.
-  panel: '#0a0a0a',
   selBg: '#b8b8b8',
   selFg: '#141414',
   track: '#404040',
-  // Semantic step colours, desaturated to sit beside the olive and the amber.
-  implement: '#6b8fd9',
-  gatekeeper: '#5fb0b0',
+  // Agent work, desaturated to sit beside the olive and the amber.
+  agent: '#6b8fd9',
 };
 
 export const GLYPH: Record<RunState, string> = {
@@ -35,9 +31,13 @@ export function stateColor(state: RunState): string {
   return C.dim;
 }
 
-const KIND: Record<StepKind, string> = { plain: '', gate: C.warning, implement: C.implement, gatekeeper: C.gatekeeper };
+/** Four families, one colour each: the human's own gates in the olive, gatekeeping in the amber,
+ *  agent work in the blue, everything technical in the label grey. */
+const KIND: Record<StepKind, string> = {
+  human: C.success, gatekeeper: C.warning, agent: C.agent, technical: C.dim,
+};
 
-/** A step's name reads as its role, its glyph reads as its life. Plain steps carry the life colour. */
-export function stepColor(kind: StepKind, state: RunState): string {
-  return KIND[kind] || stateColor(state);
+/** A step's name reads as what kind of work it is, its glyph as where it is in its life. */
+export function stepColor(kind: StepKind): string {
+  return KIND[kind];
 }

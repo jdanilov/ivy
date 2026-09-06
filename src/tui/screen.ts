@@ -17,6 +17,8 @@ const ATTENTION: Attention[] = ['full', 'light', 'unattended'];
 /** Chrome rows: blank, header, rule, status, rule — rule, key bar. The key bar sits on the last
  *  terminal row: a row left undrawn under it reads as a gap the screen forgot to fill. */
 const CHROME = 7;
+/** Full activity keeps the blank row, the rule and the key bar, and gives the log everything else. */
+const FULL_CHROME = 3;
 /** Factory's own mark. Single-width in a monospace font, unlike most of the geometric glyphs. */
 const BRAND = '⌬';
 
@@ -30,6 +32,8 @@ export interface Ui {
   toggles: Record<string, boolean>;
   confirm: boolean;
   full: boolean;
+  /** Rows the full-height log is scrolled back from its foot. Zero everywhere else. */
+  scroll: number;
   help: boolean;
   hideClosed: boolean;
   toast: string | null;
@@ -40,7 +44,7 @@ export interface Ui {
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, answer: 0, answered: new Set(), toggles: {},
-    confirm: false, full: false, help: false, hideClosed: false, toast: null, note: null,
+    confirm: false, full: false, scroll: 0, help: false, hideClosed: false, toast: null, note: null,
   };
 }
 
@@ -165,6 +169,9 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const pairs: string[][] =
+    // The panel and the full log each take the screen: their bars list what still answers.
+    ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
+    ui.full ? [['↑↓', 'Scroll'], ['↵ f esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', 'Open'], ['O', 'Tab'], ['X', 'Kill'], ['C', 'Caffeinate'],
       ['Z', 'Closed'], ['F', 'Activity'], ['?', 'Help'], ['Q', 'Quit']]
     // ←→ pick the answer in Messages, so only esc leaves that one.
@@ -183,6 +190,12 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
 
 // ── left pane ─────────────────────────────────────────────────────────────────
 
+/** What the branch is worth so far. Absent until the first `git diff` behind the snapshot lands. */
+function diffCells(m: Mission): Cell[] {
+  if (!m.diff) return [];
+  return [['  ', C.dim], [`+${m.diff.added}`, C.success], [` −${m.diff.removed}`, C.error]];
+}
+
 function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): void {
   const quiet = m.status !== 'open';
   const tail: Cell[] =
@@ -190,7 +203,7 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
     : m.status === 'closed' ? [[`  closed ${ago(m.closedAt ?? Date.now())}`, C.dim]]
     : [['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright], [m.round ? ` ↻${m.round}` : '', C.dim]];
   const right: Cell[] = m.status === 'open'
-    ? [[dur(m.wall), C.dim], ['  ', C.dim], [tokens(m.tokens.input + m.tokens.cached + m.tokens.output), C.dim]]
+    ? [[dur(m.wall), C.dim], ['  ', C.dim], [tokens(m.tokens.input + m.tokens.cached + m.tokens.output), C.dim], ...diffCells(m)]
     : [];
   const cells: Cell[] = [marker(selected, focused), [' ', C.dim], [`${GLYPH[m.state]} `, stateColor(m.state)], [m.name, quiet ? C.dim : C.bright]];
   p.row(spread([...cells, ...tail], right, p.width), selected && focused);
@@ -198,7 +211,7 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
 
 function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): void {
   p.row([
-    marker(selected, focused), [' ', C.dim], ['○ ', C.dim], [s.preset, C.bright], ['  unbound  ', C.dim],
+    marker(selected, focused), [' ', C.dim], ['○ ', C.dim], [s.preset, C.bright], ['  ', C.dim],
     [id(s.id), C.dim], [`  idle ${dur(Date.now() - s.idleSince)}`, C.dim],
   ], selected && focused);
 }
@@ -300,7 +313,7 @@ function missionPane(p: Pane, m: Mission): void {
 
   for (const s of m.steps) {
     const cells: Cell[] = [
-      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind, s.status)],
+      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind)],
       ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
     const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
@@ -385,7 +398,7 @@ function partsPane(p: Pane, project: Project, ui: Ui): void {
 // ── activity ──────────────────────────────────────────────────────────────────
 
 const VERB: Record<Activity['verb'], string> = {
-  Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.implement, Text: C.bright, Ask: C.warning,
+  Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
   Tool: C.dim, Stop: C.success,
 };
 
@@ -403,8 +416,9 @@ function sessionsOf(snap: Snapshot, here: LeftItem): Map<string, string> {
   return map;
 }
 
-/** Newest at the bottom, oldest scrolled off: the log reads the way it was written. */
-function activityPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean): void {
+/** Newest at the bottom, oldest scrolled off: the log reads the way it was written. `↑↓` walk
+ *  back through it while it is full, and the clamp lives here because only this knows the room. */
+function activityPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
   if (sep) p.rule();
   const owners = sessionsOf(snap, here);
   const rows = snap.activity.filter((a) => owners.has(a.session)).sort((a, b) => a.at - b.at);
@@ -413,7 +427,9 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: b
   p.row(spread([['ACTIVITY', C.bright], [`  ${subject(here)}`, C.dim]], [[`${rows.length}`, C.dim]], p.width));
   p.rule();
   const room = Math.max(0, h - (sep ? 3 : 2));
-  for (const a of rows.slice(Math.max(0, rows.length - room))) {
+  ui.scroll = ui.full ? Math.max(0, Math.min(ui.scroll, rows.length - room)) : 0;
+  const end = rows.length - ui.scroll;
+  for (const a of rows.slice(Math.max(0, end - room), end)) {
     p.row([
       [`${clock(a.at)}  `, C.dim], ...(merged ? ([[(owners.get(a.session) ?? '').padEnd(9), C.dim]] as Cell[]) : []),
       [a.verb.padEnd(7), VERB[a.verb]], [a.text, a.verb === 'Text' || a.verb === 'Ask' ? C.bright : C.dim],
@@ -432,29 +448,35 @@ const HELP: [group: string, keys: [string, string][]][] = [
   ['Messages', [['↑↓', 'Select'], ['←→', 'Choose answer'], ['↵', 'Confirm'], ['esc', 'Back']]],
   ['Parts', [['Space', 'Toggle'], ['↵', 'Apply'], ['R', 'Reset'], ['Y', 'Confirm'], ['N', 'Cancel']]],
   ['Mission', [['T', 'Attention full → light → unattended']]],
-  ['Activity', [['F', 'Full height'], ['↵', 'Back to the columns']]],
+  ['Activity', [['F', 'Full height'], ['↑↓', 'Scroll'], ['↵', 'Back to the columns']]],
 ];
 
 const GROUP_W = 10;
 
-function helpPanel(r: CliRenderer): void {
-  const rows = HELP.map(([group, keys]): Cell[] =>
-    [[group.padEnd(GROUP_W), C.bright], ...keys.flatMap(([k, label]) => [[`${k} `, C.accent], [`${label}   `, C.dim]] as Cell[])]);
-  const inner = Math.min(r.terminalWidth - 6, Math.max(...rows.map(len)));
-  const height = rows.length + 4;
+/** The screen explains itself once, to the human who opened it before reading any doc. */
+const PRIMER = [
+  'A mission is one unit of work: its own branch, its workflow copied in as a graph.',
+  'The Orchestrator session grills you, writes the intent, and runs the steps.',
+  'Gates stop for the human: one waits in MESSAGES until you answer it.',
+  'Gatekeepers check work they did not write: the Verifier and the Validator.',
+  '`mission close` merges the branch and files what the mission learned.',
+];
 
-  const box = new BoxRenderable(r, {
-    position: 'absolute', zIndex: 10, flexDirection: 'column', overflow: 'hidden',
-    left: Math.max(0, Math.floor((r.terminalWidth - inner - 4) / 2)),
-    top: Math.max(0, Math.floor((r.terminalHeight - height) / 2)),
-    width: inner + 4, height, paddingLeft: 1, paddingRight: 1,
-    border: true, borderStyle: 'single', borderColor: C.rule, backgroundColor: C.panel,
-  });
-  const put = (cells: Cell[]): void => { box.add(new TextRenderable(r, { content: line(cells, inner), flexShrink: 0 })); };
-  put([['KEYS', C.bright]]);
-  put([['─'.repeat(inner), C.rule]]);
-  rows.forEach(put);
-  r.root.add(box);
+/** Not an overlay: while `?` is open this is the right pane, at the full height of the body. */
+function helpPane(p: Pane): void {
+  p.row([['KEYS', C.bright]]);
+  p.rule();
+  for (const [group, keys] of HELP) {
+    p.row([[group.padEnd(GROUP_W), C.bright],
+      ...keys.flatMap(([k, label]) => [[`${k} `, C.accent], [`${label}   `, C.dim]] as Cell[])]);
+  }
+  p.row([]);
+  p.rule();
+  p.row([['HOW FACTORY WORKS', C.bright]]);
+  for (const text of PRIMER) for (const l of wrap(text, p.width, 2)) p.row([[l, C.dim]]);
+  p.row([]);
+  p.row([['Next: ', C.dim], ['factory mission new <name>', C.bright], [' in a project, or ', C.dim],
+    ['/mission', C.bright], [' in a session.', C.dim]]);
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -471,19 +493,23 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const here = items[ui.left]!;
 
   // Everything under the status rule and above the key-bar rule. Activity keeps a third of it,
-  // or all of it on `f`, and the columns take what is left.
-  const region = Math.max(0, r.terminalHeight - CHROME);
-  const actH = ui.full ? region : Math.min(region, Math.max(5, Math.floor(region / 3)));
+  // the columns take the rest — and either one takes all of it: `f` gives the log the screen,
+  // `?` gives the body to the panel, which needs the height to say anything worth reading.
+  const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME));
+  const actH = ui.full ? region : ui.help ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
   const bodyH = region - actH;
 
   // The key bar sits on the last row and no box carries a background, so every cell the screen
   // does not colour keeps the terminal's own.
   const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 1, paddingRight: 1 });
   root.row([]);
-  header(root, here, snap);
-  root.rule();
-  statusBar(root, snap, here, ui);
-  root.rule();
+  // Full activity is the log and nothing else: the header and the status bar are rows it can have.
+  if (!ui.full) {
+    header(root, here, snap);
+    root.rule();
+    statusBar(root, snap, here, ui);
+    root.rule();
+  }
 
   if (bodyH > 0) {
     const leftW = Math.max(30, Math.floor(w * 0.4));
@@ -493,7 +519,8 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
     leftPane(left, items, snap, ui);
-    if (here.kind === 'inbox') messagesPane(r, right, snap, ui, bodyH);
+    if (ui.help) helpPane(right);
+    else if (here.kind === 'inbox') messagesPane(r, right, snap, ui, bodyH);
     else if (here.kind === 'project') partsPane(right, here.project, ui);
     else if (here.kind === 'mission') missionPane(right, here.mission);
     else sessionPane(right, here.session);
@@ -504,12 +531,11 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     body.add(right.box);
     root.box.add(body);
   }
-  activityPane(root, snap, here, actH, bodyH > 0);
+  if (actH > 0) activityPane(root, snap, here, actH, bodyH > 0, ui);
 
   root.rule();
   keyBar(root, here, ui);
   r.root.add(root.box);
-  if (ui.help) helpPanel(r);
 }
 
 // ── keys ──────────────────────────────────────────────────────────────────────
@@ -570,9 +596,22 @@ export function handleKey(app: App, key: KeyEvent): void {
     return;
   }
 
-  // The overlay is a read: the next key puts it away, whatever it was.
-  if (ui.help) { ui.help = false; return draw(app); }
+  // The panel holds the right pane until it is asked to leave; nothing else acts behind it.
+  if (ui.help) {
+    if (key.name !== '?' && key.name !== 'escape') return;
+    ui.help = false;
+    return draw(app);
+  }
   if (key.name === '?') { ui.help = true; return draw(app); }
+
+  // The log has the screen to itself: the arrows walk back through it, three keys hand it back.
+  if (ui.full) {
+    if (key.name === 'up' || key.name === 'k') ui.scroll += 1;
+    else if (key.name === 'down' || key.name === 'j') ui.scroll = Math.max(0, ui.scroll - 1);
+    else if (key.name === 'return' || key.name === 'f' || key.name === 'escape') ui.full = false;
+    else return;
+    return draw(app);
+  }
 
   const items = leftItems(snap, ui.hideClosed);
   ui.left = clamp(ui.left, items.length);
@@ -620,8 +659,6 @@ export function handleKey(app: App, key: KeyEvent): void {
       }
       break;
     case 'return': {
-      // The columns are gone while Activity is full: ↵ brings them back before it does anything.
-      if (ui.full) { ui.full = false; break; }
       if (inMessages) {
         const item = snap.inbox[ui.msg];
         if (!item || ui.answered.has(ui.msg)) return;
@@ -644,7 +681,9 @@ export function handleKey(app: App, key: KeyEvent): void {
       if (inParts) ui.toggles = {};
       break;
     case 'f':
-      ui.full = !ui.full;
+      // The log opens at its foot, wherever the last visit left the scroll.
+      ui.full = true;
+      ui.scroll = 0;
       break;
     case 'z': {
       ui.hideClosed = !ui.hideClosed;

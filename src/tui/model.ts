@@ -7,7 +7,25 @@ export type { Caffeinate };
 export type RunState = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'skipped';
 
 /** Which colour family a step belongs to, independent of where it is in its life. */
-export type StepKind = 'plain' | 'gate' | 'implement' | 'gatekeeper';
+export type StepKind = 'human' | 'gatekeeper' | 'agent' | 'technical';
+
+/** As much of a workflow step as the kind is read from. */
+export interface KindOf { name: string; role?: string; gate?: string; parallel?: string[] }
+
+const GATEKEEPING = ['verify', 'validate', 'accept'];
+
+/**
+ * What kind of work a step is. The role settles it where the workflow gives one, then the three
+ * names every workflow gatekeeps under, then the human's own: a gate before the work starts is a
+ * decision, the same gate after it is bookkeeping. `early` is false past the first worker step.
+ * One mapping for the live snapshot and the fixture both, so a review reads the real colours.
+ */
+export function stepKind(step: KindOf, early = false): StepKind {
+  if (step.role === 'worker' || step.role === 'investigator') return 'agent';
+  if (GATEKEEPING.includes(step.name) || (step.parallel ?? []).some((n) => GATEKEEPING.includes(n))) return 'gatekeeper';
+  if (step.name === 'grill' || step.name === 'intent' || (step.gate === 'human' && early)) return 'human';
+  return 'technical';
+}
 
 export interface StepRow {
   name: string;
@@ -52,6 +70,8 @@ export interface Mission {
   caffeinate: boolean;
   wall: number;
   tokens: { input: number; cached: number; output: number };
+  /** Lines the branch adds and removes against the trunk. Absent until the first `git diff` lands. */
+  diff?: { added: number; removed: number };
   steps: StepRow[];
   deviations: number;
   closedAt?: number;

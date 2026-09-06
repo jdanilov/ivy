@@ -8,12 +8,16 @@ import type { InboxItem, Snapshot } from '../tui/model.js';
  */
 export async function control(flags: Flags): Promise<void> {
   const fixture = flags.fixture === true;
-  const snapshot = fixture
-    ? (await import('../tui/fixture.js')).snapshot
-    : await (await import('../tui/live.js')).buildSnapshot();
+  const live = fixture ? null : await import('../tui/live.js');
+  let snapshot = live ? await live.buildSnapshot() : (await import('../tui/fixture.js')).snapshot;
 
   const dir = str(flags, 'frames');
   if (dir !== undefined) {
+    // The git counts run behind the snapshot the screen draws; a frame gets to wait for them.
+    if (live) {
+      await live.settle();
+      snapshot = await live.buildSnapshot();
+    }
     const { liveFrames, writeFrames } = await import('../tui/frames.js');
     return writeFrames(snapshot, dir, liveFrames(snapshot));
   }

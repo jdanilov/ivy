@@ -1,0 +1,51 @@
+{
+  "name": "decisions",
+  "title": "Decisions, autonomy and the shaped graph",
+  "workflow": "story",
+  "attention": "light",
+  "status": "open",
+  "step": "spec",
+  "round": 0,
+  "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
+  "branch": "mission/decisions",
+  "worktree": null,
+  "gates": {
+    "intent": {
+      "status": "answered",
+      "file": ".factory/missions/2026-09-07-decisions/intent.md",
+      "answer": "accept",
+      "note": "spec ungated, none waits on all, TUI read-only messages",
+      "at": "2026-09-06T21:59:05.774Z"
+    }
+  },
+  "steps": {
+    "grill": {
+      "status": "done",
+      "startedAt": "2026-09-06T21:56:36.417Z",
+      "endedAt": "2026-09-06T21:56:36.479Z"
+    },
+    "intent": {
+      "status": "done",
+      "startedAt": "2026-09-06T21:56:36.537Z",
+      "endedAt": "2026-09-06T21:59:05.834Z"
+    },
+    "research": {
+      "status": "skipped",
+      "endedAt": "2026-09-06T21:59:05.891Z",
+      "reason": "hook injection points confirmed during the grill by a guide agent"
+    },
+    "spec": {
+      "status": "running",
+      "startedAt": "2026-09-06T21:59:05.949Z"
+    }
+  },
+  "deviations": [
+    {
+      "at": "2026-09-06T21:59:05.891Z",
+      "what": "skipped step research",
+      "reason": "hook injection points confirmed during the grill by a guide agent"
+    }
+  ],
+  "created": "2026-09-06T21:54:30.499Z",
+  "updated": "2026-09-06T21:59:05.949Z"
+}

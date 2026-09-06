@@ -73,7 +73,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
 | `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
 | `permissions`    | fixture | —      | Baseline tool allow list merged into `.claude/settings.json`  |
-| `hook-factory`   | fixture | —      | Reports session events to `~/.factory/events`                 |
+| `hook-factory`   | fixture | —      | Session events to `~/.factory/events`, rings on a human wait  |
 | `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                              |
 | `codegraph`      | mcp     | —      | Code graph MCP plus prompt hook, per project index (opt-in)   |
 

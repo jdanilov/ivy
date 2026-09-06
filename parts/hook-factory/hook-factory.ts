@@ -3,8 +3,9 @@
  * Factory event hook. Run as `bun hook-factory.ts <event>`, hook JSON on stdin.
  *
  * Appends one line to ~/.factory/events/<session>.jsonl, binds an unclaimed mission to the session
- * that shows up, keeps the Mac awake while a mission-bound session is mid-turn, injects mission
- * focus before a compaction, and saves a sub-agent's final message as the step handoff.
+ * that shows up, keeps the Mac awake while a mission-bound session is mid-turn, rings when the
+ * session is waiting on the human, injects mission focus before a compaction, and saves a
+ * sub-agent's final message as the step handoff.
  *
  * It never fails a hook: every step is guarded and the process always exits 0.
  */
@@ -24,6 +25,7 @@ interface HookInput {
   prompt?: string;
   message?: string;
   notification_type?: string;
+  stop_hook_active?: boolean;
   trigger?: string;
   agent_type?: string;
   agent_transcript_path?: string;
@@ -137,6 +139,48 @@ async function caffeinateStop(session: string): Promise<void> {
   await unlink(file).catch(() => {});
 }
 
+// ── sound ────────────────────────────────────────────────────────────────────
+
+/** SOUND: `off` or empty is silence, a bare name is a macOS system sound, anything else a path. */
+function soundFile(): string | null {
+  const value = (process.env.SOUND ?? '').trim();
+  if (value === '' || value === 'off') return null;
+  return value.includes('/') ? value : `/System/Library/Sounds/${value}.aiff`;
+}
+
+/** Seconds since the session's last UserPromptSubmit; null when it has none on record. */
+async function turnSeconds(session: string): Promise<number | null> {
+  const text = await readFile(path.join(EVENTS, `${session}.jsonl`), 'utf-8').catch(() => '');
+  let last: number | null = null;
+  for (const line of text.split('\n')) {
+    if (!line.includes('"UserPromptSubmit"')) continue;
+    const at = Date.parse((JSON.parse(line) as { at?: string }).at ?? '');
+    if (!Number.isNaN(at)) last = at;
+  }
+  return last === null ? null : (Date.now() - last) / 1000;
+}
+
+/**
+ * The human is waited on at the end of a turn they walked away from, and at a permission prompt,
+ * which blocks however short the turn was. A sub-agent finishing, or a turn the human sat through,
+ * is not news.
+ */
+async function waitsOnHuman(event: string, input: HookInput, session: string): Promise<boolean> {
+  if (event === 'Notification') return input.notification_type === 'permission_prompt';
+  if (event !== 'Stop' || input.stop_hook_active === true) return false;
+
+  const seconds = await turnSeconds(session);
+  const quiet = Number(process.env.QUIET);
+  return seconds !== null && seconds >= (Number.isNaN(quiet) ? 30 : quiet);
+}
+
+async function ring(event: string, input: HookInput, session: string): Promise<void> {
+  const file = soundFile();
+  if (file === null || !(await waitsOnHuman(event, input, session))) return;
+  // The player outlives this hook and is never waited on: a hook that blocks blocks the session.
+  Bun.spawn(['afplay', file], { stdio: ['ignore', 'ignore', 'ignore'] }).unref();
+}
+
 // ── handoffs ─────────────────────────────────────────────────────────────────
 
 /** Last assistant text of a sub-agent transcript, used when the hook carries no final message. */
@@ -235,6 +279,9 @@ async function main(): Promise<void> {
     detail: detailOf(event, input),
   };
   await appendFile(path.join(EVENTS, `${session}.jsonl`), `${JSON.stringify(line)}\n`);
+
+  // Sound is about the human at the keyboard, not about a mission: every session rings.
+  await ring(event, input, session).catch(() => {});
 
   if (!mission) return;
 

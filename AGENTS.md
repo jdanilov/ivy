@@ -90,7 +90,9 @@ sit outside `.claude`.
 lists: `~/.factory/config.yaml` `vars.<name>` wins over the part's `vars.<name>`, and nothing defining
 it is a refusal. A value may carry arguments; in `mcp.config.command` the first word is the command and
 the rest leads the args. Substitution happens as the manifest entry is built, so the manifest, `.mcp.json`
-and the hooks hold resolved strings and `update` re-points a project after a config edit.
+and the hooks hold resolved strings and `update` re-points a project after a config edit. The everyday
+override is hook-factory's `sound` (`off` silences it, a bare name is a macOS system sound) and
+`quiet`, the turn length in seconds below which the end of a turn does not ring.
 
 The manifest records where each file came from under the Factory root, so uninstall knows a link is
 ours without reading it; a manifest written before that falls back to `readlink`. It also records each

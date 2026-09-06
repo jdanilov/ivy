@@ -95,6 +95,46 @@ await check('resolvePart expands the hooks shorthand', async () => {
   ok(hooks.every((h) => h.command.endsWith(` ${h.event}`)), 'a hook command does not name its event');
 });
 
+await check('the hook rings only when the parent session waits on the human', async () => {
+  const dir = path.join(TMP, 'ring');
+  const home = path.join(dir, 'home');
+  const bin = path.join(dir, 'bin');
+  const log = path.join(dir, 'afplay.log');
+  const events = path.join(home, '.factory', 'events', 'S.jsonl');
+  await mkdir(path.dirname(events), { recursive: true });
+  await mkdir(bin, { recursive: true });
+  // A fake player first on PATH: the case proves the decision, never a sound on this machine.
+  await writeFile(path.join(bin, 'afplay'), `#!/bin/sh\necho "$@" >> ${log}\n`, { mode: 0o755 });
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const sound = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'sounds', 'sonar-deep.mp3');
+  const prompted = (secondsAgo: number): Promise<void> =>
+    writeFile(events, `${JSON.stringify({ at: new Date(Date.now() - secondsAgo * 1000).toISOString(), event: 'UserPromptSubmit', session: 'S' })}\n`);
+
+  /** Fires one hook and returns how many times the player has been called in all. */
+  const fire = async (event: string, input: object, SOUND = sound): Promise<number> => {
+    const proc = Bun.spawn(['bun', hook, event], {
+      cwd: dir,
+      env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, SOUND, QUIET: '30' },
+      stdin: new TextEncoder().encode(JSON.stringify({ session_id: 'S', cwd: dir, ...input })),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+    await Bun.sleep(300); // the player is detached, so its line lands after the hook is gone
+    return (await Bun.file(log).text().catch(() => '')).split('\n').filter((l) => l !== '').length;
+  };
+
+  await prompted(40);
+  ok((await fire('Stop', {})) === 1, 'a long turn ending did not ring');
+  await prompted(5);
+  ok((await fire('Stop', {})) === 1, 'a short turn rang');
+  ok((await fire('Notification', { notification_type: 'permission_prompt' })) === 2, 'a permission prompt did not ring');
+  ok((await fire('SubagentStop', { agent_type: 'Worker' })) === 2, 'a sub-agent finishing rang');
+  await prompted(40);
+  ok((await fire('Stop', {}, 'off')) === 2, 'SOUND=off rang');
+});
+
 await check('writeSnippet and removeSnippet round trip', async () => {
   const snippet = { section: '## Scratch', line: '- Scratch: @docs/scratch.md' };
   const { record } = await writeSnippet(snippet, main);

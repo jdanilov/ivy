@@ -1,9 +1,14 @@
 type: fixture
-description: report session events to ~/.factory/events
+description: report session events to ~/.factory/events, ring when the session waits on the human
 default: true
 files:
   - source: hook-factory.ts
     target: .claude/scripts/hook-factory.ts
+  - source: sounds/sonar-deep.mp3
+    target: .claude/sounds/sonar-deep.mp3
 hooks:
   - events: [SessionStart, UserPromptSubmit, Stop, SubagentStart, SubagentStop, Notification, PreCompact]
-    command: bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}
+    command: SOUND="${sound}" QUIET="${quiet}" bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}
+vars:
+  sound: "$CLAUDE_PROJECT_DIR/.claude/sounds/sonar-deep.mp3"
+  quiet: "30"

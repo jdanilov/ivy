@@ -12,3 +12,4 @@ a human prunes it, nothing else reads it.
 - [ ] `uninstall` leaves behind a `docs/` it created (2026-09-05-refit)
 - [ ] Directory `source` in a part's `files[]`, for vendors too large to list file by file (2026-09-05-refit)
 - [ ] `step add --after X` when X is done and the pointer sits on the next pending step: the pointer should move to the new step (2026-09-06-control)
+- [ ] `scripts/test.ts` in-process cases write scratch paths into the real `~/.factory/projects`: Bun fixes `os.homedir()` at start, so `FACTORY_HOME` must read `HOME` lazily or the cases must run as children (2026-09-06-control)

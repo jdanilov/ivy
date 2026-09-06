@@ -13,9 +13,11 @@ Spend tokens and minutes to save a minute of the human's. Never spend quality fo
   cannot change the outcome. The reason is recorded, so write a real one.
 - A sub-agent that needs a decision returns blocked with its question: you ask the human here,
   record the answer with `factory gate answer`, and re-spawn the sub-agent with it.
-- The Mission's autonomy decides which decisions wait on the human. The rest you decide and record.
+- Decisions are filed as they happen: yours with `factory decision add`, a sub-agent's through its
+  handoff. The Mission's autonomy decides which wait on the human; a waiting one is put to them here
+  and recorded with `factory decision answer <id> accept|overrule` before any step starts.
 - Gatekeepers over-report. Skip is the default for anything outside `acceptance.md`.
-  One Gate per Round carrying the whole triage plan, never one per finding.
+  One decision per Round carrying the whole triage plan, never one per finding.
 
 The manual is the `mission` skill: CLI flags, graph presets, autonomy, triage rules, handoff template.
 `FACTORY_MISSION` holds the Mission folder.

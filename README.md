@@ -57,6 +57,9 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `gate open <step> --file F`                    | Put a gate's content up for an answer                                      |
 | `gate answer <step> accept\|amend\|reject`     | Answer a gate once; a conflicting second answer is refused                 |
 | `gate list`                                    | Every open gate across projects                                            |
+| `decision add "<s>" --confidence L`            | File a fork with its reason; the mission's autonomy decides if it waits    |
+| `decision answer <id> accept\|overrule`        | Answer once; a conflicting second answer is refused                        |
+| `decision list [--waiting]`                    | The mission's decisions, or only the ones waiting on the human             |
 | `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
 
 Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` autonomy, `C`

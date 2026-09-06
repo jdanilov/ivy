@@ -19,6 +19,8 @@ const { update } = await import('../src/commands/update.js');
 const { uninstall } = await import('../src/commands/uninstall.js');
 const { step } = await import('../src/commands/step.js');
 const { gate } = await import('../src/commands/gate.js');
+const { decision } = await import('../src/commands/decision.js');
+const { answerDecision, readDecisions, waits } = await import('../src/core/decision.js');
 const { mission } = await import('../src/commands/mission.js');
 const { closeMission, createMission, currentBranch, git, missionWorkflow, promoteMission, resolveMission } = await import('../src/core/mission.js');
 const { removeSnippet, writeSnippet } = await import('../src/core/linker.js');
@@ -93,8 +95,9 @@ await check('install --yes links, snippets and records every source', async () =
 await check('resolvePart expands the hooks shorthand', async () => {
   const part = (await loadParts()).find((p) => p.name === 'hook-factory')!;
   const hooks = (await resolvePart(part)).hooks ?? [];
-  ok(hooks.length === 7, `expected 7 hooks, got ${hooks.length}`);
+  ok(hooks.length === 8, `expected 8 hooks, got ${hooks.length}`);
   ok(hooks.every((h) => h.command.endsWith(` ${h.event}`)), 'a hook command does not name its event');
+  ok(hooks.some((h) => h.event === 'PostToolUse' && h.matcher === 'Agent'), 'no PostToolUse hook on the Agent tool');
 });
 
 await check('the hook rings only when the parent session waits on the human', async () => {
@@ -173,6 +176,65 @@ await check('a handoff never overwrites the one before it', async () => {
   ok((await head('implement-Worker-3.md')).startsWith('W3 '), 'the third did not take -3');
   await save('Step: implement\nDone: nothing');
   ok(!(await exists(path.join(handoffs, 'implement-Worker-4.md'))), 'a sign-off under five lines was saved');
+});
+
+/** A scratch mission the hook can bind to through FACTORY_MISSION, with nothing else around it. */
+async function hookMission(name: string, autonomy: string): Promise<{ dir: string; home: string; mission: string; fire: (event: string, input: object) => Promise<string> }> {
+  const dir = path.join(TMP, name);
+  const home = path.join(dir, 'home');
+  const mission = path.join(dir, 'mission');
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  await mkdir(mission, { recursive: true });
+  await writeFile(path.join(mission, 'state.json'), JSON.stringify({ name, session: 'S', step: 'implement', autonomy }));
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const fire = async (event: string, input: object): Promise<string> => {
+    const proc = Bun.spawn(['bun', hook, event], {
+      cwd: dir,
+      env: { PATH: process.env.PATH, HOME: home, SOUND: 'off', FACTORY_MISSION: mission },
+      stdin: new TextEncoder().encode(JSON.stringify({ session_id: 'S', cwd: dir, ...input })),
+      stdout: 'pipe',
+      stderr: 'ignore',
+    });
+    const out = await new Response(proc.stdout).text();
+    await proc.exited;
+    return out.trim();
+  };
+  return { dir, home, mission, fire };
+}
+
+await check("the hook files a sub-agent's decisions from its handoff", async () => {
+  const { dir, mission, fire } = await hookMission('filed', 'partial');
+  const message = [
+    'Step: implement', 'Done: the work', 'Acceptance: A-1 pass', 'Issues: one', 'Decisions:',
+    '- HIGH: Reuse readJson | for the manifest', '- LOW: Do not implement auth, KISS and YAGNI',
+    '', 'Prose after the block, - MEDIUM: not a decision',
+  ].join('\n');
+  await fire('SubagentStop', { agent_type: 'Worker', agent_transcript_path: path.join(dir, 'agent.jsonl'), last_assistant_message: message });
+
+  const rows = await readDecisions(mission);
+  ok(rows.length === 2, `expected two rows, got ${rows.length}`);
+  ok(rows.every((d) => d.by === 'worker' && d.step === 'implement'), 'by or step did not come from the hook input');
+  ok(rows[0]!.id === 'D1' && rows[0]!.status === 'auto' && rows[0]!.summary.includes('readJson / for'), 'the HIGH row is wrong');
+  ok(rows[1]!.id === 'D2' && rows[1]!.status === 'waiting', 'the LOW row did not wait under partial');
+});
+
+await check('the hook names the waiting decisions until they are answered', async () => {
+  const { mission, home, fire } = await hookMission('inject', 'partial');
+  const message = ['Step: implement', 'Done: the work', 'Acceptance: A-1 pass', 'Issues: one', 'Decisions:', '- LOW: Do not implement auth'].join('\n');
+  await fire('SubagentStop', { agent_type: 'Worker', agent_transcript_path: path.join(mission, 'agent.jsonl'), last_assistant_message: message });
+
+  const injected = await fire('PostToolUse', { tool_name: 'Agent' });
+  const parsed = JSON.parse(injected) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+  ok(parsed.hookSpecificOutput.hookEventName === 'PostToolUse', 'the JSON does not name its event');
+  ok(parsed.hookSpecificOutput.additionalContext.includes('D1 LOW Do not implement auth'), `the context misses the row: ${injected}`);
+  ok((await fire('UserPromptSubmit', { prompt: 'go on' })).startsWith('Decisions waiting on the human (autonomy partial): D1'), 'a prompt did not carry the plain text');
+
+  await answerDecision(mission, 'D1', 'accept');
+  ok((await fire('PostToolUse', { tool_name: 'Agent' })) === '', 'an answered decision was still injected');
+
+  const events = await Bun.file(path.join(home, '.factory', 'events', 'S.jsonl')).text();
+  ok(!events.includes('PostToolUse'), 'PostToolUse landed on the event bus');
 });
 
 await check('the hook holds the machine awake only as the caffeinate mode says', async () => {
@@ -379,6 +441,34 @@ await check('an insert past a finished step takes the pointer with it', async ()
 
   await step('add', ['x'], { mission: 't', after: 'intent', reason: 'the pointer rule' }, dir);
   ok((await resolveMission(dir, 't')).state.step === 'x', 'step add did not take the pointer');
+});
+
+await check('a waiting decision holds step start until it is answered', async () => {
+  const dir = await repo('decisions');
+  const m = await createMission(dir, { name: 'd', workflow: 'chore', autonomy: 'partial', worktree: false, stub: false });
+  ok(!waits('full', 'LOW') && waits('partial', 'LOW') && !waits('partial', 'MEDIUM') && waits('none', 'HIGH'),
+    'the dial does not map confidence to waiting');
+
+  await decision('add', ['Do not implement auth | KISS and YAGNI'], { confidence: 'LOW', mission: 'd' }, dir);
+  await decision('add', ['Reuse readJson'], { confidence: 'HIGH', by: 'worker', step: 'implement', mission: 'd' }, dir);
+  const rows = await readDecisions(m.dir);
+  ok(rows.map((d) => `${d.id}:${d.status}`).join() === 'D1:waiting,D2:auto', `the table reads ${rows.map((d) => `${d.id}:${d.status}`).join()}`);
+  ok(rows[0]!.summary === 'Do not implement auth / KISS and YAGNI', 'a | in a summary was not swapped for /');
+  ok(rows[0]!.step === 'intent' && rows[1]!.by === 'worker', 'add did not default the step or take --by');
+
+  const held = await step('start', ['intent'], { mission: 'd' }, dir).then(() => null, (e: Error) => e);
+  ok(held?.message.includes('D1'), `step start ran with D1 waiting: ${held?.message ?? 'no refusal'}`);
+
+  await decision('answer', ['D1', 'overrule'], { mission: 'd', note: 'do it anyway' }, dir);
+  const answered = (await readDecisions(m.dir))[0]!;
+  ok(answered.status === 'overruled' && answered.note === 'do it anyway', 'the verdict or the note did not land');
+  await step('start', ['intent'], { mission: 'd' }, dir);
+  ok((await resolveMission(dir, 'd')).state.steps.intent?.status === 'running', 'step start still refused once nothing waited');
+
+  await decision('answer', ['D1', 'overrule'], { mission: 'd' }, dir);
+  ok((await readDecisions(m.dir))[0]!.note === 'do it anyway', 'the same verdict again rewrote the row');
+  const conflict = await decision('answer', ['D1', 'accept'], { mission: 'd' }, dir).then(() => null, (e: Error) => e);
+  ok(conflict?.name === 'Refusal', 'a conflicting second answer was accepted');
 });
 
 await check('two worktree missions close a then b', () => worktreePair(['a', 'b']));

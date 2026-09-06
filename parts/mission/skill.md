@@ -45,6 +45,7 @@ factory mission shape <preset> [--autonomy L] | autonomy full|partial|none [name
 factory mission open [name] [--preset P] [--dry-run] | list [--all] | status|resume|close [name] | adopt <name> --session <id>
 factory step start|done|skip|loop <step> [--reason R] [--mission M] | add <step> --after <step> --role R --reason R
 factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
+factory decision add "<summary>" --confidence HIGH|MEDIUM|LOW [--step S] [--by R] | answer <id> accept|overrule [--note N] | list [--waiting]
 ```
 
 - `step done` refuses on an unanswered gate and on an unfinished `parallel` member. `step loop`
@@ -84,7 +85,14 @@ human in every mode, as does `max` rounds reached with findings still open.
 
 ## Decisions
 
-W2 fills this.
+A decision is a fork a reviewer might have taken differently: one line in `decisions.md` with a
+confidence and its reason. Sub-agents file theirs in the handoff, you file yours with `factory
+decision add "<summary>" --confidence L`. A round's triage is one decision, never one per finding:
+rank by blast radius, effort and confidence, fix wide and cheap first, skip outside the contract by
+default, and record the plan in `findings.md`; accepted findings are the spec for the next round.
+Autonomy decides which decisions wait: when the hook or a `step start` refusal names one, put it to
+the human here, record the answer with `factory decision answer <id> accept|overrule --note N`, and
+go no further. An overrule is a signal: a new Worker with the note, a spec edit, or nothing.
 
 ## Amending the workflow
 
@@ -97,18 +105,10 @@ covers code and docs, Validator CLI or UI behaviour — one changed, one runs, n
 | an assertion has no owning step      | `factory step add <step> --after spec --role worker --reason R` |
 | findings accepted, code must change  | `factory step loop review --reason "4 fixes"`                   |
 
-## Triage
-
-- Rank findings by blast radius, effort and confidence; fix wide and cheap first.
-- Skip anything outside the contract by default; inside it, fix or explain.
-- One plan per round, never one per finding: fix or skip with its reason in `findings.md`.
-- Accepted findings are the spec for the next implement round.
-
 ## Handoff
 
-Every sub-agent ends with this as its final message; the `SubagentStop` hook saves it to `handoffs/`.
-`Undone`, `Commands`, `Issues`, `Deviations`, `Faster` go in only when they have content, a command
-only when it failed or decided something. Never write `none`.
+Every sub-agent ends with this final message, saved to `handoffs/` by the hook, which also files its
+`Decisions`. `Decisions`, `Undone`, `Commands`, `Issues`, `Deviations`, `Faster`: only with content.
 
 ```
 Step: <id>

@@ -3,6 +3,7 @@ import type { MissionState, Workflow } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import { Refusal, deviate, missionWorkflow, notStub, now, pointAtInserted, resolveMission, writeState } from '../core/mission.js';
 import { allStepNames, dumpWorkflow, findStep, nextStep, ownerStep, validate } from '../core/workflow.js';
+import { waitingDecisions } from '../core/decision.js';
 import { field } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
 
@@ -17,6 +18,7 @@ export async function step(sub: string, args: string[], flags: Flags, cwd: strin
 
   switch (sub) {
     case 'start':
+      await noneWaiting(mission.dir);
       start(state, workflow, name);
       break;
     case 'done':
@@ -37,6 +39,14 @@ export async function step(sub: string, args: string[], flags: Flags, cwd: strin
 
   await writeState(mission.dir, state);
   print(state, name);
+}
+
+/** Half the enforcement of the dial: no step runs while the human still owes an answer. */
+async function noneWaiting(dir: string): Promise<void> {
+  const ids = (await waitingDecisions(dir)).map((d) => d.id);
+  if (ids.length === 0) return;
+  const verb = ids.length === 1 ? 'decision waits' : 'decisions wait';
+  throw new Refusal(`${ids.length} ${verb} on the human: ${ids.join(', ')} — answer them with: factory decision answer ${ids[0]} accept|overrule`);
 }
 
 function known(workflow: Workflow, name: string): void {

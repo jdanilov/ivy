@@ -8,7 +8,7 @@ import { Refusal } from './core/mission.js';
 import { I, colors, setNameCol } from './ui/theme.js';
 
 // Mission work happens in the checkout you are standing in; only the part commands pick a project.
-const MISSION_COMMANDS = ['mission', 'step', 'gate', 'handoff'];
+const MISSION_COMMANDS = ['mission', 'step', 'gate', 'decision', 'handoff'];
 
 async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(argv);
@@ -27,6 +27,10 @@ async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
     case 'gate': {
       const { gate } = await import('./commands/gate.js');
       return gate(sub!, rest, flags, cwd);
+    }
+    case 'decision': {
+      const { decision } = await import('./commands/decision.js');
+      return decision(sub!, rest, flags, cwd);
     }
     default: {
       const { handoff } = await import('./commands/handoff.js');
@@ -56,7 +60,7 @@ async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<v
       return update(targetDir, skip ? skip.split(',') : []);
     }
     default:
-      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, handoff, control`);
+      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, decision, handoff, control`);
   }
 }
 

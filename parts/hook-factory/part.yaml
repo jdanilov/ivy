@@ -1,5 +1,5 @@
 type: fixture
-description: report session events to ~/.factory/events, ring when the session waits on the human
+description: report session events to ~/.factory/events, file decisions, ring when the session waits on the human
 default: true
 files:
   - source: hook-factory.ts
@@ -8,6 +8,10 @@ files:
     target: .claude/sounds/sonar-deep.mp3
 hooks:
   - events: [SessionStart, UserPromptSubmit, Stop, SubagentStart, SubagentStop, Notification, PreCompact]
+    command: SOUND="${sound}" QUIET="${quiet}" bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}
+  # A sub-agent's decisions reach the Orchestrator the moment its Agent tool returns.
+  - event: PostToolUse
+    matcher: Agent
     command: SOUND="${sound}" QUIET="${quiet}" bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}
 vars:
   sound: "$CLAUDE_PROJECT_DIR/.claude/sounds/sonar-deep.mp3"

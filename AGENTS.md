@@ -23,12 +23,13 @@ src/           CLI source (entry: src/cli.ts)
 ├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env,
 │              projects, config (vars + caffeinate), recipes, args, workflow (YAML load +
 │              transitions, stepRole, ROLE_MODEL), mission (folder, state, claim, branch,
-│              autonomy, insert pointer), spawn (preset, Warp tab config, claude command)
+│              autonomy, insert pointer), decision (decisions.md table, waits, first answer wins),
+│              spawn (preset, Warp tab config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (render + keys), actions (what
 │              a key writes, through the CLI's own functions), notify, frames, format, theme
-├── commands/  install, uninstall, status, update, mission, step, gate, handoff, control
+├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
@@ -123,7 +124,7 @@ in the manifest, so the project keeps its own copy for good.
 and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever removes a
 symlink pointing into the Factory.
 
-`mission | step | gate | handoff <sub>` act on the checkout you are standing in, never prompt
+`mission | step | gate | decision | handoff <sub>` act on the checkout you are standing in, never prompt
 (the one exception is the worktree offer in `mission new` on a claimed checkout) and exit 1 with a
 one-line `✗ …` on a refusal.
 
@@ -134,6 +135,8 @@ factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
 factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
 factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
+factory decision add "<summary>" --confidence HIGH|MEDIUM|LOW [--step S] [--by R]
+factory decision answer <id> accept|overrule [--note N] | list [--waiting]
 factory handoff save <step>            # reads the handoff from stdin
 ```
 
@@ -150,6 +153,14 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission open` writes the session id to `state.json` before the tab exists, so the first hook
   event the new session emits already finds a mission bound to it.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
+- A decision is one row in the mission's `decisions.md`, `id | step | by | confidence | summary |
+  status | note`, written temp plus rename by `src/core/decision.ts` and, standalone, by the hook.
+  `waits(autonomy, confidence)` decides `waiting` over `auto` at filing: `full` waits on nothing,
+  `partial` on `LOW`, `none` on all three. `step start` refuses while a decision waits, naming the
+  ids; first answer wins, the same verdict again is a no-op and a different one is refused.
+- The hook files the `Decisions:` block of a `SubagentStop` final message and, on `PostToolUse`
+  matcher `Agent` and on `UserPromptSubmit`, tells the Orchestrator which decisions wait. It never
+  logs `PostToolUse` to the events file: one Agent result per row would drown the bus.
 - A `SubagentStop` handoff lands in `handoffs/<step>[-<agent>][-r<round>].md`: a message under five
   lines is not saved, and an existing handoff is never overwritten, whatever the lengths — the second
   save of one name takes `-2`, the third `-3`.

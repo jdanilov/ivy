@@ -16,6 +16,7 @@ Single source of names for the Factory. Agents and humans use these words and no
 | Gate      | A step that blocks until a decision. `human` gates are asked in the session and recorded by `factory gate answer`. `orchestrator` gates are recorded decisions with a reason. `factory step` refuses to pass a gate unanswered. |
 | Loop      | A step that returns to an earlier step while findings are accepted. `max` caps the rounds.               |
 | Round     | One pass through a loop: gatekeepers check, orchestrator triages, human accepts or amends, implement resumes. |
+| Decision  | One fork an agent took that a reviewer might have taken differently: a row in `decisions.md` with a confidence and its reason. `auto` when the mission's autonomy leaves it to the agent, `waiting` when the human owes an answer, then `accepted` or `overruled` with a note. A round's fix-or-skip plan over findings is one decision, never one per finding. |
 | Autonomy  | Mission-level dial: `full`, `partial`, `none`. Decides which decisions wait on the human. Set at shape time, moved with `mission autonomy L`. |
 | Recipe    | A project command list in `factory.yaml`: `verify`, `e2e`, `deliver`.                                     |
 | Claim     | `.factory/claim` naming the mission that owns the main checkout. Other missions are offered a worktree.   |
@@ -37,7 +38,6 @@ Single source of names for the Factory. Agents and humans use these words and no
 | Investigator | Sonnet read-only sub-agent for code search, codegraph, web and transcript research, recovery design. Runs in parallel. |
 | Summarizer   | Headless Sonnet run over a whole mission. Condenses artefacts, writes suggestions, proposes memories. At close or on demand. |
 | Question     | A sub-agent request for human input, raised by returning blocked with the question. The Orchestrator asks the human and re-spawns the sub-agent with the answer. |
-| Triage       | Orchestrator's fix-or-skip plan over findings, one Inbox item per round. Human accepts or amends.        |
 | Retro sweep  | `/retro` over every closed mission's `retro.md` in the project: one actionable item at a time, applied, stubbed, roadmapped or dropped, then pruned. |
 
 ## Docs a mission produces
@@ -49,8 +49,9 @@ Agent-facing except intent.md. Short, reasoning-first. Format in the `docs-forma
 | intent.md     | Orchestrator | After grilling      | Why, goal, done criteria, guardrails. The one file the human reads.     |
 | spec.md       | Orchestrator | After review        | Steps for workers, files touched, decisions, risks, recovery per step.  |
 | acceptance.md | Orchestrator | With the spec       | Contract: one assertion per line, id, kind (verify or validate), claim, check, owning step. Every assertion ends pass, fail or unchecked. |
-| findings.md   | Gatekeepers  | Each round          | Findings by assertion id with blast radius, effort, confidence. Triage recorded here. |
-| handoffs/     | Sub-agents   | End of each step    | Final-message handoff saved by hook: step, done, acceptance, then undone, commands, issues, deviations, faster ways. A field is present only when it has content. |
+| findings.md   | Gatekeepers  | Each round          | Findings by assertion id with blast radius, effort, confidence.         |
+| decisions.md  | Hook and CLI | As they happen      | One decision per row: `id`, `step`, `by`, `confidence`, `summary`, `status`, `note`. Sub-agents file theirs in the handoff, the Orchestrator with `factory decision add`. |
+| handoffs/     | Sub-agents   | End of each step    | Final-message handoff saved by hook: step, done, acceptance, then decisions, undone, commands, issues, deviations, faster ways. A field is present only when it has content. |
 | retro.md      | Summarizer   | Mission close       | Feedback from agents to the human: tools, context bloat, wrong memories, workflow defaults. Feeds a periodic chore mission. |
 | workflow.yaml | Factory CLI  | At creation         | The mission's own copy of the workflow. Orchestrator edits with reasons.|
 | state.json    | Factory CLI  | Every transition    | Current step, round, session id, gates, deviations, worktree, wall time and tokens per step. |

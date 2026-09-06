@@ -20,18 +20,21 @@ export function headerRow(left: string, right: string): void {
   console.log(`${I}${left}${' '.repeat(gap)}${right}`);
 }
 
-/** One mission line: glyph, name, workflow · step · round, then session liveness. */
-export function missionRow(state: MissionState, row: string, live: boolean): void {
-  const glyph = `${rowColor(row)}${rowSymbol(row)}${colors.reset}`;
+/** One mission line: glyph, name, workflow · step · round, then session liveness. Archived rows dim. */
+export function missionRow(state: MissionState, row: string, live: boolean, archived = false): void {
+  const glyph = `${archived ? colors.dim : rowColor(row)}${rowSymbol(row)}${colors.reset}`;
+  const name = archived ? `${colors.dim}${state.name.padEnd(20)}${colors.reset}` : state.name.padEnd(20);
   const detail = `${colors.dim}${state.workflow} · ${state.step || '—'} · r${state.round}${colors.reset}`;
-  const session = state.status === 'stub'
+  const session = archived
+    ? `${colors.dim}archived${colors.reset}`
+    : state.status === 'stub'
     ? `${colors.dim}stub${colors.reset}`
     : state.status === 'closed'
     ? `${colors.dim}closed${colors.reset}`
     : live
       ? `${colors.cyan}session${colors.reset}`
       : `${colors.dim}no session${colors.reset}`;
-  headerRow(`${glyph} ${state.name.padEnd(20)}${detail}`, session);
+  headerRow(`${glyph} ${name}${detail}`, session);
 }
 
 // indent + "✓ " + name column
@@ -64,11 +67,9 @@ export function printPartResult(
   }
 }
 
-/**
- * Print hook injection info line (indented under the part result).
- */
-export function printHookInfo(): void {
-  console.log(`${pad()}.claude/settings.local.json → hook added`);
+/** One line under the part result for the settings file the hooks went into. */
+export function printHookInfo(file: string): void {
+  console.log(`${pad()}${file} → hook added`);
 }
 
 /** One line under the part result for the agent-file line a snippet added or removed. */

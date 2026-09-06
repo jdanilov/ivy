@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { watch, type FSWatcher } from 'node:fs';
-import { FACTORY_HOME } from '../core/projects.js';
+import { factoryHome } from '../core/projects.js';
 import { buildSnapshot } from './live.js';
 import { openTranscripts } from './transcript.js';
 import type { Snapshot } from './model.js';
@@ -17,8 +17,8 @@ const POLL = 2000;
 /** Recursive on the mission folders, which grow subfolders; flat on the rest, which do not. */
 function watched(snap: Snapshot): [dir: string, recursive: boolean][] {
   return [
-    [path.join(FACTORY_HOME, 'events'), false],
-    [path.join(FACTORY_HOME, 'caffeinate'), false],
+    [path.join(factoryHome(), 'events'), false],
+    [path.join(factoryHome(), 'caffeinate'), false],
     ...snap.projects.map((p): [string, boolean] => [path.join(p.path, '.factory', 'missions'), true]),
     ...openTranscripts().map((file): [string, boolean] => [file, false]),
   ];

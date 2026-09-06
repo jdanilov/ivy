@@ -3,11 +3,11 @@ import {
   type CliRenderer, type KeyEvent,
 } from '@opentui/core';
 import { appendFile, mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import path from 'node:path';
 import { C, GLYPH, stateColor, stepColor } from './theme.js';
 import { ago, clock, dur, id, len, line, spread, tokens, wrap, type Cell } from './format.js';
 import { answerGate, applyParts, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
+import { factoryHome } from '../core/projects.js';
 import type { Activity, Autonomy, Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from './model.js';
 
 const ANSWERS = ['accept', 'amend', 'reject'] as const;
@@ -742,7 +742,7 @@ export function onKey(app: App, key: KeyEvent): void {
     handleKey(app, key);
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
-    const log = path.join(homedir(), '.factory', 'control.log');
+    const log = path.join(factoryHome(), 'control.log');
     const entry = `${new Date().toISOString()} key=${key.name}\n${err.stack ?? err.message}\n\n`;
     void mkdir(path.dirname(log), { recursive: true }).then(() => appendFile(log, entry)).catch(() => {});
     try {

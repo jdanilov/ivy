@@ -1,5 +1,6 @@
 type: tool
 description: web research via Grok
+scope: global
 default: true
 files:
   - source: skill.md

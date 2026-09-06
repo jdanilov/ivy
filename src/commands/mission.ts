@@ -3,9 +3,9 @@ import * as p from '@clack/prompts';
 import type { Autonomy, Mission, MissionState, WorkflowStep } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import {
-  Refusal, closeMission, createMission, currentBranch, currentCheckout, ensureClaimIgnored, git,
-  listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub, pointAtInserted,
-  promoteMission, readClaim, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
+  Refusal, archiveMission, closeMission, createMission, currentBranch, currentCheckout, ensureClaimIgnored,
+  git, listArchived, listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub,
+  pointAtInserted, promoteMission, readClaim, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
 } from '../core/mission.js';
 import { ROLE_MODEL, dumpWorkflow, loadWorkflow, stepRole } from '../core/workflow.js';
 import { loadPreset, openSession } from '../core/spawn.js';
@@ -43,8 +43,11 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
       return resume(args[0], cwd);
     case 'close':
       return close(args[0], flags, cwd);
+    case 'archive':
+    case 'unarchive':
+      return archive(args[0], sub === 'unarchive', cwd);
     default:
-      throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, shape, autonomy, list, status, adopt, resume, close`);
+      throw new Refusal(`mission: unknown subcommand "${sub ?? ''}" — new, open, shape, autonomy, list, status, adopt, resume, close, archive, unarchive`);
   }
 }
 
@@ -60,6 +63,8 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
 
   // A stub touches no branch, so a claim held by someone else is none of its business.
   if (!stub && claim && claim.mission !== name && !worktree && flags['no-worktree'] !== true) {
+    // Nobody to ask: a script that would have been offered a worktree has to say so itself.
+    if (!process.stdin.isTTY) throw new Refusal(`checkout claimed by mission ${claim.mission} — add --worktree`);
     console.log(`${I}${colors.yellow}⊘${colors.reset} ${main} is claimed by mission ${colors.bold}${claim.mission}${colors.reset}`);
     const answer = await p.confirm({ message: `Work ${name} in a worktree at ../${path.basename(main)}-${name}?`, initialValue: true });
     if (p.isCancel(answer)) throw new CancelError();
@@ -96,13 +101,17 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
 /** Writes the Warp tab config and opens it. The session id reaches state.json first. */
 async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
+  if (m.state.status === 'closed') throw new Refusal(`mission ${m.state.name} is closed`);
+  const dry = flags['dry-run'] === true;
+  const stub = m.state.status === 'stub';
+
+  // A dry run writes nothing at all, so even the promotion waits for the real run.
   let ignored: 'added' | 'committed' | null = null;
-  if (m.state.status === 'stub') {
+  if (stub && !dry) {
     await promoteMission(cwd, m);
     ignored = await ensureClaimIgnored(await currentCheckout(cwd));
   }
   const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
-  const dry = flags['dry-run'] === true;
   const spawn = await openSession(cwd, m, preset, dry);
   const opened = spawn.warp ? 'tab opened' : 'no warp — run it yourself';
   const note = dry ? `dry run${spawn.warp ? '' : ' · no warp'}` : opened;
@@ -117,6 +126,7 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   field('cwd', spawn.cwd);
   field('config', dry ? `would write ${spawn.configPath}` : spawn.configPath);
   field('uri', spawn.uri);
+  if (dry && stub) field('promote', `would branch mission/${m.state.name} and claim the checkout`);
   if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log(`${I}${colors.dim}command${colors.reset}`);
   console.log(`${I}${spawn.command}`);
@@ -180,11 +190,16 @@ async function list(flags: Flags): Promise<void> {
     const missions = await listMissions(project).catch(() => []);
     const rows = (all ? missions : missions.filter((m) => m.state.status !== 'closed'))
       .sort((a, b) => Number(a.state.status === 'stub') - Number(b.state.status === 'stub'));
-    if (rows.length === 0) continue;
+    const archived = all ? await listArchived(project).catch(() => []) : [];
+    if (rows.length === 0 && archived.length === 0) continue;
 
     console.log(`${I}${colors.dim}${project}${colors.reset}`);
     for (const m of rows) {
       missionRow(m.state, missionRowState(m.state), await sessionLive(m.state.session));
+      shown++;
+    }
+    for (const m of archived) {
+      missionRow(m.state, missionRowState(m.state), false, true);
       shown++;
     }
     console.log('');
@@ -312,6 +327,19 @@ async function close(name: string | undefined, flags: Flags, cwd: string): Promi
   headerRow(`${colors.green}✓${colors.reset} ${colors.bold}${m.state.name}${colors.reset} ${colors.dim}closed${colors.reset}`, '');
   rule();
   if (log.length === 0) console.log(`${I}${colors.dim}already closed, nothing left to do${colors.reset}`);
+  for (const line of log) console.log(`${I}${colors.dim}·${colors.reset} ${line}`);
+  console.log('');
+}
+
+/** Closed work moved between `.factory/missions/` and `.factory/archive/`, history and all. */
+async function archive(name: string | undefined, back: boolean, cwd: string): Promise<void> {
+  if (!name) throw new Refusal(`mission ${back ? 'unarchive' : 'archive'} <name>`);
+  const log = await archiveMission(cwd, name, back);
+
+  console.log('');
+  headerRow(`${colors.dim}🗄${colors.reset}  ${colors.bold}${name}${colors.reset} ${colors.dim}${back ? 'unarchived' : 'archived'}${colors.reset}`, '');
+  rule();
+  if (log.length === 0) console.log(`${I}${colors.dim}already ${back ? 'in the mission folder' : 'archived'}, nothing to do${colors.reset}`);
   for (const line of log) console.log(`${I}${colors.dim}·${colors.reset} ${line}`);
   console.log('');
 }

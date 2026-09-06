@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { existingProjects, FACTORY_HOME } from '../core/projects.js';
+import { existingProjects, factoryHome } from '../core/projects.js';
 import { readCaffeinate } from '../core/config.js';
 import { git, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
@@ -24,8 +24,8 @@ const DAY = 24 * 60 * 60 * 1000;
 /** A gate body is read to be skimmed, not to be paged through. */
 const BODY_LINES = 200;
 
-const EVENTS = path.join(FACTORY_HOME, 'events');
-const PIDS = path.join(FACTORY_HOME, 'caffeinate');
+const events = (): string => path.join(factoryHome(), 'events');
+const pids = (): string => path.join(factoryHome(), 'caffeinate');
 
 // ── events ───────────────────────────────────────────────────────────────────
 
@@ -57,9 +57,9 @@ function parse(line: string): EventLine | null {
 
 async function readEvents(): Promise<Map<string, Ev>> {
   const out = new Map<string, Ev>();
-  for (const name of await readdir(EVENTS).catch(() => [])) {
+  for (const name of await readdir(events()).catch(() => [])) {
     if (!name.endsWith('.jsonl')) continue;
-    const file = path.join(EVENTS, name);
+    const file = path.join(events(), name);
     const info = await stat(file).catch(() => null);
     if (!info || Date.now() - info.mtimeMs > DAY) continue;
 
@@ -202,7 +202,7 @@ export async function settle(): Promise<void> {
 /** The hook records one pid per session; a stale file outlives the process that made it. */
 async function caffeinated(session: string | null): Promise<boolean> {
   if (!session) return false;
-  const pid = Number(await readFile(path.join(PIDS, `${session}.pid`), 'utf-8').catch(() => ''));
+  const pid = Number(await readFile(path.join(pids(), `${session}.pid`), 'utf-8').catch(() => ''));
   try {
     return pid > 0 && process.kill(pid, 0);
   } catch {

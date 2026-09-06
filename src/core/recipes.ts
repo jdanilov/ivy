@@ -1,5 +1,6 @@
 import type { ManifestPart, Part } from '../types.js';
 import { loadConfig } from './config.js';
+import { scopeOf } from './projects.js';
 import { Refusal } from './mission.js';
 import { I, colors } from '../ui/theme.js';
 
@@ -7,16 +8,19 @@ const VAR = /\$\{([A-Za-z_][A-Za-z0-9_-]*)\}/g;
 
 /**
  * Substitutes `${name}` in hooks, mcp and recipes: `~/.factory/config.yaml` over the part's own
- * default, else a refusal. Callers resolve once and use the result everywhere, so the manifest,
- * `.mcp.json` and the hooks all hold the same strings and `update` re-points a project.
+ * default over the built-in `${root}`, else a refusal. Callers resolve once and use the result
+ * everywhere, so the manifest, `.mcp.json` and the hooks all hold the same strings and `update`
+ * re-points a project.
  */
-export async function resolvePart(part: Part): Promise<Part> {
+export async function resolvePart(part: Part, targetDir: string): Promise<Part> {
   if (!part.hooks && !part.mcp && !part.recipes) return part;
 
   const config = await loadConfig();
+  // The one var the Factory itself defines: where the harness that runs the hook is rooted.
+  const root = scopeOf(targetDir) === 'global' ? '$HOME' : '$CLAUDE_PROJECT_DIR';
   const sub = (text: string): string =>
     text.replace(VAR, (_, name: string) => {
-      const value = config.vars?.[name] ?? part.vars?.[name];
+      const value = config.vars?.[name] ?? part.vars?.[name] ?? (name === 'root' ? root : undefined);
       if (value === undefined) throw new Refusal(`part ${part.name} uses \${${name}} and nothing defines it`);
       return value;
     });

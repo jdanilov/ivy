@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { homedir } from 'node:os';
 import { stat } from 'node:fs/promises';
 import type { Activity } from './model.js';
+import { home } from '../core/projects.js';
 
 /**
  * Claude Code's live transcript, one JSON object per line. The screen reads the tail only: a byte
@@ -11,7 +11,7 @@ import type { Activity } from './model.js';
 
 /** `~/.claude/projects/<cwd with every / turned into ->/<session>.jsonl`. */
 export function transcriptPath(cwd: string, session: string): string {
-  return path.join(homedir(), '.claude', 'projects', cwd.replaceAll('/', '-'), `${session}.jsonl`);
+  return path.join(home(), '.claude', 'projects', cwd.replaceAll('/', '-'), `${session}.jsonl`);
 }
 
 export interface Usage { at: number; input: number; cached: number; output: number }

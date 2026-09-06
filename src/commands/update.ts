@@ -3,6 +3,7 @@ import { lstat } from 'node:fs/promises';
 import type { HookConfig, ManifestPart, Part, SnippetRecord } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, withRequires, FACTORY_ROOT } from '../core/registry.js';
+import { scopeOf } from '../core/projects.js';
 import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
 import { resolvePart, runInit, runUninit } from '../core/recipes.js';
 import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
@@ -21,7 +22,7 @@ async function applyPart(
   prev: ManifestPart | undefined,
   targetDir: string,
 ): Promise<{ next: ManifestPart; snippetAdded: boolean; failure: unknown }> {
-  const resolved = await resolvePart(part);
+  const resolved = await resolvePart(part, targetDir);
   const next = await linkPart(resolved, targetDir, FACTORY_ROOT);
   if (resolved.hooks) await injectHooks(resolved.hooks, targetDir);
   if (resolved.mcp) await injectMcp(resolved.mcp, targetDir);
@@ -57,7 +58,8 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     return;
   }
 
-  const parts = await loadParts();
+  // Out of scope is out of the registry: a part that turned global unlinks here like a retired one.
+  const parts = (await loadParts()).filter((p) => p.scope === scopeOf(resolvedDir));
   const registry = new Map(parts.map((p) => [p.name, p]));
   // Dropped parts must not take files or hooks that a surviving part still owns.
   const liveFiles = new Set(parts.flatMap((p) => p.files.map((f) => f.target)));

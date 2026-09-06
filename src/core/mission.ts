@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
+import { mkdir, readdir, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
 import type { Autonomy, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
-import { FACTORY_HOME, saveProject } from './projects.js';
+import { factoryHome, loadProjects, saveProject } from './projects.js';
 import { dumpWorkflow, loadWorkflow, readWorkflowFile } from './workflow.js';
 
 /** A refusal is an expected "no" from the CLI: one line, exit 1, no stack. */
@@ -18,7 +18,7 @@ export function notStub(state: MissionState): asserts state is MissionState & { 
 }
 
 const LIVE_WINDOW_MS = 10 * 60 * 1000;
-const EVENTS_DIR = path.join(FACTORY_HOME, 'events');
+const eventsDir = (): string => path.join(factoryHome(), 'events');
 
 // ── git ──────────────────────────────────────────────────────────────────────
 
@@ -180,16 +180,30 @@ export async function ensureClaimIgnored(checkout: string): Promise<'added' | 'c
 /** Live means the session's events file was touched inside the last ten minutes. */
 export async function sessionLive(session: string | null): Promise<boolean> {
   if (!session) return false;
-  const info = await stat(path.join(EVENTS_DIR, `${session}.jsonl`)).catch(() => null);
+  const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
   return info !== null && Date.now() - info.mtimeMs < LIVE_WINDOW_MS;
 }
 
 // ── finding missions ─────────────────────────────────────────────────────────
 
 export const missionsDir = (main: string): string => path.join(main, '.factory', 'missions');
+export const archiveDir = (main: string): string => path.join(main, '.factory', 'archive');
 
-export async function listMissions(cwd: string): Promise<Mission[]> {
-  const dir = missionsDir(await mainCheckout(cwd));
+/**
+ * Mission work only happens in a checkout `~/.factory/projects` knows: the projects list lives
+ * under HOME, so this is what makes a scratch HOME a sandbox instead of a suggestion.
+ */
+export async function registered(main: string): Promise<void> {
+  const real = await realpath(main).catch(() => main);
+  for (const project of await loadProjects()) {
+    if (project === main || project === real) return;
+    if ((await realpath(project).catch(() => null)) === real) return;
+  }
+  throw new Refusal(`${main} is not a registered project — run: factory install ${main}`);
+}
+
+/** The missions in a folder, newest name last. Missing folder reads as none. */
+async function readMissions(dir: string): Promise<Mission[]> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const missions: Mission[] = [];
   for (const entry of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -198,6 +212,19 @@ export async function listMissions(cwd: string): Promise<Mission[]> {
     if (state) missions.push({ dir: folder, state });
   }
   return missions;
+}
+
+export async function listMissions(cwd: string): Promise<Mission[]> {
+  const main = await mainCheckout(cwd);
+  await registered(main);
+  return readMissions(missionsDir(main));
+}
+
+/** Archived missions: closed work moved aside, read by `mission list --all` and nothing else. */
+export async function listArchived(cwd: string): Promise<Mission[]> {
+  const main = await mainCheckout(cwd);
+  await registered(main);
+  return readMissions(archiveDir(main));
 }
 
 /**
@@ -277,6 +304,7 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   if (!/^[a-z0-9][a-z0-9-]*$/.test(opts.name)) throw new Refusal(`mission name must be lowercase letters, digits and dashes, got "${opts.name}"`);
 
   const main = await mainCheckout(cwd);
+  await registered(main);
   const checkout = await currentCheckout(cwd);
   const workflow = await loadWorkflow(opts.workflow, main);
   const title = opts.title ?? opts.name;
@@ -447,6 +475,42 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
     log.push(gone ? `branch ${state.branch} deleted` : `branch ${state.branch} left in place — delete it by hand`);
   }
 
+  return log;
+}
+
+// ── archive ──────────────────────────────────────────────────────────────────
+
+/**
+ * A closed mission steps out of the way: one `git mv` between `.factory/missions/` and
+ * `.factory/archive/`, so the history follows the folder instead of reading as a delete and an add.
+ * The commit only happens when the tree is otherwise clean — nobody else's work rides along with it.
+ */
+export async function archiveMission(cwd: string, name: string, back = false): Promise<string[]> {
+  const main = await mainCheckout(cwd);
+  await registered(main);
+  const from = back ? archiveDir(main) : missionsDir(main);
+  const to = back ? missionsDir(main) : archiveDir(main);
+  const named = (m: Mission): boolean => m.state.name === name || path.basename(m.dir) === name;
+
+  const mission = (await readMissions(from)).find(named);
+  if (!mission) {
+    if ((await readMissions(to)).find(named)) return [];
+    throw new Refusal(`no mission "${name}" in ${from}`);
+  }
+  if (mission.state.status !== 'closed') throw new Refusal(`mission ${name} is ${mission.state.status} — close it first`);
+
+  const target = path.join(to, path.basename(mission.dir));
+  const clean = (await git(main, 'status', '--porcelain')) === '';
+  await mkdir(to, { recursive: true });
+  await git(main, 'mv', path.relative(main, mission.dir), path.relative(main, target));
+
+  const log = [`${back ? 'unarchived' : 'archived'} ${path.relative(main, target)}`];
+  if (clean) {
+    await git(main, 'commit', '-m', `🗄️ chore: ${back ? 'unarchive' : 'archive'} mission ${name}`);
+    log.push(`committed on ${await currentBranch(main)}`);
+  } else {
+    log.push('tree is dirty — the move is staged, commit it yourself');
+  }
   return log;
 }
 

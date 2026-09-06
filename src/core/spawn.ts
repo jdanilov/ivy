@@ -1,12 +1,12 @@
 import path from 'node:path';
-import { homedir } from 'node:os';
 import { mkdir, stat } from 'node:fs/promises';
 import type { Mission, Preset } from '../types.js';
 import { Refusal, mainCheckout, now, readClaim, writeClaim, writeState } from './mission.js';
 import { FACTORY_ROOT } from './registry.js';
+import { home } from './projects.js';
 
 /** Warp reads tab configs from here and opens them with warp://tab_config/<file stem>. */
-const TAB_CONFIGS = path.join(homedir(), '.warp', 'tab_configs');
+const tabConfigs = (): string => path.join(home(), '.warp', 'tab_configs');
 
 export interface Spawn {
   preset: Preset;
@@ -100,7 +100,7 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
   const checkout = mission.state.worktree ?? (await mainCheckout(cwd));
   const name = `factory-${mission.state.name}`;
   const command = assembleCommand(preset, mission, session);
-  const configPath = path.join(TAB_CONFIGS, `${name}.toml`);
+  const configPath = path.join(tabConfigs(), `${name}.toml`);
   const uri = `warp://tab_config/${encodeURIComponent(name)}`;
   const spawn: Spawn = { preset, session, cwd: checkout, command, configPath, uri, warp: await warpInstalled() };
 
@@ -113,7 +113,7 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
   const claim = await readClaim(main);
   if (claim?.mission === mission.state.name) await writeClaim(main, { ...claim, session, at: now() });
 
-  await mkdir(TAB_CONFIGS, { recursive: true });
+  await mkdir(path.dirname(configPath), { recursive: true });
   await Bun.write(configPath, tabConfig(name, checkout, command));
 
   if (spawn.warp) await Bun.spawn(['open', uri], { stdout: 'ignore', stderr: 'ignore' }).exited;

@@ -6,7 +6,7 @@ import { removeParts } from '../core/parts.js';
 import { resolveMission, sessionLive, setAutonomy as writeAutonomy, writeState } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { writeCaffeinate, type Caffeinate } from '../core/config.js';
-import { FACTORY_HOME } from '../core/projects.js';
+import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import type { Autonomy, InboxItem } from './model.js';
 
@@ -95,9 +95,9 @@ export async function applyParts(project: string, add: string[], drop: string[])
 
 // ── caffeinate ───────────────────────────────────────────────────────────────
 
-const PIDS = path.join(FACTORY_HOME, 'caffeinate');
+const PIDS = (): string => path.join(factoryHome(), 'caffeinate');
 /** Mission Control's own hold, next to the hook's one file per session. */
-const CONTROL = path.join(PIDS, 'control.pid');
+const CONTROL = (): string => path.join(PIDS(), 'control.pid');
 
 async function stop(file: string): Promise<void> {
   const pid = Number(await readFile(file, 'utf-8').catch(() => ''));
@@ -110,7 +110,7 @@ async function stop(file: string): Promise<void> {
 }
 
 async function start(): Promise<void> {
-  const pid = Number(await readFile(CONTROL, 'utf-8').catch(() => ''));
+  const pid = Number(await readFile(CONTROL(), 'utf-8').catch(() => ''));
   try {
     if (pid > 0 && process.kill(pid, 0)) return;
   } catch {
@@ -120,7 +120,7 @@ async function start(): Promise<void> {
   const proc = Bun.spawn(['/bin/sh', '-c', 'nohup caffeinate -i >/dev/null 2>&1 & printf %s "$!"'], { stdout: 'pipe', stderr: 'ignore' });
   const spawned = (await new Response(proc.stdout).text()).trim();
   await proc.exited;
-  if (spawned !== '') await Bun.write(CONTROL, spawned);
+  if (spawned !== '') await Bun.write(CONTROL(), spawned);
 }
 
 /**
@@ -131,8 +131,8 @@ async function start(): Promise<void> {
 export async function setCaffeinate(mode: Caffeinate): Promise<string> {
   await writeCaffeinate(mode);
   if (mode === 'on') await start();
-  else if (mode === 'auto') await stop(CONTROL);
-  else for (const name of await readdir(PIDS).catch(() => [])) await stop(path.join(PIDS, name));
+  else if (mode === 'auto') await stop(CONTROL());
+  else for (const name of await readdir(PIDS()).catch(() => [])) await stop(path.join(PIDS(), name));
   return `caffeinate ${mode.toUpperCase()}`;
 }
 

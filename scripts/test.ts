@@ -5,16 +5,26 @@ import path from 'node:path';
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
-// Every module that reads HOME reads it at import time: scratch it before any of them load.
-// Resolved, because a relative symlink computed through /var would not point where it says.
+// The scratch HOME lands before any module that reads it loads. `$TMPDIR` is honoured, so a caller
+// with a slow temp folder can point the whole run somewhere small. Resolved, because macOS hands
+// back a symlink and the linker builds relative symlink targets a logical path leaves dangling.
 const TMP = await realpath(await mkdtemp(path.join(tmpdir(), 'factory-test-')));
 process.env.HOME = path.join(TMP, 'home');
+
+// The whole run writes under this home. If it does not resolve here, nothing else may happen.
+const { factoryHome, loadProjects, saveProject } = await import('../src/core/projects.js');
+if (!factoryHome().startsWith(TMP + path.sep)) {
+  console.log(`✗ refusing to write: factoryHome() is ${factoryHome()}, not under ${TMP}`);
+  process.exit(1);
+}
+
 await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
 // The config is read once and cached, so it lands before anything resolves a part. `codegraph` as
 // the bare command keeps the codegraph case off the network.
 await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
 
 const { install } = await import('../src/commands/install.js');
+const { scanProject } = await import('../src/core/scanner.js');
 const { update } = await import('../src/commands/update.js');
 const { uninstall } = await import('../src/commands/uninstall.js');
 const { step } = await import('../src/commands/step.js');
@@ -22,8 +32,8 @@ const { gate } = await import('../src/commands/gate.js');
 const { decision } = await import('../src/commands/decision.js');
 const { answerDecision, readDecisions, waits } = await import('../src/core/decision.js');
 const { mission } = await import('../src/commands/mission.js');
-const { closeMission, createMission, currentBranch, git, missionWorkflow, promoteMission, resolveMission } = await import('../src/core/mission.js');
-const { removeSnippet, writeSnippet } = await import('../src/core/linker.js');
+const { archiveMission, closeMission, createMission, currentBranch, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission } = await import('../src/core/mission.js');
+const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, loadParts } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
@@ -44,7 +54,7 @@ async function check(name: string, fn: () => Promise<void>): Promise<void> {
   console.log(err ? `✗ ${name} — ${err.message}` : `✓ ${name}`);
 }
 
-async function repo(name: string): Promise<string> {
+async function repo(name: string, register = true): Promise<string> {
   const dir = path.join(TMP, name);
   await mkdir(dir, { recursive: true });
   await git(dir, 'init', '-q', '-b', 'main');
@@ -52,6 +62,8 @@ async function repo(name: string): Promise<string> {
   await writeFile(path.join(dir, 'README.md'), '# test\n');
   await git(dir, 'add', '-A');
   await git(dir, 'commit', '-qm', 'init');
+  // Mission commands refuse outside `~/.factory/projects`, which is what the scratch HOME sandboxes.
+  if (register) await saveProject(dir);
   return dir;
 }
 
@@ -86,18 +98,20 @@ const main = await repo('main');
 
 await check('install --yes links, snippets and records every source', async () => {
   await install(main, true);
-  ok(await exists(path.join(main, '.claude/skills/commit/skill.md')), 'no commit skill');
+  ok(await exists(path.join(main, '.claude/skills/mission/skill.md')), 'no mission skill');
   ok((await Bun.file(path.join(main, 'AGENTS.md')).text()).includes('@.claude/docs-format.md'), 'no snippet');
   const manifest = await readManifest(main);
-  ok(manifest?.parts.commit?.sources?.['.claude/skills/commit/skill.md'] === 'parts/commit/skill.md', 'no source recorded');
+  ok(manifest?.parts.mission?.sources?.['.claude/skills/mission/skill.md'] === 'parts/mission/skill.md', 'no source recorded');
+  ok(!manifest?.parts.commit, 'a global part landed in a project');
 });
 
-await check('resolvePart expands the hooks shorthand', async () => {
+await check('resolvePart expands the hooks shorthand and roots it in the project', async () => {
   const part = (await loadParts()).find((p) => p.name === 'hook-factory')!;
-  const hooks = (await resolvePart(part)).hooks ?? [];
+  const hooks = (await resolvePart(part, main)).hooks ?? [];
   ok(hooks.length === 8, `expected 8 hooks, got ${hooks.length}`);
   ok(hooks.every((h) => h.command.endsWith(` ${h.event}`)), 'a hook command does not name its event');
   ok(hooks.some((h) => h.event === 'PostToolUse' && h.matcher === 'Agent'), 'no PostToolUse hook on the Agent tool');
+  ok(hooks.every((h) => h.command.includes('$CLAUDE_PROJECT_DIR/.claude/scripts/')), '${root} did not resolve to the project dir');
 });
 
 await check('the hook rings only when the parent session waits on the human', async () => {
@@ -474,6 +488,114 @@ await check('a waiting decision holds step start until it is answered', async ()
 await check('two worktree missions close a then b', () => worktreePair(['a', 'b']));
 await check('two worktree missions close b then a', () => worktreePair(['b', 'a']));
 
+await check('a mission command refuses outside a registered project', async () => {
+  const dir = await repo('stranger', false);
+  const opts = { name: 'n', workflow: 'chore', autonomy: 'partial' as const, worktree: false, stub: false };
+  const refused = await createMission(dir, opts).then(() => null, (e: Error) => e);
+  ok(refused?.message.includes(`${dir} is not a registered project`), `no sandbox refusal: ${refused?.message ?? 'none'}`);
+  await saveProject(dir);
+  await createMission(dir, opts);
+  ok((await listMissions(dir)).length === 1, 'registering the project did not let the mission through');
+});
+
+await check('open writes nothing on a dry run and never reopens a closed mission', async () => {
+  const dir = await repo('reopen');
+  await mission('new', ['s'], { stub: true }, dir);
+  const file = path.join((await resolveMission(dir, 's')).dir, 'state.json');
+  const before = await Bun.file(file).text();
+
+  await mission('open', ['s'], { 'dry-run': true }, dir);
+  ok((await Bun.file(file).text()) === before, 'a dry run rewrote state.json');
+  ok((await currentBranch(dir)) === 'main', 'a dry run promoted the stub');
+  ok(!(await exists(path.join(dir, '.factory', 'claim'))), 'a dry run claimed the checkout');
+
+  await createMission(dir, { name: 'c', workflow: 'chore', autonomy: 'partial', worktree: false, stub: false });
+  await walk(dir, 'c');
+  await closeMission(dir, await resolveMission(dir, 'c'));
+  const closed = path.join((await resolveMission(dir, 'c')).dir, 'state.json');
+  const bytes = await Bun.file(closed).text();
+  const refused = await mission('open', ['c'], { 'dry-run': true }, dir).then(() => null, (e: Error) => e);
+  ok(refused?.message === 'mission c is closed', `a closed mission opened: ${refused?.message ?? 'no refusal'}`);
+  ok((await Bun.file(closed).text()) === bytes, 'the refusal still rewrote state.json');
+});
+
+await check('a closed mission archives, comes back and is idempotent either way', async () => {
+  const dir = await repo('archive');
+  await createMission(dir, { name: 'a', workflow: 'chore', autonomy: 'partial', worktree: false, stub: false });
+  await walk(dir, 'a');
+  const early = await archiveMission(dir, 'a').then(() => null, (e: Error) => e);
+  ok(early?.name === 'Refusal', 'an open mission was archived');
+
+  await closeMission(dir, await resolveMission(dir, 'a'));
+  const log = await archiveMission(dir, 'a');
+  ok(log.some((l) => l.startsWith('committed')), `a clean tree was not committed: ${log.join(' · ')}`);
+  ok((await git(dir, 'status', '--porcelain')) === '', 'archive left the tree dirty');
+  ok((await listArchived(dir)).map((m) => m.state.name).join() === 'a', 'the archive does not hold it');
+  ok((await listMissions(dir)).length === 0, 'the missions folder still holds it');
+  ok((await archiveMission(dir, 'a')).length === 0, 'a second archive was not a no-op');
+
+  await archiveMission(dir, 'a', true);
+  ok((await listMissions(dir)).length === 1 && (await listArchived(dir)).length === 0, 'unarchive did not put it back');
+});
+
+await check('a hand-copied template reads as installed with no manifest', async () => {
+  const dir = await repo('seeded');
+  await mkdir(path.join(dir, 'docs'), { recursive: true });
+  await writeFile(path.join(dir, 'docs', 'terminology.md'), '# the project owns this\n');
+  const states = await scanProject(dir);
+  const status = (name: string): string | undefined => states.find((s) => s.part.name === name)?.status;
+  ok(status('terminology') === 'installed', `a seeded template reads ${status('terminology')}`);
+  ok(status('roadmap') === 'not-installed', 'a template nobody copied reads as installed');
+});
+
+await check('uninstall takes an emptied docs/ and leaves one holding the project\'s own', async () => {
+  const dir = await repo('emptied');
+  await mkdir(path.join(dir, 'docs'), { recursive: true });
+  ok((await dropCreated([], dir)).includes('docs/'), 'an empty docs/ was left behind');
+
+  await mkdir(path.join(dir, 'docs'), { recursive: true });
+  await writeFile(path.join(dir, 'docs', 'terminology.md'), '# the project owns this\n');
+  ok(!(await dropCreated([], dir)).includes('docs/'), 'a docs/ with something in it was removed');
+});
+
+await check('global parts install into the home dir and come back out', async () => {
+  const home = process.env.HOME!;
+  await install(home, true);
+  const manifest = await readManifest(home);
+  ok(Object.keys(manifest!.parts).sort().join() === 'commit,explain,hook-safe-bash,permissions,research',
+    `the home manifest holds ${Object.keys(manifest?.parts ?? {}).join()}`);
+  ok(await exists(path.join(home, '.claude/skills/commit/skill.md')), 'no commit skill under the home dir');
+
+  const settings = (await Bun.file(path.join(home, '.claude/settings.json')).json()) as Record<string, any>;
+  ok(JSON.stringify(settings.hooks).includes('$HOME/.claude/scripts/safe-bash.sh'), '${root} did not resolve to $HOME');
+  ok(Array.isArray(settings.permissions?.allow), 'the allow list and the hooks are not in the one file');
+  ok(!(await exists(path.join(home, '.claude/settings.local.json'))), 'a settings.local.json at user level');
+  ok((await scanProject(home)).every((s) => s.part.scope === 'global' && s.status === 'installed'), 'status --global reads them back wrong');
+  ok(!(await loadProjects()).includes(home), 'the home dir landed in the projects list');
+
+  // A project still holding one of them is what `update` is for; until it runs, no global install.
+  const project = await repo('holder');
+  await install(project, false, ['mission']);
+  const held = (await readManifest(project))!;
+  held.parts.commit = { files: [], hashes: {} };
+  await writeManifest(project, held);
+  const clash = await install(home, true).then(() => null, (e: Error) => e);
+  ok(clash?.message === `commit is installed in ${project} — run factory update on each first`, `no collision refusal: ${clash?.message ?? 'none'}`);
+  const wrongScope = await install(project, false, ['commit']).then(() => null, (e: Error) => e);
+  ok(wrongScope?.message === 'commit is a global part — factory install --global', `no scope refusal: ${wrongScope?.message ?? 'none'}`);
+
+  await update(project);
+  ok(!(await readManifest(project))?.parts.commit, 'update kept a part whose scope moved');
+  await install(home, true);
+
+  // `update --global` relinks the home dir without ever reaching for a project part.
+  await update(home);
+  ok(Object.keys((await readManifest(home))!.parts).length === 5, 'update --global changed the home manifest');
+
+  await uninstall(home, true);
+  ok(!(await exists(path.join(home, '.claude'))), 'uninstall left the home .claude behind');
+});
+
 await check('install --parts takes exactly the named parts', async () => {
   const dir = await repo('parts');
   const refused = await install(dir, false, ['nope']).then(() => null, (e: Error) => e);
@@ -490,7 +612,7 @@ await check('install --parts takes exactly the named parts', async () => {
 
 await check('uninstall --yes leaves nothing behind', async () => {
   await uninstall(main, true);
-  ok(!(await exists(path.join(main, '.claude/skills/commit/skill.md'))), 'a skill was left behind');
+  ok(!(await exists(path.join(main, '.claude/skills/mission/skill.md'))), 'a skill was left behind');
   ok(!(await exists(path.join(main, '.claude/.factory-manifest.json'))), 'the manifest was left behind');
   ok(!(await exists(path.join(main, '.mcp.json'))), 'an empty .mcp.json was left behind');
 });

@@ -2,26 +2,44 @@ import path from 'node:path';
 import { access } from 'node:fs/promises';
 import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
-import { linkPart, injectHooks, injectMcp, injectSettings, writeSnippet } from '../core/linker.js';
+import { linkPart, injectHooks, injectMcp, injectSettings, hooksFileName, writeSnippet } from '../core/linker.js';
 import { resolvePart, runInit } from '../core/recipes.js';
-import { FACTORY_ROOT, withRequires } from '../core/registry.js';
+import { FACTORY_ROOT, loadParts, withRequires } from '../core/registry.js';
+import { existingProjects, scopeOf } from '../core/projects.js';
 import { checkEnvVars } from '../core/env.js';
 import { Refusal } from '../core/mission.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
 import { printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
 
+/**
+ * A part cannot be a project's and the user's at once: the same file linked twice would load twice.
+ * The migration is `update` on each project, which unlinks what has become global, then this.
+ */
+async function noProjectHolds(names: string[]): Promise<void> {
+  for (const name of names) {
+    const holders: string[] = [];
+    for (const project of await existingProjects()) {
+      if ((await readManifest(project))?.parts[name]) holders.push(project);
+    }
+    if (holders.length > 0) throw new Refusal(`${name} is installed in ${holders.join(', ')} — run factory update on each first`);
+  }
+}
+
 export async function install(targetDir: string, yes = false, only: string[] = []): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
+  const scope = scopeOf(resolvedDir);
 
-  // Validate git repo
-  try {
-    await access(path.join(resolvedDir, '.git'));
-  } catch {
-    console.log('');
-    console.log(`${I}${colors.red}${symbols.cross}${colors.reset} Not a git repository: ${resolvedDir}`);
-    console.log('');
-    return;
+  // Validate git repo. The home dir is nobody's repo and needs none.
+  if (scope === 'project') {
+    try {
+      await access(path.join(resolvedDir, '.git'));
+    } catch {
+      console.log('');
+      console.log(`${I}${colors.red}${symbols.cross}${colors.reset} Not a git repository: ${resolvedDir}`);
+      console.log('');
+      return;
+    }
   }
 
   // Check if .claude/ exists
@@ -59,7 +77,12 @@ export async function install(targetDir: string, yes = false, only: string[] = [
   // plus what is already installed, and a part whose target holds a file of the project's own is
   // left alone. Either way nothing is asked, so neither confirm below runs.
   const unknown = only.filter((n) => !states.some((s) => s.part.name === n));
-  if (unknown.length > 0) throw new Refusal(`no such part: ${unknown.join(', ')}`);
+  if (unknown.length > 0) {
+    // A name the other scope owns is a wrong-command mistake, not a typo: say which command it is.
+    const elsewhere = (await loadParts()).find((p) => unknown.includes(p.name));
+    if (elsewhere) throw new Refusal(`${elsewhere.name} is a ${elsewhere.scope} part — factory install ${elsewhere.scope === 'global' ? '--global' : '<project>'}`);
+    throw new Refusal(`no such part: ${unknown.join(', ')}`);
+  }
   const asked = only.length === 0 && !yes;
 
   const selectedNames = only.length > 0
@@ -115,6 +138,8 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     return;
   }
 
+  if (scope === 'global') await noProjectHolds(filteredNames);
+
   console.log('');
   console.log(`${I}Installing ${pluralize(filteredNames.length, 'part')}...`);
   console.log('');
@@ -140,7 +165,7 @@ export async function install(targetDir: string, yes = false, only: string[] = [
 
   for (const name of filteredNames) {
     const ps = states.find((s) => s.part.name === name)!;
-    const part = await resolvePart(ps.part);
+    const part = await resolvePart(ps.part, resolvedDir);
     const wasInstalled = ps.status === 'installed' || ps.status === 'modified';
     const previous = manifest.parts[name];
 
@@ -185,7 +210,7 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     printPartResult(part, { suffix });
 
     if (part.hooks) {
-      printHookInfo();
+      printHookInfo(hooksFileName(resolvedDir));
     }
 
     if (snippetAdded) {

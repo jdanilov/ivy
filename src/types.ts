@@ -58,12 +58,17 @@ export interface Recipes {
 
 export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 
+/** Where a part installs: into a project's `.claude/`, or into the user's own `~/.claude/`. */
+export type Scope = 'project' | 'global';
+
 /** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
 export type Settings = Record<string, unknown>;
 
 export interface Part {
   name: string;
   type: PartType;
+  /** `global` parts belong to the user, not a project: no snippet, no recipes, no project root. */
+  scope: Scope;
   description: string;
   default: boolean;        // enabled by default in install menu
   files: PartFile[];

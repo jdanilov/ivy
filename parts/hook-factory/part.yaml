@@ -8,11 +8,11 @@ files:
     target: .claude/sounds/sonar-deep.mp3
 hooks:
   - events: [SessionStart, UserPromptSubmit, Stop, SubagentStart, SubagentStop, Notification, PreCompact]
-    command: SOUND="${sound}" QUIET="${quiet}" bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}
+    command: SOUND="${sound}" QUIET="${quiet}" bun ${root}/.claude/scripts/hook-factory.ts ${event}
   # A sub-agent's decisions reach the Orchestrator the moment its Agent tool returns.
   - event: PostToolUse
     matcher: Agent
-    command: SOUND="${sound}" QUIET="${quiet}" bun $CLAUDE_PROJECT_DIR/.claude/scripts/hook-factory.ts ${event}
+    command: SOUND="${sound}" QUIET="${quiet}" bun ${root}/.claude/scripts/hook-factory.ts ${event}
 vars:
   sound: "$CLAUDE_PROJECT_DIR/.claude/sounds/sonar-deep.mp3"
   quiet: "30"

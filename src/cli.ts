@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { pickCommand, pickProject, CancelError } from './ui/prompts.js';
-import { loadProjects, saveProject } from './core/projects.js';
+import { home, loadProjects, saveProject } from './core/projects.js';
 import { loadParts } from './core/registry.js';
 import { parseArgs, str, type Flags } from './core/args.js';
 import { Refusal } from './core/mission.js';
@@ -84,8 +84,10 @@ async function main() {
   setNameCol(await loadParts());
 
   const cmd = first === 'menu' ? await pickCommand() : first;
-  const targetDir = positionals[1] ?? await pickProject(await loadProjects());
-  await saveProject(targetDir);
+  // `--global` stands where the project path would: the home dir, and never in the projects list.
+  const global = flags.global === true;
+  const targetDir = global ? home() : (positionals[1] ?? await pickProject(await loadProjects()));
+  if (!global) await saveProject(targetDir);
 
   await dispatch(cmd, targetDir, flags);
 }

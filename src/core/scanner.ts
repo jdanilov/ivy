@@ -2,6 +2,7 @@ import path from 'node:path';
 import { lstat } from 'node:fs/promises';
 import type { PartState, PartStatus } from '../types.js';
 import { loadParts, FACTORY_ROOT } from './registry.js';
+import { scopeOf } from './projects.js';
 import { readManifest } from './manifest.js';
 
 export async function hashFile(filePath: string): Promise<string> {
@@ -17,7 +18,8 @@ export async function hashFile(filePath: string): Promise<string> {
 
 export async function scanProject(targetDir: string): Promise<PartState[]> {
   const manifest = await readManifest(targetDir);
-  const parts = await loadParts();
+  // A project never sees a global part and the home dir never sees a project one.
+  const parts = (await loadParts()).filter((p) => p.scope === scopeOf(targetDir));
   const skipped = new Set(manifest?.skipped ?? []);
   const states: PartState[] = [];
 

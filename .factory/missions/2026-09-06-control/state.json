@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "prototype",
+  "step": "implement",
   "round": 0,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/control",
@@ -30,11 +30,29 @@
       "endedAt": "2026-09-05T23:12:02.255Z"
     },
     "prototype": {
-      "status": "running",
-      "startedAt": "2026-09-05T23:12:37.238Z"
+      "status": "done",
+      "startedAt": "2026-09-05T23:12:37.238Z",
+      "endedAt": "2026-09-06T11:27:24.921Z"
     },
     "research": {
-      "status": "pending"
+      "status": "skipped",
+      "startedAt": "2026-09-06T11:36:19.455Z",
+      "endedAt": "2026-09-06T11:36:19.510Z",
+      "reason": "design settled in ai-factory and four prototype rounds; transcript format checked in session"
+    },
+    "sounds": {
+      "status": "done",
+      "startedAt": "2026-09-06T11:27:33.965Z",
+      "endedAt": "2026-09-06T11:36:19.403Z"
+    },
+    "spec": {
+      "status": "done",
+      "startedAt": "2026-09-06T11:38:40.756Z",
+      "endedAt": "2026-09-06T11:38:40.809Z"
+    },
+    "implement": {
+      "status": "running",
+      "startedAt": "2026-09-06T11:38:40.869Z"
     }
   },
   "deviations": [
@@ -47,8 +65,23 @@
       "at": "2026-09-05T23:12:37.175Z",
       "what": "current step moved from research back to prototype",
       "reason": "step add --after a done step landed the new step behind the pointer; the CLI should place the pointer on it"
+    },
+    {
+      "at": "2026-09-06T11:27:24.974Z",
+      "what": "added step sounds after prototype",
+      "reason": "sound on parent-session wait, agreed in review; small, ships in hook-factory before the wiring spec"
+    },
+    {
+      "at": "2026-09-06T11:27:33.910Z",
+      "what": "current step moved from research back to sounds",
+      "reason": "same step add pointer gap as before, roadmapped"
+    },
+    {
+      "at": "2026-09-06T11:36:19.510Z",
+      "what": "skipped step research",
+      "reason": "design settled in ai-factory and four prototype rounds; transcript format checked in session"
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-05T23:12:37.238Z"
+  "updated": "2026-09-06T11:38:40.869Z"
 }

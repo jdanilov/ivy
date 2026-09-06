@@ -3,6 +3,7 @@ steps:
   - grill
   - intent: { gate: human }
   - prototype: { role: worker }
+  - sounds: { role: worker }
   - research: { role: investigator }
   - spec
   - implement: { role: worker }

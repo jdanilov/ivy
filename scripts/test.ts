@@ -28,6 +28,7 @@ const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
 const exists = (p: string): Promise<boolean> => Bun.file(p).exists();
+const alive = (pid: number): boolean => { try { return process.kill(pid, 0); } catch { return false; } };
 const branchGone = async (dir: string, b: string): Promise<boolean> => (await git(dir, 'branch', '--list', b)) === '';
 
 /** The commands talk to a human; a case only cares about what they left behind. */
@@ -93,6 +94,202 @@ await check('resolvePart expands the hooks shorthand', async () => {
   const hooks = (await resolvePart(part)).hooks ?? [];
   ok(hooks.length === 7, `expected 7 hooks, got ${hooks.length}`);
   ok(hooks.every((h) => h.command.endsWith(` ${h.event}`)), 'a hook command does not name its event');
+});
+
+await check('the hook rings only when the parent session waits on the human', async () => {
+  const dir = path.join(TMP, 'ring');
+  const home = path.join(dir, 'home');
+  const bin = path.join(dir, 'bin');
+  const log = path.join(dir, 'afplay.log');
+  const events = path.join(home, '.factory', 'events', 'S.jsonl');
+  await mkdir(path.dirname(events), { recursive: true });
+  await mkdir(bin, { recursive: true });
+  // A fake player first on PATH: the case proves the decision, never a sound on this machine.
+  await writeFile(path.join(bin, 'afplay'), `#!/bin/sh\necho "$@" >> ${log}\n`, { mode: 0o755 });
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const sound = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'sounds', 'sonar-deep.mp3');
+  const prompted = (secondsAgo: number): Promise<void> =>
+    writeFile(events, `${JSON.stringify({ at: new Date(Date.now() - secondsAgo * 1000).toISOString(), event: 'UserPromptSubmit', session: 'S' })}\n`);
+
+  /** Fires one hook and returns how many times the player has been called in all. */
+  const fire = async (event: string, input: object, SOUND = sound): Promise<number> => {
+    const proc = Bun.spawn(['bun', hook, event], {
+      cwd: dir,
+      env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, SOUND, QUIET: '30' },
+      stdin: new TextEncoder().encode(JSON.stringify({ session_id: 'S', cwd: dir, ...input })),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+    await Bun.sleep(300); // the player is detached, so its line lands after the hook is gone
+    return (await Bun.file(log).text().catch(() => '')).split('\n').filter((l) => l !== '').length;
+  };
+
+  await prompted(40);
+  ok((await fire('Stop', {})) === 1, 'a long turn ending did not ring');
+  await prompted(5);
+  ok((await fire('Stop', {})) === 1, 'a short turn rang');
+  ok((await fire('Notification', { notification_type: 'permission_prompt' })) === 2, 'a permission prompt did not ring');
+  ok((await fire('SubagentStop', { agent_type: 'Worker' })) === 2, 'a sub-agent finishing rang');
+  await prompted(40);
+  ok((await fire('Stop', {}, 'off')) === 2, 'SOUND=off rang');
+});
+
+await check('a handoff never overwrites the one before it', async () => {
+  const dir = path.join(TMP, 'handoff');
+  const home = path.join(dir, 'home');
+  const mission = path.join(dir, 'mission');
+  const handoffs = path.join(mission, 'handoffs');
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  await mkdir(mission, { recursive: true });
+  await writeFile(path.join(mission, 'state.json'), JSON.stringify({ name: 'h', session: 'S', step: 'implement' }));
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const save = async (message: string): Promise<void> => {
+    const proc = Bun.spawn(['bun', hook, 'SubagentStop'], {
+      cwd: dir,
+      env: { PATH: process.env.PATH, HOME: home, SOUND: 'off', FACTORY_MISSION: mission },
+      stdin: new TextEncoder().encode(JSON.stringify({
+        session_id: 'S', cwd: dir, agent_type: 'Worker',
+        agent_transcript_path: path.join(dir, 'agent.jsonl'), last_assistant_message: message,
+      })),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+  };
+  const body = (worker: number, lines: number): string =>
+    Array.from({ length: lines }, (_, i) => `W${worker} line ${i}`).join('\n');
+  const head = (file: string): Promise<string> => Bun.file(path.join(handoffs, file)).text().catch(() => '');
+
+  // The longest first: a rule that compares lengths would trade it for either of the next two.
+  await save(body(1, 12));
+  await save(body(2, 6));
+  await save(body(3, 20));
+  ok((await head('implement-Worker.md')).startsWith('W1 '), 'the first handoff was overwritten');
+  ok((await head('implement-Worker-2.md')).startsWith('W2 '), 'the second did not take -2');
+  ok((await head('implement-Worker-3.md')).startsWith('W3 '), 'the third did not take -3');
+  await save('Step: implement\nDone: nothing');
+  ok(!(await exists(path.join(handoffs, 'implement-Worker-4.md'))), 'a sign-off under five lines was saved');
+});
+
+await check('the hook holds the machine awake only as the caffeinate mode says', async () => {
+  const dir = path.join(TMP, 'caff');
+  const home = path.join(dir, 'home');
+  const bin = path.join(dir, 'bin');
+  const mission = path.join(dir, 'mission');
+  const pid = path.join(home, '.factory', 'caffeinate', 'S.pid');
+  await mkdir(bin, { recursive: true });
+  await mkdir(mission, { recursive: true });
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  // A fake holder first on PATH: the case proves the decision, never this machine's sleep.
+  await writeFile(path.join(bin, 'caffeinate'), '#!/bin/sh\nexec sleep 5\n', { mode: 0o755 });
+  await writeFile(path.join(mission, 'state.json'), JSON.stringify({ name: 'c', session: 'S', step: 'implement' }));
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const fire = async (event: string): Promise<boolean> => {
+    const proc = Bun.spawn(['bun', hook, event], {
+      cwd: dir,
+      env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, SOUND: 'off', FACTORY_MISSION: mission },
+      stdin: new TextEncoder().encode(JSON.stringify({ session_id: 'S', cwd: dir })),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+    return exists(pid);
+  };
+  const mode = (value: string): Promise<void> => writeFile(path.join(home, '.factory', 'config.yaml'), `caffeinate: "${value}"\n`);
+
+  await mode('off');
+  ok(!(await fire('SessionStart')) && !(await fire('UserPromptSubmit')), 'off started one anyway');
+  await mode('on');
+  ok(await fire('SessionStart'), 'on did not start at the session start');
+  ok(await fire('Stop'), 'on let go at the end of a turn');
+  await rm(pid, { force: true });
+  await mode('auto');
+  ok(!(await fire('SessionStart')), 'auto started before the first prompt');
+  ok(await fire('UserPromptSubmit'), 'auto did not start on a prompt');
+  ok(!(await fire('Stop')), 'auto held on past the turn');
+});
+
+await check('c writes the mode, keeps vars and holds only its own pid', async () => {
+  const dir = path.join(TMP, 'caffc');
+  const home = path.join(dir, 'home');
+  const bin = path.join(dir, 'bin');
+  const pids = path.join(home, '.factory', 'caffeinate');
+  await mkdir(bin, { recursive: true });
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  await writeFile(path.join(bin, 'caffeinate'), '#!/bin/sh\nexec sleep 60\n', { mode: 0o755 });
+  await writeFile(path.join(home, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
+  // A pid the hook would have left behind: `auto` leaves it alone, `off` takes it down too.
+  const other = Bun.spawn(['sleep', '60']);
+  await Bun.write(path.join(pids, 'S.pid'), String(other.pid));
+
+  // os.homedir() is fixed when the process starts, so a scratch ~/.factory only reaches a child.
+  const script = path.join(dir, 'c.ts');
+  const actions = path.join(import.meta.dir, '..', 'src', 'tui', 'actions.ts');
+  await writeFile(script, `const { setCaffeinate } = await import('${actions}');\nawait setCaffeinate(process.argv[2] as never);\n`);
+  const press = async (mode: string): Promise<void> => {
+    const proc = Bun.spawn(['bun', script, mode], {
+      env: { HOME: home, PATH: `${bin}:${process.env.PATH}` }, stdout: 'ignore', stderr: 'ignore',
+    });
+    ok((await proc.exited) === 0, `c ${mode} exited non-zero`);
+  };
+  const gone = (proc: { exited: Promise<unknown> }): Promise<boolean> =>
+    Promise.race([proc.exited.then(() => true), Bun.sleep(1500).then(() => false)]);
+
+  await press('on');
+  const config = await Bun.file(path.join(home, '.factory', 'config.yaml')).text();
+  ok(config.includes('caffeinate: "on"'), `the mode did not land, got ${JSON.stringify(config)}`);
+  ok(config.includes('codegraph'), 'the rewrite lost vars');
+  const held = Number(await Bun.file(path.join(pids, 'control.pid')).text());
+  ok(held > 0 && alive(held), 'no live caffeinate behind control.pid');
+
+  await press('auto');
+  ok(!(await exists(path.join(pids, 'control.pid'))) && !alive(held), 'auto left control.pid running');
+  ok(alive(other.pid), 'auto killed a pid that was not its own');
+
+  await press('off');
+  ok(await gone(other), 'off left a session pid running');
+  ok(!(await exists(path.join(pids, 'S.pid'))), 'off left a pid file behind');
+});
+
+await check('a new inbox key is news, the first snapshot and an ageing item are not', async () => {
+  const { arrivals, inboxKey } = await import('../src/tui/notify.js');
+  const item = (origin: string, at: number) => ({ kind: 'gate' as const, project: 'p', origin, label: 'gate g', at });
+  const first = [item('a', 1)];
+  ok(inboxKey(item('a', 1)) === 'p/a/gate', `key is project/origin/kind, got ${inboxKey(item('a', 1))}`);
+  ok(arrivals(null, first).length === 0, 'the first snapshot announced its own backlog');
+  ok(arrivals(first, [item('a', 9)]).length === 0, 'an item that only aged read as new');
+  ok(arrivals(first, [item('a', 9), item('b', 9)]).map((i) => i.origin).join() === 'b', 'the new item was missed');
+});
+
+await check('a step is coloured by what kind of work it is', async () => {
+  const { stepKind } = await import('../src/tui/model.js');
+  const { loadWorkflow } = await import('../src/core/workflow.js');
+  const story = await loadWorkflow('story', TMP);
+  // The story workflow names all four kinds; `early` is what the live mapping computes per step.
+  const work = story.steps.findIndex((step) => step.role === 'worker');
+  const kinds = story.steps.map((step, i) => `${step.name}:${stepKind(step, i < work)}`);
+  const want = 'grill:human,intent:human,research:agent,spec:technical,implement:agent,'
+    + 'accept:gatekeeper,condense:technical,merge:technical';
+  ok(kinds.join() === want, `story reads ${kinds.join()}`);
+  ok(stepKind({ name: 'verify' }) === 'gatekeeper' && stepKind({ name: 'validate' }) === 'gatekeeper',
+    'a parallel gatekeeper row is not gatekeeping');
+});
+
+await check('the transcript tail parses each line once', async () => {
+  const { readTranscript } = await import('../src/tui/transcript.js');
+  const file = path.join(TMP, 'tail.jsonl');
+  const row = (n: number): string => `${JSON.stringify({ type: 'assistant', timestamp: new Date(1e12 + n * 1000).toISOString(),
+    message: { id: `m${n}`, usage: { output_tokens: 1 }, content: [{ type: 'tool_use', name: 'Bash', input: { command: `cmd ${n}` } }] } })}\n`;
+  await writeFile(file, row(1) + row(2));
+  ok((await readTranscript(file, 's', TMP)).activity.length === 2, 'two rows on the first read');
+  await writeFile(file, row(3), { flag: 'a' });
+  const tail = await readTranscript(file, 's', TMP);
+  ok(tail.activity.map((a) => a.text).join() === 'cmd 1,cmd 2,cmd 3', `each line once, got ${tail.activity.map((a) => a.text).join()}`);
+  ok(tail.offset === Bun.file(file).size && tail.usage.length === 3, 'offset and usage follow the file');
 });
 
 await check('writeSnippet and removeSnippet round trip', async () => {

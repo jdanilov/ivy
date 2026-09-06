@@ -20,11 +20,15 @@ in a manifest.
 
 ```
 src/           CLI source (entry: src/cli.ts)
-├── core/      Business logic — registry, scanner, manifest, linker, env, projects, config,
-│              recipes, args, workflow (YAML load + transitions), mission (folder, state,
-│              claim, branch), spawn (preset, Warp tab config, claude command)
+├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env,
+│              projects, config (vars + caffeinate), recipes, args, workflow (YAML load +
+│              transitions), mission (folder, state, claim, branch), spawn (preset, Warp tab
+│              config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
-├── commands/  install, uninstall, status, update, mission, step, gate, handoff
+├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
+│              activity, tokens), watch (fs.watch + poll), screen (render + keys), actions (what
+│              a key writes, through the CLI's own functions), notify, frames, format, theme
+├── commands/  install, uninstall, status, update, mission, step, gate, handoff, control
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
@@ -34,8 +38,9 @@ scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, un
                recipe reads back under its dotted path
 workflows/     story, fix, chore, research, quick — the shipped workflow YAML
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
-~/.factory/    Home dir: projects list, config.yaml (var overrides), events/<session>.jsonl,
-               caffeinate/<session>.pid
+~/.factory/    Home dir: projects list, config.yaml (var overrides plus `caffeinate: auto|on|off`,
+               which the hook reads per event and Mission Control's `c` rewrites),
+               events/<session>.jsonl, caffeinate/<session>.pid and control.pid
 ~/.warp/tab_configs/factory-<mission>.toml   written by `mission open`, opened by URI
 ```
 
@@ -90,7 +95,9 @@ sit outside `.claude`.
 lists: `~/.factory/config.yaml` `vars.<name>` wins over the part's `vars.<name>`, and nothing defining
 it is a refusal. A value may carry arguments; in `mcp.config.command` the first word is the command and
 the rest leads the args. Substitution happens as the manifest entry is built, so the manifest, `.mcp.json`
-and the hooks hold resolved strings and `update` re-points a project after a config edit.
+and the hooks hold resolved strings and `update` re-points a project after a config edit. The everyday
+override is hook-factory's `sound` (`off` silences it, a bare name is a macOS system sound) and
+`quiet`, the turn length in seconds below which the end of a turn does not ring.
 
 The manifest records where each file came from under the Factory root, so uninstall knows a link is
 ours without reading it; a manifest written before that falls back to `readlink`. It also records each
@@ -142,7 +149,8 @@ factory handoff save <step>            # reads the handoff from stdin
   event the new session emits already finds a mission bound to it.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
 - A `SubagentStop` handoff lands in `handoffs/<step>[-<agent>][-r<round>].md`: a message under five
-  lines is not saved, and a longer file is never traded for a shorter one, that gets a `-2` sibling.
+  lines is not saved, and an existing handoff is never overwritten, whatever the lengths — the second
+  save of one name takes `-2`, the third `-3`.
 - A claimed mission whose `state.json` has `session: null` adopts the first session to send a
   `SessionStart` or `UserPromptSubmit`; a session already recorded is never overwritten.
 - `mission new` and the promotion in `mission open` add `.factory/claim` to the project `.gitignore`

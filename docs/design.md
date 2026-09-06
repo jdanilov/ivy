@@ -1,6 +1,6 @@
 # Design language
 
-The look for `factory` CLI output and the future OpenTUI Mission Control. Extracted from seven Droid
+The look for `factory` CLI output and for Mission Control, the OpenTUI screen. Extracted from seven Droid
 Mission Control screenshots in this mission's `screenshots/` folder, pixel-sampled for color. Applies
 to both surfaces so they read as one product. Terse-visual vocabulary: `● entity ○ pending ≋ store
 ◇ decision → flow ← return ⇢ async ↻ loop ✓ done ✗ failed ⊘ blocked ◈ warning ± change`.
@@ -50,6 +50,71 @@ undershoots these values on screen but the hierarchy holds.
   after the rule. No blank lines between consecutive log rows. CLI output keeps the 3-space `I`
   indent from `src/ui/theme.ts` to match the `@clack/prompts` gutter; the TUI has no gutter to match
   so its left margin is one cell.
+
+## Mission Control
+
+The screen the palette above was extracted for. One grid, the right pane follows the selection, and `?`
+replaces it with the help panel. Sizes are what `render()` computes, not what a window manager decides.
+
+```
+row 0        blank
+row 1        ⌬ FACTORY  <project or path>                        caffeinate AUTO [ON]
+row 2        ───────────────────────────────────────────────────────────────────────
+row 3        status: mission bar or project summary, or the toast that replaces it
+row 4        ───────────────────────────────────────────────────────────────────────
+             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | PARTS (60%)
+             inbox, projects,        │  a list above a detail block; the detail of
+             missions, sessions      │  a gate ends in the answer row
+             ───────────────────────────────────────────────────────────────────────
+             ACTIVITY  <subject>     one third of the body, all of it on F
+last row     ───────────────────────────────────────────────────────────────────────
+             ↑↓ Select  ↵ Open  O Tab  X Kill  C Caffeinate  Z Closed  F Activity  ? Help  Q Quit
+```
+
+- Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
+  Two cells of padding on the left pane keep its right-aligned tokens off the divider.
+- Activity keeps a third of the body, never fewer than 5 rows; `F` gives it all of it.
+- Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
+  disappears on a terminal background lighter than the screenshots'.
+- The key bar sits on the last row and lists the focused pane's keys; `?` is the first pair
+  dropped when the terminal is too narrow, because the panel it opens lists everything.
+- No box carries a background: every cell the screen does not colour keeps the terminal's own.
+  The one exception is the inverted selected row; the help panel paints nothing either.
+
+### Step colours by meaning
+
+A step's name is coloured by what kind of work it is, its glyph by where it is in its life, so one
+row carries both without a legend. Kind comes from the workflow: role `worker` or `investigator`
+is agent work, `verify`, `validate` and `accept` are gatekeeping, `grill` and `intent` are the
+human's, everything left is technical.
+
+| Kind        | Colour    | Steps                                   |
+|-------------|-----------|------------------------------------------|
+| human       | `#a8a968` | grill, intent — the gates the human owns |
+| gatekeeper  | `#d7af5f` | accept, verify, validate                 |
+| agent       | `#6b8fd9` | implement, research, any worker step     |
+| technical   | `#6e6e6e` | spec, condense, merge                    |
+
+Agent prompt colours follow the same reading: Worker blue, Investigator cyan, Verifier and
+Validator yellow, Summarizer magenta because Claude Code has no grey.
+
+### Keys
+
+| Key      | Pane            | Does                                                         |
+|----------|------------------|---------------------------------------------------------------|
+| `↑↓`     | any              | move the selection                                            |
+| `→` `↵`  | left             | enter the right pane; in Messages `←→` pick the answer         |
+| `←` `esc`| right            | back to the left pane                                         |
+| `↵`      | Messages         | record the answer; amend and reject take a one-line note first |
+| `Space` `↵` `Y` | Parts     | toggle a part, apply the set, confirm                          |
+| `O`      | mission row      | open the mission's Warp tab, or name the tab that is live      |
+| `X`      | mission, session | SIGTERM the session's process, SIGKILL on a second press       |
+| `T`      | mission row      | attention full → light → unattended                            |
+| `C`      | any              | caffeinate auto → on → off                                     |
+| `Z`      | left             | hide closed missions                                           |
+| `F`      | any              | Activity at full height; header and status bar hidden          |
+| `↑↓`     | full activity    | scroll the log; `↵`, `F` or `esc` restore the columns          |
+| `?` `Q`  | any              | help panel, quit                                               |
 
 ## Glyphs
 

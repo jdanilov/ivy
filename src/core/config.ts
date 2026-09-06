@@ -1,10 +1,14 @@
 import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { FACTORY_HOME } from './projects.js';
 
-/** `~/.factory/config.yaml`: machine-level facts, today only var overrides. */
+/** `~/.factory/config.yaml`: machine-level facts — var overrides and the caffeinate mode. */
 export interface FactoryConfig {
   vars?: Record<string, string>;
 }
+
+/** AUTO holds the machine awake while a session is mid-turn, ON always, OFF never. */
+export type Caffeinate = 'auto' | 'on' | 'off';
 
 const CONFIG_PATH = path.join(FACTORY_HOME, 'config.yaml');
 
@@ -25,4 +29,23 @@ export async function loadConfig(): Promise<FactoryConfig> {
 
   const entries = Object.entries(vars).filter(([, v]) => typeof v === 'string') as [string, string][];
   return (cache = { vars: Object.fromEntries(entries) });
+}
+
+/** Read from the file every time, never the cache: Mission Control rewrites it while it runs. */
+export async function readCaffeinate(): Promise<Caffeinate> {
+  const raw = await Bun.file(CONFIG_PATH).text().catch(() => '');
+  const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
+  return value === 'on' || value === 'off' ? value : 'auto';
+}
+
+/**
+ * One line rewritten in place, not the file re-serialised: `vars` and anything else a human put
+ * here outlive the change. Quoted, because YAML reads a bare `on` as true.
+ */
+export async function writeCaffeinate(mode: Caffeinate): Promise<void> {
+  const text = await Bun.file(CONFIG_PATH).text().catch(() => '');
+  const line = `caffeinate: "${mode}"`;
+  const next = /^caffeinate:.*$/m.test(text) ? text.replace(/^caffeinate:.*$/m, line) : `${line}\n${text}`;
+  await mkdir(FACTORY_HOME, { recursive: true });
+  await Bun.write(CONFIG_PATH, next.endsWith('\n') ? next : `${next}\n`);
 }

@@ -1,0 +1,42 @@
+                                                                                                                                            
+ ⌬ FACTORY  ~/dev/igs                                                                                                  caffeinate AUTO [ON] 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ 1 waiting                                                                                                                                  
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ PROJECTS                                               │ SESSION  quick                                                                    
+ ─────────────────────────────────────────────────────  │ ───────────────────────────────────────────────────────────────────────────────── 
+    Inbox (3)                                           │ session #b3f21c07 · idle 12m                                                      
+                                                        │ cwd ~/dev/igs                                                                     
+    ivy                                                 │ last Notification  waiting on the human  12m ago                                  
+     ● refit  story  implement ↻2  14m  4.5M  +412 −96  │ ───────────────────────────────────────────────────────────────────────────────── 
+     ○ memory  stub                                     │ asks                                                                              
+                                                        │ Two recall strategies fit here, embeddings or a grep index. Which do you want for 
+    igs                                                 │ v1?                                                                               
+     ⊘ auth  fix  merge ↻2       2h 4m  1.2M  +120 −34  │                                                                                   
+ ›   ○ quick  #b3f21c07  idle 12m                       │                                                                                   
+                                                        │                                                                                   
+    cut                                                 │                                                                                   
+     ✓ intro  closed 2d ago                             │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ACTIVITY  quick                                                                                                                          5 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ 16:06:45  Text   Looking at how recall should be indexed before writing anything.                                                          
+ 16:10:45  Read   docs/terminology.md                                                                                                       
+ 16:14:45  Bash   rg -n "Recall" docs                                                                                                       
+ 16:17:45  Text   Embeddings need a model on the box; a grep index is instant and dumb.                                                     
+ 16:20:45  Ask    Which recall strategy for v1, embeddings or a grep index?                                                                 
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ←esc Back  C Caffeinate  F Activity  ? Help  Q Quit                                                                                        

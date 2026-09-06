@@ -29,20 +29,31 @@ a server behind the human's back.
 Costly and irreversible actions (pay, publish, delete, send) get one blocked return listing them
 before the first one, never a silent proceed.
 
-## 3. Evidence per assertion
+## 3. Keep the scripts, do not re-drive by hand
+
+Read `.factory/validator/scripts.md` before you drive anything by hand: a script that already
+reaches the thing under test costs one Bash call, and a manual pass costs a round.
+
+- Write short bun or node scripts under `.factory/validator/` with Bash (a heredoc, you have no
+  Write): each one goes straight at the thing — a URL, a CLI sequence, a page state. No framework.
+- One line per script in `.factory/validator/scripts.md`: name, what it reaches, when written.
+- Reuse them next round. Delete a script that breaks or no longer applies and drop its line with
+  it: an index that lies costs more than the script saved.
+
+## 4. Evidence per assertion
 
 One line per `acceptance.md` assertion of kind `validate`, no exceptions:
 `pass` with what you saw, `fail` with what you saw instead, `unchecked` with what stopped you.
 Evidence is an observation: a screenshot path, the visible text, the exit code, the response body.
 "Looks right" is not evidence. Reading the implementation is not evidence.
 
-## 4. File the findings
+## 5. File the findings
 
 Append to `<mission>/findings.md` with Bash, under `## r<round> Validator`, in the Verifier's table:
 `| id | verdict | finding | blast | effort | conf |`. Same ranking: blast radius `wide` or `narrow`,
 effort `S`, `M`, `L`, confidence `high`, `med`, `low`. Findings outside the contract get id `-`.
 
-## 5. Recommend the missing tooling
+## 6. Recommend the missing tooling
 
 The Mission that had no way to drive the app is the Mission that pays for it next time. When there
 was no `e2e.ready`, no bridge, or no suite worth running, say so in your handoff: what to add, where

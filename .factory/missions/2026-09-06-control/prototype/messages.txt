@@ -1,0 +1,42 @@
+                                                                                                                                            
+ ⌬ FACTORY  all projects                                                                                               caffeinate AUTO [ON] 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ 1 running · 1 waiting · 1 stub · 1 closed                                                                                                  
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ PROJECTS                                               │ MESSAGES (3)                                                                      
+ ─────────────────────────────────────────────────────  │ ───────────────────────────────────────────────────────────────────────────────── 
+ ›  Inbox (3)                                           │    ⊘ igs/auth  triage r2                                                   1h ago 
+                                                        │    ⊘ igs/quick  asks                                                       8m ago 
+    ivy                                                 │    ⊘ igs/auth  gate merge                                                  3m ago 
+     ● refit  story  implement ↻2  14m  4.5M  +412 −96  │ ───────────────────────────────────────────────────────────────────────────────── 
+     ○ memory  stub                                     │ triage r2  3 fix · 2 skip                                                         
+                                                        │ fix   A3 session cookie survives logout — Worker, one round                       
+    igs                                                 │ fix   A7 refresh token not rotated on reuse                                       
+     ⊘ auth  fix  merge ↻2       2h 4m  1.2M  +120 −34  │ fix   A9 rate limit counts by IP, not by account                                  
+     ○ quick  #b3f21c07  idle 12m                       │ skip  A4 password rules read oddly — copy, not behaviour                          
+                                                        │ skip  A11 device list paging — out of the contract                                
+    cut                                                 │                                                                                   
+     ✓ intro  closed 2d ago                             │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │  accept    amend    reject                                                        
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ACTIVITY  all projects                                                                                                                  57 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ 16:25:45  auth     Text   The contract is green. Opening the merge gate on retro.md.                                                       
+ 16:26:33  refit    Bash   bun src/cli.ts step done implement                                                                               
+ 16:27:21  refit    Agent  Validator drive the screen at three sizes                                                                        
+ 16:28:39  refit    Bash   bun scripts/tui-snapshot.ts                                                                                      
+ 16:29:45  auth     Ask    Merge auth into main?                                                                                            
+ 16:29:51  refit    Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                        
+ 16:31:09  refit    Text   Frames read right at 140x42, the key bar sits on the last row.                                                   
+ 16:32:21  refit    Ask    Round 2 accepted?                                                                                                
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ↑↓ Select  ←→ Answer  ↵ Confirm  esc Back  F Activity  ? Help  Q Quit                                                                      

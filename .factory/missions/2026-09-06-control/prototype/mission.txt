@@ -1,0 +1,42 @@
+                                                                                                                                            
+ ⌬ FACTORY  /opt/ed/ivy                                                                                                caffeinate AUTO [ON] 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ● RUNNING  █████████████████████████████████████████  3/10                attention light   TIME 14m · In 310.2K · Cached 4.1M · Out 48.0K 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ PROJECTS                                               │ MISSION  refit                                                               3/10 
+ ─────────────────────────────────────────────────────  │ ───────────────────────────────────────────────────────────────────────────────── 
+    Inbox (3)                                           │  ✓ grill                                                                       3m 
+                                                        │  ✓ intent                                                                     12m 
+    ivy                                                 │  · research                                                               skipped 
+     ● refit  story  implement ↻2  14m  4.5M  +412 −96  │  ✓ spec                                                                        8m 
+     ○ memory  stub                                     │  ● implement                                                                   6m 
+                                                        │  ○ accept                                                                 pending 
+    igs                                                 │  ○ verify                                                                 pending 
+     ⊘ auth  fix  merge ↻2       2h 4m  1.2M  +120 −34  │  ○ validate                                                               pending 
+     ○ quick  #b3f21c07  idle 12m                       │  ○ condense                                                               pending 
+                                                        │  ○ merge                                                                  pending 
+    cut                                                 │ ───────────────────────────────────────────────────────────────────────────────── 
+     ✓ intro  closed 2d ago                             │ step implement · role worker · round 2 · attention light                          
+                                                        │ branch mission/refit · wt ../ivy-refit                                            
+                                                        │ session #75cb46e1 · caffeinate on                                                 
+                                                        │ deviations 1                                                                      
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+                                                        │                                                                                   
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ACTIVITY  refit                                                                                                                         40 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ 16:24:21  Ask    Accept round 2 and move on to validate?                                                                                   
+ 16:25:39  Read   .factory/missions/2026-09-06-refit/state.json                                                                             
+ 16:26:33  Bash   bun src/cli.ts step done implement                                                                                        
+ 16:27:21  Agent  Validator drive the screen at three sizes                                                                                 
+ 16:28:39  Bash   bun scripts/tui-snapshot.ts                                                                                               
+ 16:29:51  Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                                 
+ 16:31:09  Text   Frames read right at 140x42, the key bar sits on the last row.                                                            
+ 16:32:21  Ask    Round 2 accepted?                                                                                                         
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ↑↓ Select  ↵ Open  O Tab  X Kill  C Caffeinate  Z Closed  F Activity  ? Help  Q Quit                                                       

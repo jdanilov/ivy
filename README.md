@@ -33,6 +33,9 @@ Everything else acts on the checkout you are standing in and never prompts.
 
 | Command                                        | Purpose                                                                    |
 |------------------------------------------------|----------------------------------------------------------------------------|
+| `factory`                                      | Open Mission Control: every project, mission, session and open gate        |
+| `factory menu`                                 | The interactive picker: a command, then a project                          |
+| `factory --fixture`, `factory --frames <dir>`  | Draw the demo snapshot; write the screen as text and exit, with no terminal |
 | `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
 | `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm     |
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
@@ -54,6 +57,10 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `gate list`                                    | Every open gate across projects                                            |
 | `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
 
+Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` attention, `C`
+caffeinate, `Z` hide closed, `F` activity, `?` help, `Q` quit. Space toggles a part and `Y`
+applies the set.
+
 ## Parts
 
 | Part             | Type    | Model  | Description                                                  |
@@ -72,7 +79,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
 | `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
 | `permissions`    | fixture | —      | Baseline tool allow list merged into `.claude/settings.json`  |
-| `hook-factory`   | fixture | —      | Reports session events to `~/.factory/events`                 |
+| `hook-factory`   | fixture | —      | Session events to `~/.factory/events`, rings on a human wait  |
 | `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                              |
 | `codegraph`      | mcp     | —      | Code graph MCP plus prompt hook, per project index (opt-in)   |
 

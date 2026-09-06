@@ -41,6 +41,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
 | `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
 | `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |
+| `install\|uninstall\|status\|update --global`  | The same four over `~/.claude/`, on the parts marked `scope: global`       |
 | `mission new <name> [--autonomy L]`            | Create the folder, the `intent` workflow copy, `state.json`, branch, claim |
 | `mission new <name> --stub \| --quick`         | Intent skeleton with no branch, or the one-step `quick` workflow           |
 | `mission shape <preset> [--autonomy L]`        | Append a preset's steps behind `intent`, once, after the intent gate       |
@@ -51,6 +52,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                          |
 | `mission resume [name]`                        | Check the branch back out and print the current step and open gates        |
 | `mission close [name] [--keep-branch]`         | Commit the folder, merge, commit on trunk, clear claim, delete the branch  |
+| `mission archive\|unarchive <name>`            | Git-move a closed mission's folder into `.factory/archive/`, or back       |
 | `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                    |
 | `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                   |
 | `step loop <step>`                             | Record a round and send the mission back to the step's loop target         |
@@ -90,6 +92,10 @@ applies the set.
 
 Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summarizer` with
 `/mission`, `Verifier` with `/verify`, `Validator` with `/validate`, `Commit` with `/commit`.
+
+`/commit`, `/explain`, `/research`, `permissions` and `hook-safe-bash` carry `scope: global`: they
+are the user's, not a project's. `factory install --global` links them into `~/.claude/`, where every
+session on the machine reads them, and no project command ever lists them.
 
 | Type        | Prefix | What it is                                                       |
 |-------------|--------|-------------------------------------------------------------------|

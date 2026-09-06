@@ -8,7 +8,7 @@ Single source of names for the Factory. Agents and humans use these words and no
 |-----------|-----------------------------------------------------------------------------------------------------------|
 | Factory   | This repo and its CLI. Installs parts, tracks missions across projects, runs Mission Control.            |
 | Project   | A git repo registered with the Factory. Owns `.factory/` and an optional `factory.yaml`.                  |
-| Part      | One installable unit: skill, tool, fixture, mcp, plugin, or global. Symlinked, tracked in a manifest.     |
+| Part      | One installable unit, symlinked and tracked in a manifest. Its type is skill, tool, fixture, mcp or plugin; its scope is `project`, installed into the project's `.claude/`, or `global`, installed into `~/.claude/` by `factory install --global` and shared by every session on the machine. |
 | Plugin    | A Claude Code plugin shipped by the Factory. `factory` holds the function hooks and the `ask` tool.       |
 | Preset    | Spawn-time bundle for a session: prompt file, settings overlay, MCP list, model, effort.                  |
 | Workflow  | An ordered YAML list of steps that says how a mission is run. Order is the sequence. A mission starts on `intent` and `mission shape <preset>` appends a preset behind that step. |
@@ -30,6 +30,7 @@ Single source of names for the Factory. Agents and humans use these words and no
 | Session      | One Claude Code process in a Warp tab. Known to the Factory through hook events, spawned or adopted.     |
 | Mission      | One unit of tracked work. Folder `.factory/missions/<YYYY-MM-DD-name>/` in the main checkout, branch `mission/<name>`. One workflow, one session. |
 | Stub         | A mission with an intent and no branch: folder, workflow copy, `status: stub`, no claim. `mission open` promotes it. |
+| Archive      | `.factory/archive/<dir>`, where `mission archive` git-moves a closed mission's folder so the history follows it. Only `mission list --all` reads it; `mission unarchive` puts the folder back. |
 | Orchestrator | The interactive Fable session bound to a mission. Plans, delegates, asks, triages, records steps, amends the workflow. Never implements. Never merges by hand. |
 | Worker       | Opus sub-agent that implements one step with clean context. Serial, one at a time per mission.           |
 | Gatekeeper   | Verifier or Validator. Checks work it did not produce against `acceptance.md`. Never edits code.        |

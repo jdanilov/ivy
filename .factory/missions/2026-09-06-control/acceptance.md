@@ -47,3 +47,11 @@ the fixture. Every id ends pass, fail or unchecked in `findings.md`.
 - A-DOC-1 | verify | `docs/design.md` carries the pane grid, the three semantic step colours, the `#3a3a3a` rule and the key bar; `docs/terminology.md` has rows Mission Control, Inbox, Activity, Caffeinate that match the screen | read | W2
 - A-DOC-2 | verify | README command table has `factory` and `factory menu`; AGENTS.md architecture block lists `src/tui/` and the `config.yaml` sentence names `caffeinate`; `docs/roadmap.md` no longer lists the Mission Control or tokens lines | read | W2
 - A-DOC-3 | verify | `src/tui/` plus `src/commands/control.ts` under 1700 lines; `bun x tsc --noEmit` clean; `bun scripts/test.ts` and `bash scripts/e2e.sh` exit 0 | run | W2
+
+## Screen and prompts
+
+- A-UI-1 | validate | MISSION steps colour by kind: grill and intent green, accept, verify and validate amber, implement and research blue, spec, condense and merge dim; the glyph keeps the lifecycle colour | `--frames` with span capture on a story mission | W3
+- A-UI-2 | validate | `?` replaces the right pane at full height with KEYS groups, a rule, HOW FACTORY WORKS under twelve lines ending in the next command; `?` and `esc` close it | `--frames` help frame, key script | W3
+- A-UI-3 | validate | Full activity hides header and status bar, `↑↓` scroll it, `↵`, `f` and `esc` restore the columns | key script under the test renderer | W3
+- A-UI-4 | verify | Each open mission row carries `+N −M` from `git diff --shortstat <trunk>...<branch>` in its checkout, refreshed on the poll and never awaited by the render | scratch mission with a committed change, read `live.ts` | W3
+- A-VAL-1 | verify | Validator.md instructs writing, indexing in `.factory/validator/scripts.md`, reusing and pruning short scripts under `.factory/validator/`; file under 80 lines; the two colour rows in agent prompts match the spec | read | W3

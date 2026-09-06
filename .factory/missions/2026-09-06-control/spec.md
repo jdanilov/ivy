@@ -121,3 +121,41 @@ Mission Control lines and the tokens line. Owns A-ACT-*, A-NTF-*, A-DOC-*.
 
 `Step`, `Done`, `Acceptance` with each owned id as pass, fail or unchecked and the evidence, then
 only fields with content: `Undone`, `Commands`, `Issues`, `Deviations`, `Faster ways`.
+
+## Added after the prototype closed
+
+The human's notes on the fourth round, folded in before implement finished.
+
+### W3, screen and prompts
+
+- Step colours by kind, simpler than the prototype's: `human` (grill, intent) green `#a8a968`;
+  `gatekeeper` (accept, verify, validate) amber `#d7af5f`; `agent` (implement, research, any
+  worker or investigator step) blue `#6b8fd9`; `technical` (spec, condense, merge) dim `#6e6e6e`.
+  Kind comes from the workflow step's role and gate: role `worker`/`investigator` → agent,
+  `verify`/`validate`/`accept` → gatekeeper, `grill`/`intent` or `gate: human` on the first half
+  → human, else technical. The glyph keeps the lifecycle colour. Agent prompt colours follow:
+  Worker blue, Investigator cyan, Verifier and Validator yellow, Summarizer stays magenta because
+  Claude Code has no grey.
+- `?` is a right-side panel at full height, replacing the right pane while open: `KEYS` grouped
+  as before, then a rule, then `HOW FACTORY WORKS` in under twelve lines: a mission is one unit
+  of work on its own branch with a workflow copied in as its graph; the Orchestrator session
+  grills, writes intent, and runs the steps; gates stop for the human; gatekeepers check work
+  they did not write; `mission close` merges. Last line: what to do next, `factory mission new
+  <name>` in a project, or `/mission` inside a session. `?` or `esc` closes it.
+- `f` full activity hides the header and status bar too, the key bar stays; `↑↓` scroll the
+  activity while it is full, `↵`, `f` or `esc` restore.
+- Git line counts per mission on the left: `+120 −34` after the tokens, green and red, from
+  `git diff --shortstat <trunk>...<branch>` run in the mission's checkout, open missions only,
+  refreshed on the 2 s poll, never blocking the render (last value shown until the next result).
+- `parts/validate/agents/Validator.md`: the Validator writes and maintains short reusable scripts
+  under `.factory/validator/` (bun or node) that drive the UI or CLI straight to the thing under
+  test, keeps an index in `.factory/validator/scripts.md` with one line per script (what it
+  reaches, when written), reuses them on the next round, and prunes broken or obsolete ones. The
+  file stays under 80 lines. Owns A-UI-*, A-VAL-1.
+
+### Out of this mission, tracked
+
+- Processes per project: `factory.yaml` `processes:` map, a PROCESSES block on the project's right
+  pane, `↵` starts and stops, output to `.factory/logs/<name>.log` shown in the activity pane.
+  Stub mission `processes`, right after this one closes.
+- Creating a mission from the screen: name, workflow, opens the tab. Same stub, second item.

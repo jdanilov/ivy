@@ -1,0 +1,17 @@
+{
+  "name": "processes",
+  "title": "Processes per project and mission creation from Mission Control",
+  "workflow": "story",
+  "attention": "light",
+  "status": "stub",
+  "step": "grill",
+  "round": 0,
+  "session": null,
+  "branch": null,
+  "worktree": null,
+  "gates": {},
+  "steps": {},
+  "deviations": [],
+  "created": "2026-09-06T11:55:31.324Z",
+  "updated": "2026-09-06T11:55:31.324Z"
+}

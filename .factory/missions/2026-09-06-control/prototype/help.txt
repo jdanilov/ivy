@@ -13,17 +13,17 @@
                                                         │ fix   A3 session cookie survives logout — Worker, one round                       
     igs                                                 │ fix   A7 refresh token not rotated on reuse                                       
      ⊘ auth  fix  merge ↻2                 2h 4m  1.2M  │ fix   A9 rate limit counts by IP, not by account                                  
-     ○ quick  unbound  #b3f21c07  idle 12m              │ skip  A4 password rules read oddly — copy, not behaviour                          
-                                                        │ skip  A11 device list paging — out of the contract                                
-    cut                                                 │                                                                                   
-     ✓ intro  closed 2d ago                             │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
+     ○ quick  unbound  #b3f21c┌──────────────────────────────────────────────────────────────────────────────┐iour                          
+                              │ KEYS                                                                         │                              
+    cut                       │ ──────────────────────────────────────────────────────────────────────────── │                              
+     ✓ intro  closed 2d ago   │ Global    ↑↓ Select   ↵ Open   → Enter pane   ←esc Back   ? Help   Q Quit    │                              
+                              │           C Caffeinate   N Simulate arrival (prototype)                      │                              
+                              │ Projects  Z Hide closed   O Open tab   X Kill                                │                              
+                              │ Messages  ↑↓ Select   ←→ Choose answer   ↵ Confirm   esc Back                │                              
+                              │ Parts     Space Toggle   ↵ Apply   R Reset   Y Confirm   N Cancel            │                              
+                              │ Mission   T Attention full → light → unattended                              │                              
+                              │ Activity  F Full height   ↵ Back to the columns                              │                              
+                              └──────────────────────────────────────────────────────────────────────────────┘                              
                                                         │                                                                                   
                                                         │                                                                                   
                                                         │  accept    amend    reject                                                        

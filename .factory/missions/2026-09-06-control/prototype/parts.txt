@@ -13,7 +13,7 @@
                                                         │    docs-format     fixture  ● installed  .claude/docs-format.md                   
     igs                                                 │    explain         skill    ● installed  .claude/skills/explain/skill.md          
      ⊘ auth  fix  merge ↻2                 2h 4m  1.2M  │    hook-factory    fixture  ● installed  .claude/scripts/hook-factory.ts          
-     ○ quick  unbound  #8a9e6b42  idle 12m              │    hook-safe-bash  fixture  ● installed  .claude/scripts/safe-bash.sh             
+     ○ quick  unbound  #b3f21c07  idle 12m              │    hook-safe-bash  fixture  ● installed  .claude/scripts/safe-bash.sh             
                                                         │    mission         skill    ● installed  .claude/skills/mission/skill.md          
     cut                                                 │    permissions     fixture  ● installed  .claude/settings.json                    
      ✓ intro  closed 2d ago                             │    research        tool     ● installed  .claude/skills/research/skill.md         
@@ -27,16 +27,16 @@
                                                         │ .claude/skills/archify/template.html                                              
                                                         │                                                                                   
                                                         │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
-                                                        │                                                                                   
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- ↑↓ Select  space Toggle  ↵ Apply  ←esc Back  q Quit                                                                                        
-                                                                                                                                            
+ ACTIVITY  ivy                                                                                                                           40 
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ 14:16:59  Ask    Accept round 2 and move on to validate?                                                                                   
+ 14:18:17  Read   .factory/missions/2026-09-06-refit/state.json                                                                             
+ 14:19:11  Bash   bun src/cli.ts step done implement                                                                                        
+ 14:19:59  Agent  Validator drive the screen at three sizes                                                                                 
+ 14:21:17  Bash   bun scripts/tui-snapshot.ts                                                                                               
+ 14:22:29  Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                                 
+ 14:23:47  Text   Frames read right at 140x42, the key bar sits on the last row.                                                            
+ 14:24:59  Ask    Round 2 accepted?                                                                                                         
+ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
+ ↑↓ Select  Space Toggle  ↵ Apply  ←esc Back  ? Help  Q Quit                                                                                

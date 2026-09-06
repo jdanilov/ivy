@@ -21,11 +21,23 @@ export interface EventRow {
   mark?: string;
 }
 
+/** One line of a session's progress log. Wiring reads these from Claude Code's transcript jsonl. */
+export interface Activity {
+  at: number;
+  session: string;
+  verb: 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Stop';
+  text: string;
+}
+
+/** Which gates and rounds reach the human on this mission. */
+export type Attention = 'full' | 'light' | 'unattended';
+
 export interface Mission {
   name: string;
   workflow: string;
   status: 'open' | 'stub' | 'closed';
   state: RunState;
+  attention: Attention;
   step: string | null;
   round: number;
   session: string | null;
@@ -36,7 +48,6 @@ export interface Mission {
   tokens: { input: number; cached: number; output: number };
   steps: StepRow[];
   deviations: number;
-  events: EventRow[];
   closedAt?: number;
 }
 
@@ -91,5 +102,6 @@ export type Caffeinate = 'auto' | 'on' | 'off';
 export interface Snapshot {
   projects: Project[];
   inbox: InboxItem[];
+  activity: Activity[];
   caffeinate: Caffeinate;
 }

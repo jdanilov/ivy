@@ -3,13 +3,18 @@ import type { RunState, StepKind } from './model.js';
 /** Truecolor palette from docs/design.md. Weight is colour: nothing here is bold or italic.
  *  No background: the screen draws on whatever the terminal already paints. */
 export const C = {
-  rule: '#232323',
+  // design.md samples the separator at #232323; that vanishes on a terminal background lighter
+  // than the screenshots'. One step up keeps every rule and the column divider visible.
+  rule: '#3a3a3a',
   dim: '#6e6e6e',
   bright: '#e4e4e4',
   accent: '#d97757',
   success: '#a8a968',
   warning: '#d7af5f',
   error: '#cc5555',
+  // The one fill on the screen besides the selected row: an overlay that does not cover the
+  // rows under it is not an overlay, and spaces alone do not paint over what is already there.
+  panel: '#0a0a0a',
   selBg: '#b8b8b8',
   selFg: '#141414',
   track: '#404040',

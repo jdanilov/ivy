@@ -33,6 +33,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 
 | Command                                        | Purpose                                                                    |
 |------------------------------------------------|----------------------------------------------------------------------------|
+| `factory`                                      | Open Mission Control; `menu` falls back to the interactive part picker     |
 | `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
 | `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm     |
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |

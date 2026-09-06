@@ -11,6 +11,11 @@ export function ago(at: number, now = Date.now()): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
+/** Wall-clock time of a log line, the shape Droid's Progress Log uses. */
+export function clock(at: number): string {
+  return new Date(at).toTimeString().slice(0, 8);
+}
+
 export function dur(ms: number): string {
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;

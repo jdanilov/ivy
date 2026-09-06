@@ -56,7 +56,7 @@ async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<v
       return update(targetDir, skip ? skip.split(',') : []);
     }
     default:
-      throw new Refusal(`unknown command: ${cmd} — install, uninstall, status, update, mission, step, gate, handoff, control`);
+      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, handoff, control`);
   }
 }
 
@@ -65,18 +65,21 @@ async function main() {
 
   if (args[0] && MISSION_COMMANDS.includes(args[0])) return runMissionCommand(args[0], args.slice(1));
 
-  // Mission Control owns the screen: no banner, no project picker.
-  if (args[0] === 'control') {
+  const { positionals, flags } = parseArgs(args);
+  const first = positionals[0];
+
+  // Mission Control is what `factory` is for; it owns the screen, so no banner and no picker.
+  // The part menu it replaced is still there under `menu`.
+  if (!first || first === 'control') {
     const { control } = await import('./commands/control.js');
-    return control(parseArgs(args.slice(1)).flags);
+    return control(flags);
   }
 
   console.log(`\n${colors.bold}Factory${colors.reset} ${colors.dim}— portable development harness${colors.reset}\n`);
 
   setNameCol(await loadParts());
 
-  const { positionals, flags } = parseArgs(args);
-  const cmd = positionals[0] || await pickCommand();
+  const cmd = first === 'menu' ? await pickCommand() : first;
   const targetDir = positionals[1] ?? await pickProject(await loadProjects());
   await saveProject(targetDir);
 

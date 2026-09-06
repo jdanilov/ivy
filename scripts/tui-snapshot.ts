@@ -27,6 +27,8 @@ const frames: { name: string; left: number; focus: Ui['focus']; set?: (ui: Ui) =
       ui.part = 3;
     },
   },
+  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
+  { name: 'help', left: at((i) => i.kind === 'inbox'), focus: 'right', set: (ui) => { ui.help = true; } },
   {
     name: 'parts-confirm',
     left: at((i) => i.kind === 'project' && i.project.name === 'ivy'),
@@ -51,8 +53,9 @@ function chrome(): string {
       if (a !== 0) backgrounds.add(`#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`);
     }
   }
-  const last = (frame.lines[frame.rows - 1]?.spans ?? []).map((span) => span.text).join('');
-  return `bg ${[...backgrounds].join(' ') || 'none'} · last row ${last.trim() ? `DRAWN ${JSON.stringify(last)}` : 'empty'}`;
+  // The key bar owns the last row: an empty one there is the blank line the human kept seeing.
+  const last = (frame.lines[frame.rows - 1]?.spans ?? []).map((span) => span.text).join('').trim();
+  return `bg ${[...backgrounds].join(' ') || 'none'} · last row ${last ? JSON.stringify(last.slice(0, 20)) : 'EMPTY'}`;
 }
 
 for (const frame of frames) {

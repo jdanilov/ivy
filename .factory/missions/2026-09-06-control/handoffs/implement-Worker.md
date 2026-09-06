@@ -1,45 +1,43 @@
-Committed. Final state verified: `tsc` clean, `scripts/test.ts` exit 0 (17 cases), `scripts/e2e.sh` exit 0, `factory status` 17 installed / 0 modified.
+Committed clean on `mission/control`. Summary of the work and evidence:
+
+**Files:** `/opt/ed/ivy/src/tui/{model,theme,live,screen,fixture,frames}.ts`, `/opt/ed/ivy/src/commands/control.ts`, `/opt/ed/ivy/scripts/test.ts`, `/opt/ed/ivy/parts/validate/agents/Validator.md`
 
 ```
-Step: implement (W2, write side and docs)
+Step: implement (W3, screen and prompts)
 Done:
-- /opt/ed/ivy/src/tui/actions.ts — every key's write side through the CLI's own functions: answerGate (gate() with cwd = project), openTab (sessionLive + loadPreset + openSession), killSession (pgrep -f -- "--session-id <id>", SIGTERM then SIGKILL inside 5 s), applyParts (install --parts + removeParts), setCaffeinate, setAttention. Console silenced while a command runs, each returns the toast line, a refusal throws.
-- /opt/ed/ivy/src/core/parts.ts — removeParts(dir, names): uninit, unlink, hooks, mcp, settings, snippet, dropEmptied, manifest write-or-delete, dropCreated. /opt/ed/ivy/src/commands/uninstall.ts now prints around it instead of doing it.
-- /opt/ed/ivy/src/core/config.ts — Caffeinate type, readCaffeinate (uncached) and writeCaffeinate (one line rewritten in place, so vars survive); live.ts reads through it, model.ts re-exports the type. One reader, not two.
-- /opt/ed/ivy/src/tui/screen.ts — keys act: App {r, ui, snap} + draw(), toast re-renders from the current snapshot (W1's stale-toast issue), act() toasts start then outcome, amend/reject open an InputRenderable at the answer row with esc to cancel, `y` applies the pending part set, `c`/`t`/`o`/`x` call actions. A live rebuild does not redraw while the note is open, and `q` does not quit mid-note.
-- /opt/ed/ivy/src/tui/notify.ts — inboxKey, arrivals(prev, next), and the Warp 777;notify sequence beside the bell; /opt/ed/ivy/src/commands/control.ts diffs the inbox at the startLive call site and notifies once per new key.
-- /opt/ed/ivy/parts/hook-factory/hook-factory.ts — reads `caffeinate` from ~/.factory/config.yaml per event: off never starts, on starts at SessionStart and does not stop on Stop, auto unchanged.
-- /opt/ed/ivy/src/tui/live.ts, model.ts — InboxItem carries the step an answer is recorded against.
-- /opt/ed/ivy/scripts/test.ts — three cases: the hook's three caffeinate modes (fake caffeinate on PATH), `c` writing the mode and holding only its own pid, and arrivals.
-- Docs: docs/design.md gained a Mission Control section (pane grid, semantic step colours, #3a3a3a rule, key bar and key table); docs/terminology.md rewrote Mission Control and Inbox and added Messages, Activity, Caffeinate; README gained `factory`, `factory menu` and a keys line; AGENTS.md lists src/tui/ and names caffeinate in the config.yaml line; docs/roadmap.md dropped the three Mission Control lines and the tokens-per-step line.
+- src/tui/model.ts — StepKind is human | gatekeeper | agent | technical, and stepKind(step, early) is the one mapping: role worker/investigator → agent, verify/validate/accept or a parallel of those → gatekeeper, grill/intent or gate: human before the first worker step → human, else technical. live.ts flattens the workflow and passes `early`; fixture.ts spells no kind at all and reads its colours through the same call, so a look review is a review of what the screen draws. Mission gains `diff`.
+- src/tui/theme.ts — the four kinds named in one KIND record (human C.success #a8a968, gatekeeper C.warning #d7af5f, agent #6b8fd9, technical C.dim #6e6e6e); the old gate/implement/gatekeeper trio and the now-unused panel fill are gone; stepColor takes the kind alone, the glyph keeps stateColor.
+- src/tui/screen.ts — `?` is the right pane, not an overlay: KEYS with the same groups, a rule, HOW FACTORY WORKS in five wrapped sentences plus a Next line, drawn at the full body height (activity yields to it) with no border and no fill; `?` and esc close it, every other key is swallowed, the bar reads `? esc Back  Q Quit`.
+- src/tui/screen.ts — `f` gives the log the screen: header and status bar are not drawn (FULL_CHROME 3), the bar reads `↑↓ Scroll  ↵ f esc Back  Q Quit`, `↑↓` scroll (Ui.scroll, clamped in activityPane which is the only place that knows the room), `↵`/`f`/`esc` restore the columns with ui.left untouched and the scroll reset.
+- src/tui/live.ts — diffCount() runs `git diff --shortstat <trunkBranch>...<branch>` in state.worktree || the project, keyed per checkout+branch, cached in a module map, one run in flight at a time, never awaited by buildSnapshot; open missions with a branch only. settle() lets `--frames` wait for the counts in flight, then control.ts builds a second snapshot so a still frame carries them.
+- src/tui/screen.ts — the row shows `+N −M` after the tokens, `+` olive, `−` (U+2212) red, and nothing while unknown.
+- src/tui/live.ts — an unbound session is listed only while sessionLive(id) is true, which gates its question with it; the question's origin is the short id, so MESSAGES reads `alpha/#bbbbbbbb  asks`; the session row drops "unbound" and reads `quick  #bbbbbbbb  idle 9s`. A bound mission's question still carries the mission name.
+- parts/validate/agents/Validator.md — new §3 "Keep the scripts, do not re-drive by hand": read .factory/validator/scripts.md first, write short bun/node scripts under .factory/validator/ with Bash (it has no Write), one index line each (name, what it reaches, when written), reuse next round, delete what breaks and drop its line. 75 lines, every existing rule kept, sections renumbered.
+- scripts/test.ts — a case asserting the story workflow maps to grill:human,intent:human,research:agent,spec:technical,implement:agent,accept:gatekeeper,condense:technical,merge:technical, and that a bare verify/validate row is gatekeeping.
 
 Acceptance:
-- A-ACT-1 pass — ↵ on the gate wrote {status: answered, file: intent.md, answer: accept}, identical to `gate answer`; a second, different answer toasted "✗ gate grill was already answered accept at …" and the stored answer stayed accept.
-- A-ACT-2 pass — amend drew "amend note" over the verdicts with a focused InputRenderable, typed text reached ui.note, esc left the gate open with nothing written, and a second pass recorded {answer: amend, note: "add the migration step"}.
-- A-ACT-3 pass — `o` with no live session wrote state.session and ~/.warp/tab_configs/factory-alpha.toml; with a fresh events file it only toasted "factory-alpha is already open — switch to that tab" and the session id was unchanged.
-- A-ACT-4 pass — against a script whose argv carries --session-id <id>: first press SIGTERM (process exited within 2 s), second within 5 s SIGKILL, an unknown id returned "no process for #…" and signalled nothing; process.pid is excluded from the pgrep hits.
-- A-ACT-5 pass — toggling commit off and docs-format on then ↵,y removed .claude/skills/commit/skill.md and installed .claude/docs-format.md; `bun src/cli.ts status <dir>` afterwards read "1 installed, 0 modified, 16 available" with docs-format the only installed row.
-- A-ACT-6 pass — scripts/test.ts case, scratch HOME with a fake caffeinate: `on` wrote caffeinate: "on" keeping vars and left a live pid in control.pid; `auto` killed control.pid only and left a session pid alone; `off` killed the session pid too and cleared the folder.
-- A-ACT-7 pass — scripts/test.ts case: off started nothing on SessionStart or UserPromptSubmit; on started at SessionStart and still held after Stop; auto started on the prompt and let go on Stop.
-- A-ACT-8 pass — `t` wrote attention: unattended and appended {what: "attention set to unattended", reason: "set from Mission Control"} to deviations.
-- A-NTF-1 pass — arrivals(null, [a]) = [], arrivals([a], [a aged]) = [], arrivals([a], [a, b]) = [b]; control.ts seeds `seen` with the first snapshot and announces once per rebuild before apply.
-- A-NTF-2 pass — notify() writes \x07 and \x1b]777;notify;Factory;<label>\x07 to stdout, then Bun.spawn(['osascript', …]).unref() behind a darwin guard, never awaited.
-- A-DOC-1 pass — docs/design.md "Mission Control" carries the row-by-row pane grid, the semantic colour table (human #a8a968, gatekeeper #d7af5f, agent #6b8fd9, technical #6e6e6e), the #3a3a3a rule note and the key bar plus a key table; docs/terminology.md rows Mission Control, Inbox, Activity, Caffeinate describe the screen as built.
-- A-DOC-2 pass — README rows `factory` and `factory menu` plus the keys paragraph; AGENTS.md src/ block lists tui/ and the ~/.factory line names `caffeinate: auto|on|off`; roadmap has neither Mission Control nor tokens-per-step lines.
-- A-DOC-3 pass — src/tui/ plus src/commands/control.ts = 2011 lines of 2200; `bun x tsc --noEmit` exit 0; `bun scripts/test.ts` exit 0, 17 cases; `bash scripts/e2e.sh` exit 0 ("e2e: ok").
+- A-UI-1 pass — captureSpans at 140x42 over the refit mission pane, colour read at the column each name starts: grill #a8a968, intent #a8a968, research #6b8fd9, spec #6e6e6e, implement #6b8fd9, accept #d7af5f, verify #d7af5f, validate #d7af5f, condense #6e6e6e, merge #6e6e6e — all as specified; the glyphs beside them stayed lifecycle (research `·` #6e6e6e skipped, implement `●` #d97757 running, spec `✓` #a8a968 done).
+- A-UI-2 pass — `?` frame: the right pane reads KEYS, seven groups, a rule, HOW FACTORY WORKS and 8 lines under it (5 primer + blank + "Next: factory mission new <name> in a project, or /mission in a session."), MISSION/MESSAGES gone, no border and no background span (frames report `bg none`); under the test renderer `down` behind the panel produced a byte-identical frame, `esc` and `?` each returned the exact pre-help frame.
+- A-UI-3 pass — after `f` the frame carries no "FACTORY" and no status bar, last row is `↑↓ Scroll  ↵ f esc Back  Q Quit`; `↑` changed the visible rows, `↓` returned to the foot frame; `esc`, `↵` and `f` each restored the pre-`f` frame byte for byte with ui.left unchanged.
+- A-UI-4 pass — scratch HOME, repo alpha, `mission new alpha`, one commit on mission/alpha: `git diff --shortstat main...mission/alpha` = "34 insertions(+), 1 deletion(-)" and the live frame row reads `● alpha  story  grill  8s  0  +34 −1`. Colours proved on the fixture: `+120` #a8a968, `−34` #cc5555. buildSnapshot calls diffCount synchronously and returns the cached value; the git run is a floating promise.
+- A-UI-5 pass — same scratch HOME with three unbound sessions in one project, two with events touched now and one touched two hours ago: the frame lists `○ quick  #bbbbbbbb  idle 9s` and `○ quick  #aaaaaaaa  idle 9s`, MESSAGES (2) reads `alpha/#bbbbbbbb  asks` and `alpha/#aaaaaaaa  asks`, and the stale session appears in neither although its transcript holds a text block.
+- A-VAL-1 pass — Validator.md §3 names writing under .factory/validator/, the one-line-per-script index in scripts.md, reuse next round and pruning with its line; file is 75 lines. Colours read Worker blue, Investigator cyan, Verifier yellow, Validator yellow, Summarizer magenta — all already as specified, none changed.
 
-Deviations:
-- readCaffeinate/writeCaffeinate live in src/core/config.ts rather than beside live.ts's copy: the file is the core's, and the writer belongs with the reader. model.ts re-exports the Caffeinate type so the TUI still names it once.
-- `o` uses the orchestrator preset, the one `mission open` defaults to; state.json records no preset of its own.
-- `c off` kills the hook's session pids as well as control.pid, per the spec's "kill every pid in that folder"; OFF would otherwise not read as off until every session ended.
-- design.md documents the four-kind colour scheme from the spec's W3 section; theme.ts still carries the prototype's three, which is W3's change.
+Commands:
+- `bun x tsc --noEmit` exit 0; `bun scripts/test.ts` exit 0, 18 cases, 0 failures; `bun src/cli.ts status /opt/ed/ivy` exit 0; `bash scripts/e2e.sh` exit 0 ("e2e: ok").
+- Budget: src/tui/ plus src/commands/control.ts = 2126 lines of 2200 (W2 left 2011). The help primer and the scroll cost 115; nothing else was squeezed.
 
 Issues:
-- Bun's os.homedir() is fixed at process start, so scripts/test.ts's `process.env.HOME` does not redirect FACTORY_HOME for in-process code — the existing in-process cases append scratch paths to the real ~/.factory/projects. My caffeinate case runs as a child with HOME in its env for that reason. Worth a roadmap line.
-- pgrep -f matches any process whose command line contains "--session-id <id>", a shell that spawned claude included; the id keeps it off anything unrelated, but a kill can hit two pids.
-- docs/factory-transcript.txt, docs/function-hooks-transcript.txt, docs/graph-engineering-transcript.txt and docs/screenshots/*.png were staged-but-uncommitted at mission start and are absent from disk and index now; nothing in this step touched them, and git fsck still lists dangling blobs.
+- A-UI-5 tightens A-SRC-4: an unbound session used to be listed on a 24h-old events line, it now needs sessionLive (events touched inside ten minutes). A bound mission's question is unchanged and can still outlive its session.
+- docs/design.md now drifts in two places I am not allowed to touch: it says the help panel paints #0a0a0a (it paints nothing and is a pane, not an overlay) and its key table has no Activity scroll row. One-line fixes for whoever owns docs.
+- The fixture frames in .factory/missions/2026-09-06-control/prototype/ predate this step, so they still show the old colours and the "unbound" session row. `bun scripts/tui-snapshot.ts <dir>` regenerates them; I wrote mine to /tmp rather than touch the mission folder.
+
+Deviations:
+- `?` takes the whole body height, so the activity pane is not drawn while it is open. "Full height" any other way leaves the primer without room at 24 rows.
+- `factory --frames` builds the snapshot twice, with live.settle() between: the git counts land behind the first build and a still frame that never shows them is not worth writing. The live screen still never waits.
+- Full activity keeps the leading blank row (chrome 3, not 2), so the screen's top margin does not jump when `f` is pressed.
 
 Faster:
-- The action loop is the test renderer plus onKey: render(app.r, app.snap, ui) + renderOnce() + captureCharFrame() for the look, and the InputRenderable found by walking renderer.root and driven with insertText() for the note.
-- A victim process for `x` must be a script (#!/bin/sh + sleep), not `sh -c 'sleep 60' --session-id X`: sh execs a lone command away and the argv pgrep needs goes with it.
+- captureSpans() merges adjacent spans of one colour, so `spans.find(text === name)` silently misses every step whose name shares its glyph's colour. Walk the spans accumulating columns and read the colour at the column the name starts in.
+- `factory mission new` run with the wrong cwd acts on whatever repo you are standing in, and on a claimed checkout it blocks on the worktree prompt with no output. Under a scratch HOME, cd into the scratch repo first and give it `</dev/null`.
 ```

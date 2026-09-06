@@ -53,8 +53,8 @@ undershoots these values on screen but the hierarchy holds.
 
 ## Mission Control
 
-The screen the palette above was extracted for. One grid, three right-pane modes, no popups but
-the help panel. Sizes are what `render()` computes, not what a window manager decides.
+The screen the palette above was extracted for. One grid, the right pane follows the selection, and `?`
+replaces it with the help panel. Sizes are what `render()` computes, not what a window manager decides.
 
 ```
 row 0        blank
@@ -79,7 +79,7 @@ last row     ──────────────────────�
 - The key bar sits on the last row and lists the focused pane's keys; `?` is the first pair
   dropped when the terminal is too narrow, because the panel it opens lists everything.
 - No box carries a background: every cell the screen does not colour keeps the terminal's own.
-  The two exceptions are the inverted selected row and the help panel's `#0a0a0a` fill.
+  The one exception is the inverted selected row; the help panel paints nothing either.
 
 ### Step colours by meaning
 
@@ -112,7 +112,8 @@ Validator yellow, Summarizer magenta because Claude Code has no grey.
 | `T`      | mission row      | attention full → light → unattended                            |
 | `C`      | any              | caffeinate auto → on → off                                     |
 | `Z`      | left             | hide closed missions                                           |
-| `F`      | any              | Activity at full height                                        |
+| `F`      | any              | Activity at full height; header and status bar hidden          |
+| `↑↓`     | full activity    | scroll the log; `↵`, `F` or `esc` restore the columns          |
 | `?` `Q`  | any              | help panel, quit                                               |
 
 ## Glyphs

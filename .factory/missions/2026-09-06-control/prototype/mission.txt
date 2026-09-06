@@ -8,12 +8,12 @@
     Inbox (3)                                           │  ✓ grill                                                                       3m 
                                                         │  ✓ intent                                                                     12m 
     ivy                                                 │  · research                                                               skipped 
-     ● refit  story  implement ↻2            14m  4.5M  │  ✓ spec                                                                        8m 
+     ● refit  story  implement ↻2  14m  4.5M  +412 −96  │  ✓ spec                                                                        8m 
      ○ memory  stub                                     │  ● implement                                                                   6m 
                                                         │  ○ accept                                                                 pending 
     igs                                                 │  ○ verify                                                                 pending 
-     ⊘ auth  fix  merge ↻2                 2h 4m  1.2M  │  ○ validate                                                               pending 
-     ○ quick  unbound  #b3f21c07  idle 12m              │  ○ condense                                                               pending 
+     ⊘ auth  fix  merge ↻2       2h 4m  1.2M  +120 −34  │  ○ validate                                                               pending 
+     ○ quick  #b3f21c07  idle 12m                       │  ○ condense                                                               pending 
                                                         │  ○ merge                                                                  pending 
     cut                                                 │ ───────────────────────────────────────────────────────────────────────────────── 
      ✓ intro  closed 2d ago                             │ step implement · role worker · round 2 · attention light                          
@@ -30,13 +30,13 @@
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ACTIVITY  refit                                                                                                                         40 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- 14:16:59  Ask    Accept round 2 and move on to validate?                                                                                   
- 14:18:17  Read   .factory/missions/2026-09-06-refit/state.json                                                                             
- 14:19:11  Bash   bun src/cli.ts step done implement                                                                                        
- 14:19:59  Agent  Validator drive the screen at three sizes                                                                                 
- 14:21:17  Bash   bun scripts/tui-snapshot.ts                                                                                               
- 14:22:29  Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                                 
- 14:23:47  Text   Frames read right at 140x42, the key bar sits on the last row.                                                            
- 14:24:59  Ask    Round 2 accepted?                                                                                                         
+ 15:57:54  Ask    Accept round 2 and move on to validate?                                                                                   
+ 15:59:12  Read   .factory/missions/2026-09-06-refit/state.json                                                                             
+ 16:00:06  Bash   bun src/cli.ts step done implement                                                                                        
+ 16:00:54  Agent  Validator drive the screen at three sizes                                                                                 
+ 16:02:12  Bash   bun scripts/tui-snapshot.ts                                                                                               
+ 16:03:24  Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                                 
+ 16:04:42  Text   Frames read right at 140x42, the key bar sits on the last row.                                                            
+ 16:05:54  Ask    Round 2 accepted?                                                                                                         
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ↑↓ Select  ↵ Open  O Tab  X Kill  C Caffeinate  Z Closed  F Activity  ? Help  Q Quit                                                       

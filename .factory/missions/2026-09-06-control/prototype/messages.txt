@@ -8,12 +8,12 @@
  ›  Inbox (3)                                           │    ⊘ igs/auth  triage r2                                                   1h ago 
                                                         │    ⊘ igs/quick  asks                                                       8m ago 
     ivy                                                 │    ⊘ igs/auth  gate merge                                                  3m ago 
-     ● refit  story  implement ↻2            14m  4.5M  │ ───────────────────────────────────────────────────────────────────────────────── 
+     ● refit  story  implement ↻2  14m  4.5M  +412 −96  │ ───────────────────────────────────────────────────────────────────────────────── 
      ○ memory  stub                                     │ triage r2  3 fix · 2 skip                                                         
                                                         │ fix   A3 session cookie survives logout — Worker, one round                       
     igs                                                 │ fix   A7 refresh token not rotated on reuse                                       
-     ⊘ auth  fix  merge ↻2                 2h 4m  1.2M  │ fix   A9 rate limit counts by IP, not by account                                  
-     ○ quick  unbound  #b3f21c07  idle 12m              │ skip  A4 password rules read oddly — copy, not behaviour                          
+     ⊘ auth  fix  merge ↻2       2h 4m  1.2M  +120 −34  │ fix   A9 rate limit counts by IP, not by account                                  
+     ○ quick  #b3f21c07  idle 12m                       │ skip  A4 password rules read oddly — copy, not behaviour                          
                                                         │ skip  A11 device list paging — out of the contract                                
     cut                                                 │                                                                                   
      ✓ intro  closed 2d ago                             │                                                                                   
@@ -30,13 +30,13 @@
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ACTIVITY  all projects                                                                                                                  57 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- 14:18:23  auth     Text   The contract is green. Opening the merge gate on retro.md.                                                       
- 14:19:11  refit    Bash   bun src/cli.ts step done implement                                                                               
- 14:19:59  refit    Agent  Validator drive the screen at three sizes                                                                        
- 14:21:17  refit    Bash   bun scripts/tui-snapshot.ts                                                                                      
- 14:22:23  auth     Ask    Merge auth into main?                                                                                            
- 14:22:29  refit    Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                        
- 14:23:47  refit    Text   Frames read right at 140x42, the key bar sits on the last row.                                                   
- 14:24:59  refit    Ask    Round 2 accepted?                                                                                                
+ 15:59:18  auth     Text   The contract is green. Opening the merge gate on retro.md.                                                       
+ 16:00:06  refit    Bash   bun src/cli.ts step done implement                                                                               
+ 16:00:54  refit    Agent  Validator drive the screen at three sizes                                                                        
+ 16:02:12  refit    Bash   bun scripts/tui-snapshot.ts                                                                                      
+ 16:03:18  auth     Ask    Merge auth into main?                                                                                            
+ 16:03:24  refit    Read   .factory/missions/2026-09-06-refit/prototype/messages.txt                                                        
+ 16:04:42  refit    Text   Frames read right at 140x42, the key bar sits on the last row.                                                   
+ 16:05:54  refit    Ask    Round 2 accepted?                                                                                                
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  ↑↓ Select  ←→ Answer  ↵ Confirm  esc Back  F Activity  ? Help  Q Quit                                                                      

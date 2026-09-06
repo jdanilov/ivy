@@ -4,7 +4,7 @@
   "workflow": "story",
   "attention": "light",
   "status": "open",
-  "step": "accept",
+  "step": "condense",
   "round": 1,
   "session": "75cb46e1-3809-4b2d-bedc-2e6003121cb8",
   "branch": "mission/control",
@@ -56,8 +56,9 @@
       "endedAt": "2026-09-06T13:36:32.893Z"
     },
     "accept": {
-      "status": "running",
-      "startedAt": "2026-09-06T13:36:32.950Z"
+      "status": "done",
+      "startedAt": "2026-09-06T13:36:32.950Z",
+      "endedAt": "2026-09-06T13:49:46.882Z"
     },
     "verify": {
       "status": "skipped",
@@ -65,7 +66,13 @@
       "reason": "round 2 is the eight round-1 fixes; the Validator runs the verify recipe and covers the three verify ids"
     },
     "validate": {
-      "status": "pending"
+      "status": "done",
+      "startedAt": "2026-09-06T13:49:46.767Z",
+      "endedAt": "2026-09-06T13:49:46.823Z"
+    },
+    "condense": {
+      "status": "running",
+      "startedAt": "2026-09-06T13:49:46.938Z"
     }
   },
   "deviations": [
@@ -101,5 +108,5 @@
     }
   ],
   "created": "2026-09-05T23:11:21.304Z",
-  "updated": "2026-09-06T13:36:52.663Z"
+  "updated": "2026-09-06T13:49:46.938Z"
 }

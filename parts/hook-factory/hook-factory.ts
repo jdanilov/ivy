@@ -3,7 +3,7 @@
  * Factory event hook. Run as `bun hook-factory.ts <event>`, hook JSON on stdin.
  *
  * Appends one line to ~/.factory/events/<session>.jsonl, binds an unclaimed mission to the session
- * that shows up, keeps the Mac awake while a mission-bound session is mid-turn, rings when the
+ * that shows up, keeps the Mac awake as ~/.factory/config.yaml says to, rings when the
  * session is waiting on the human, injects mission focus before a compaction, and saves a
  * sub-agent's final message as the step handoff.
  *
@@ -16,6 +16,7 @@ import { appendFile, mkdir, readdir, readFile, rename, unlink, writeFile } from 
 const HOME = path.join(homedir(), '.factory');
 const EVENTS = path.join(HOME, 'events');
 const PIDS = path.join(HOME, 'caffeinate');
+const CONFIG = path.join(HOME, 'config.yaml');
 
 interface HookInput {
   session_id?: string;
@@ -116,6 +117,19 @@ const alive = (pid: number): boolean => {
     return false;
   }
 };
+
+/**
+ * `auto` holds the machine awake for the length of a turn, `on` from the session's first event
+ * until something else lets go, `off` never. Read per event, so Mission Control's `c` lands on
+ * the next hook without restarting anything.
+ */
+type Mode = 'auto' | 'on' | 'off';
+
+async function caffeinateMode(): Promise<Mode> {
+  const raw = await readFile(CONFIG, 'utf-8').catch(() => '');
+  const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
+  return value === 'on' || value === 'off' ? value : 'auto';
+}
 
 async function caffeinateStart(session: string): Promise<void> {
   const file = pidFile(session);
@@ -287,9 +301,12 @@ async function main(): Promise<void> {
 
   if (event === 'SessionStart' || event === 'UserPromptSubmit') await adoptSession(mission, session);
   if (event === 'PreCompact') console.log(focus(mission));
-  if (event === 'UserPromptSubmit') await caffeinateStart(session);
-  if (event === 'Stop') await caffeinateStop(session);
   if (event === 'SubagentStop') await saveHandoff(mission, input);
+
+  const mode = await caffeinateMode();
+  if (mode === 'off') return;
+  if (event === (mode === 'on' ? 'SessionStart' : 'UserPromptSubmit')) await caffeinateStart(session);
+  if (event === 'Stop' && mode === 'auto') await caffeinateStop(session);
 }
 
 await main().catch(() => {});

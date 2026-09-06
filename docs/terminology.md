@@ -70,7 +70,10 @@ Agent-facing except intent.md. Short, reasoning-first. Format in the `docs-forma
 | Term            | Meaning                                                                                        |
 |-----------------|------------------------------------------------------------------------------------------------|
 | Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No daemon in v1.        |
-| Mission Control | The Factory TUI on OpenTUI in a Warp tab. One screen: projects and missions left, Inbox or Parts right. |
-| Inbox           | Open questions, gates and triage plans from all sessions. Plugin-drawn items answerable in place, orchestrator text jumps to the tab. |
+| Mission Control | The Factory TUI on OpenTUI, `factory` with no arguments. One screen: projects, missions and unbound sessions left; Messages, Mission, Session or Parts right; Activity across the foot. Reads the files the CLI writes and writes through the CLI's own functions. |
+| Messages        | The right pane over the Inbox: the selected item's body and, on a gate, the answer row. |
+| Inbox           | Every open gate, triage plan and waiting question across all projects, keyed `project/origin/kind`. A gate answers in place through `factory gate answer`; a question names the tab that owns it. A key the last snapshot did not have rings the bell and raises a desktop notification. |
+| Activity        | The pane along the foot: rows read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`, `Tool` — plus the hook's `Stop`, newest last. `F` gives it the whole body. |
+| Caffeinate      | Whether the Mac is held awake, `~/.factory/config.yaml` key `caffeinate`, cycled with `C`. `auto` holds it for the length of a turn, `on` from a session's start, `off` never. Pids live in `~/.factory/caffeinate/`, one per session plus Mission Control's own `control.pid`. |
 | Changes         | Warp's own diff panel. The Factory does not render diffs.                                      |
 | Tab config      | Warp TOML in `~/.warp/tab_configs/`. The Factory writes one per mission and opens it by URI.   |

@@ -33,7 +33,8 @@ Everything else acts on the checkout you are standing in and never prompts.
 
 | Command                                        | Purpose                                                                    |
 |------------------------------------------------|----------------------------------------------------------------------------|
-| `factory`                                      | Open Mission Control; `menu` falls back to the interactive part picker     |
+| `factory`                                      | Open Mission Control: every project, mission, session and open gate        |
+| `factory menu`                                 | The interactive picker: a command, then a project                          |
 | `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
 | `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm     |
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
@@ -54,6 +55,11 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `gate answer <step> accept\|amend\|reject`     | Answer a gate once; a conflicting second answer is refused                 |
 | `gate list`                                    | Every open gate across projects                                            |
 | `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
+
+Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` attention, `C`
+caffeinate, `Z` hide closed, `F` activity, `?` help, `Q` quit. Space toggles a part and `Y`
+applies the set. `--fixture` draws the demo snapshot, `--frames <dir>` writes the screen as text
+and exits, which is how it is reviewed without a terminal.
 
 ## Parts
 

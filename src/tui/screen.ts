@@ -1,9 +1,13 @@
-import { BoxRenderable, TextRenderable, createCliRenderer, type CliRenderer, type KeyEvent } from '@opentui/core';
+import {
+  BoxRenderable, InputRenderable, InputRenderableEvents, TextRenderable, createCliRenderer,
+  type CliRenderer, type KeyEvent,
+} from '@opentui/core';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { C, GLYPH, stateColor, stepColor } from './theme.js';
 import { ago, clock, dur, id, len, line, spread, tokens, wrap, type Cell } from './format.js';
+import { answerGate, applyParts, killSession, openTab, setAttention, setCaffeinate } from './actions.js';
 import type { Activity, Attention, Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from './model.js';
 
 const ANSWERS = ['accept', 'amend', 'reject'] as const;
@@ -29,12 +33,14 @@ export interface Ui {
   help: boolean;
   hideClosed: boolean;
   toast: string | null;
+  /** Open while a rejected or amended gate is waiting for its one-line note. */
+  note: { verdict: 'amend' | 'reject'; text: string } | null;
 }
 
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, answer: 0, answered: new Set(), toggles: {},
-    confirm: false, full: false, help: false, hideClosed: false, toast: null,
+    confirm: false, full: false, help: false, hideClosed: false, toast: null, note: null,
   };
 }
 
@@ -219,7 +225,7 @@ function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
 
 // ── messages ──────────────────────────────────────────────────────────────────
 
-function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {
+function messagesPane(r: CliRenderer, p: Pane, snap: Snapshot, ui: Ui, h: number): void {
   const items = snap.inbox;
   p.row([['MESSAGES', C.bright], [` (${items.length - ui.answered.size})`, C.dim]]);
   p.rule();
@@ -237,17 +243,31 @@ function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {
 
   p.rule();
   const item = items[ui.msg];
-  if (item) messageDetail(p, item, ui, h - 3 - items.length);
+  if (item) messageDetail(r, p, item, ui, h - 3 - items.length);
 }
 
 /** Sits at the foot of the pane: `pad` blank rows push it there, one more separates it. */
-function answerRow(p: Pane, ui: Ui, answered: boolean, pad: number): void {
+function answerRow(r: CliRenderer, p: Pane, ui: Ui, answered: boolean, pad: number): void {
   for (let i = 0; i <= pad; i++) p.row([]);
   if (answered) return p.row([['✓ answered', C.success]]);
+  if (ui.note) return notePrompt(r, p, ui.note);
   p.row(ANSWERS.flatMap((a, i) => [[` ${a} `, C.bright, ui.focus === 'right' && i === ui.answer], ['  ', C.dim]] as Cell[]));
 }
 
-function messageDetail(p: Pane, item: InboxItem, ui: Ui, h: number): void {
+/** An amend or a reject is a sentence, not a verdict: the input takes it where the verdicts were. */
+function notePrompt(r: CliRenderer, p: Pane, note: NonNullable<Ui['note']>): void {
+  p.row([[`${note.verdict} `, C.warning], ['note', C.bright], ['   ↵ record · esc cancel', C.dim]]);
+  const input = new InputRenderable(r, {
+    width: p.width, flexShrink: 0, value: note.text,
+    placeholder: 'one line', textColor: C.bright, placeholderColor: C.dim, cursorColor: C.accent,
+  });
+  // The text lives in the Ui, so a rebuild under the human's hands redraws what they have typed.
+  input.on(InputRenderableEvents.INPUT, (value: string) => { note.text = value; });
+  p.box.add(input);
+  input.focus();
+}
+
+function messageDetail(r: CliRenderer, p: Pane, item: InboxItem, ui: Ui, h: number): void {
   const answered = ui.answered.has(ui.msg);
   const room = Math.max(0, h - 3);
 
@@ -255,7 +275,7 @@ function messageDetail(p: Pane, item: InboxItem, ui: Ui, h: number): void {
     p.row([[item.file ?? '', C.bright], [` (${item.lines} lines)`, C.dim]]);
     const body = (item.body ?? []).flatMap((l) => (l ? wrap(l, p.width, 4) : ['']));
     for (const l of body.slice(0, room)) p.row([[l, C.dim]]);
-    return answerRow(p, ui, answered, room - Math.min(body.length, room));
+    return answerRow(r, p, ui, answered, room - Math.min(body.length, room));
   }
   if (item.kind === 'question') {
     for (const l of wrap(item.text ?? '', p.width, Math.max(1, h - 2))) p.row([[l, C.bright]]);
@@ -268,7 +288,7 @@ function messageDetail(p: Pane, item: InboxItem, ui: Ui, h: number): void {
   p.row([['triage ', C.dim], [item.label.replace('triage ', ''), C.bright],
     [`  ${plan.filter((l) => l.action === 'fix').length} fix · ${plan.filter((l) => l.action === 'skip').length} skip`, C.dim]]);
   for (const l of plan) p.row([[l.action === 'fix' ? 'fix   ' : 'skip  ', l.action === 'fix' ? C.accent : C.dim], [l.text, C.bright]]);
-  answerRow(p, ui, answered, Math.max(0, room - plan.length));
+  answerRow(r, p, ui, answered, Math.max(0, room - plan.length));
 }
 
 // ── mission and session ───────────────────────────────────────────────────────
@@ -316,11 +336,18 @@ function partStatus(name: string, base: string, ui: Ui): string {
   return toggled === undefined ? base : toggled ? 'installed' : 'not-installed';
 }
 
-/** What `↵` would apply: the toggles that disagree with the manifest. */
+/** The parts `↵` would install and the ones it would remove: the toggles the manifest disagrees with. */
+function changes(project: Project, ui: Ui): { add: string[]; drop: string[] } {
+  const moved = project.parts.filter((part) => partStatus(part.name, part.status, ui) !== part.status);
+  return {
+    add: moved.filter((part) => ui.toggles[part.name] === true).map((part) => part.name),
+    drop: moved.filter((part) => ui.toggles[part.name] === false).map((part) => part.name),
+  };
+}
+
 function pending(project: Project, ui: Ui): string[] {
-  return project.parts
-    .filter((part) => partStatus(part.name, part.status, ui) !== part.status)
-    .map((part) => `${ui.toggles[part.name] ? 'install' : 'uninstall'} ${part.name}`);
+  const { add, drop } = changes(project, ui);
+  return [...add.map((name) => `install ${name}`), ...drop.map((name) => `uninstall ${name}`)];
 }
 
 function partsPane(p: Pane, project: Project, ui: Ui): void {
@@ -466,7 +493,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
     leftPane(left, items, snap, ui);
-    if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
+    if (here.kind === 'inbox') messagesPane(r, right, snap, ui, bodyH);
     else if (here.kind === 'project') partsPane(right, here.project, ui);
     else if (here.kind === 'mission') missionPane(right, here.mission);
     else sessionPane(right, here.session);
@@ -487,17 +514,65 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
 
 // ── keys ──────────────────────────────────────────────────────────────────────
 
-function toast(r: CliRenderer, snap: Snapshot, ui: Ui, text: string): void {
-  ui.toast = text;
-  render(r, snap, ui);
-  setTimeout(() => { ui.toast = null; render(r, snap, ui); }, 2000);
+/** The screen as one thing a key can act on: the snapshot moves under it, the Ui persists. */
+export interface App { r: CliRenderer; ui: Ui; snap: Snapshot }
+
+export const draw = (app: App): void => render(app.r, app.snap, app.ui);
+
+/** Only the newest toast clears itself: an action's result must not be wiped by its own "doing". */
+let toasted = 0;
+
+function toast(app: App, text: string): void {
+  app.ui.toast = text;
+  const mine = ++toasted;
+  draw(app);
+  setTimeout(() => {
+    if (mine !== toasted) return;
+    app.ui.toast = null;
+    draw(app);
+  }, 2000);
 }
 
-/** Every action is in memory: the prototype shows what would happen, it does nothing. */
-export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent): void {
+/** An action touches the disk while the screen keeps drawing: it says what it started, then how it
+ *  ended. The files it wrote reach the screen through the next rebuild, not through this. */
+function act(app: App, doing: string, fn: () => Promise<string>): void {
+  toast(app, doing);
+  void fn().then(
+    (done) => toast(app, done),
+    (e: unknown) => toast(app, `✗ ${e instanceof Error ? e.message : String(e)}`),
+  );
+}
+
+/** Where a message came from: the Inbox names its project, the action needs the checkout. */
+function projectOf(snap: Snapshot, name: string): string {
+  const project = snap.projects.find((p) => p.name === name);
+  if (!project) throw new Error(`no project ${name}`);
+  return project.path;
+}
+
+/** ↵ on a gate: `accept` goes straight through, the other two come back here with the note. */
+function record(app: App, verdict: (typeof ANSWERS)[number], note: string): void {
+  const { snap, ui } = app;
+  const item = snap.inbox[ui.msg];
+  if (!item) return;
+  ui.note = null;
+  ui.answered.add(ui.msg);
+  act(app, `${verdict} ${item.label}…`, () => answerGate(projectOf(snap, item.project), item, verdict, note));
+}
+
+export function handleKey(app: App, key: KeyEvent): void {
+  const { snap, ui } = app;
+
+  // The input owns the keyboard while a note is open: only these two are the screen's.
+  if (ui.note) {
+    if (key.name === 'escape') { ui.note = null; return draw(app); }
+    if (key.name === 'return') return record(app, ui.note.verdict, ui.note.text.trim());
+    return;
+  }
+
   // The overlay is a read: the next key puts it away, whatever it was.
-  if (ui.help) { ui.help = false; return render(r, snap, ui); }
-  if (key.name === '?') { ui.help = true; return render(r, snap, ui); }
+  if (ui.help) { ui.help = false; return draw(app); }
+  if (key.name === '?') { ui.help = true; return draw(app); }
 
   const items = leftItems(snap, ui.hideClosed);
   ui.left = clamp(ui.left, items.length);
@@ -508,9 +583,14 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);
 
   if (inParts && ui.confirm) {
-    if (key.name === 'y') { ui.toggles = {}; ui.confirm = false; return toast(r, snap, ui, 'applied (prototype)'); }
+    if (key.name === 'y') {
+      const { add, drop } = changes(here.project, ui);
+      ui.toggles = {};
+      ui.confirm = false;
+      return act(app, `applying ${add.length + drop.length} change(s)…`, () => applyParts(here.project.path, add, drop));
+    }
     if (key.name === 'n' || key.name === 'escape') ui.confirm = false;
-    return render(r, snap, ui);
+    return draw(app);
   }
 
   switch (key.name) {
@@ -539,13 +619,18 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
         if (part) ui.toggles[part.name] = partStatus(part.name, part.status, ui) !== 'installed';
       }
       break;
-    case 'return':
+    case 'return': {
       // The columns are gone while Activity is full: ↵ brings them back before it does anything.
       if (ui.full) { ui.full = false; break; }
       if (inMessages) {
-        if (ui.answered.has(ui.msg)) return;
-        ui.answered.add(ui.msg);
-        return toast(r, snap, ui, `${ANSWERS[ui.answer]} ${snap.inbox[ui.msg]?.label} (prototype: no-op)`);
+        const item = snap.inbox[ui.msg];
+        if (!item || ui.answered.has(ui.msg)) return;
+        // A question is a turn in someone else's session; only its tab can answer it.
+        if (item.kind === 'question') return toast(app, `answer ${item.origin} in tab ${item.tab ?? '—'}`);
+        const verdict = ANSWERS[ui.answer]!;
+        if (verdict === 'accept') return record(app, verdict, '');
+        ui.note = { verdict, text: '' };
+        break;
       }
       if (inParts) {
         if (!pending(here.project, ui).length) return;
@@ -554,6 +639,7 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
       }
       if (!right) ui.focus = 'right';
       break;
+    }
     case 'r':
       if (inParts) ui.toggles = {};
       break;
@@ -570,35 +656,42 @@ export function handleKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent)
     case 't': {
       if (here.kind !== 'mission') break;
       const m = here.mission;
+      // Shown at once, written behind it: the rebuild that follows reads state.json back.
       m.attention = ATTENTION[(ATTENTION.indexOf(m.attention) + 1) % ATTENTION.length]!;
-      return toast(r, snap, ui, `${m.name} attention ${m.attention}`);
+      return act(app, `${m.name} attention ${m.attention}…`, () => setAttention(here.project.path, m.name, m.attention));
     }
-    case 'c':
+    case 'c': {
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;
-      return toast(r, snap, ui, `caffeinate ${snap.caffeinate.toUpperCase()} [${awake(snap) ? 'ON' : 'OFF'}]`);
+      const mode = snap.caffeinate;
+      return act(app, `caffeinate ${mode.toUpperCase()}…`, () => setCaffeinate(mode));
+    }
     case 'o':
-      if (!right) return toast(r, snap, ui, `open tab ${here.kind === 'mission' ? here.mission.name : here.kind === 'session' ? id(here.session.id) : '—'} (prototype: no-op)`);
-      break;
-    case 'x':
-      if (!right) return toast(r, snap, ui, `kill ${here.kind === 'session' ? id(here.session.id) : '—'} (prototype: no-op)`);
-      break;
+      if (right) break;
+      if (here.kind !== 'mission') return toast(app, 'select a mission to open its tab');
+      return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
+    case 'x': {
+      if (right) break;
+      const session = here.kind === 'mission' ? here.mission.session : here.kind === 'session' ? here.session.id : null;
+      if (!session) return toast(app, 'no session on this row');
+      return act(app, `killing ${id(session)}…`, () => killSession(session));
+    }
     default:
       return;
   }
-  render(r, snap, ui);
+  draw(app);
 }
 
 /** A key must never take the screen down: the toast says what broke, the log says where. */
-export function onKey(r: CliRenderer, snap: Snapshot, ui: Ui, key: KeyEvent): void {
+export function onKey(app: App, key: KeyEvent): void {
   try {
-    handleKey(r, snap, ui, key);
+    handleKey(app, key);
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     const log = path.join(homedir(), '.factory', 'control.log');
     const entry = `${new Date().toISOString()} key=${key.name}\n${err.stack ?? err.message}\n\n`;
     void mkdir(path.dirname(log), { recursive: true }).then(() => appendFile(log, entry)).catch(() => {});
     try {
-      toast(r, snap, ui, `error: ${err.message}`);
+      toast(app, `error: ${err.message}`);
     } catch {
       // The renderer itself is gone; the log already has the stack.
     }
@@ -611,23 +704,23 @@ export type Live = (apply: (next: Snapshot) => void) => { close(): void };
 /** Resolves when the human quits, so the CLI ends without an exit call. */
 export async function run(snap: Snapshot, live?: Live): Promise<void> {
   const r = await createCliRenderer({ exitOnCtrlC: true, targetFps: 30 });
-  const ui = newUi();
-  let current = snap;
-  render(r, current, ui);
-  r.on('resize', () => render(r, current, ui));
+  const app: App = { r, ui: newUi(), snap };
+  draw(app);
+  r.on('resize', () => draw(app));
   const watcher = live?.((next) => {
-    current = next;
-    render(r, current, ui);
+    app.snap = next;
+    // A redraw destroys the note input and what the human had typed into it: the next key redraws.
+    if (!app.ui.note) draw(app);
   });
 
   await new Promise<void>((done) => {
     r.keyInput.on('keypress', (key: KeyEvent) => {
-      if (key.name === 'q') {
+      if (key.name === 'q' && !app.ui.note) {
         watcher?.close();
         r.destroy();
         return done();
       }
-      onKey(r, current, ui, key);
+      onKey(app, key);
     });
   });
 }

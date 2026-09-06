@@ -1,12 +1,13 @@
 import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { existingProjects, FACTORY_HOME } from '../core/projects.js';
+import { readCaffeinate } from '../core/config.js';
 import { listMissions, missionRowState, missionWorkflow } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
 import type {
-  Activity, Caffeinate, InboxItem, Mission, PartRow, Project, RunState, Session, Snapshot, StepKind, StepRow, TriageLine,
+  Activity, InboxItem, Mission, PartRow, Project, RunState, Session, Snapshot, StepKind, StepRow, TriageLine,
 } from './model.js';
 
 /**
@@ -23,7 +24,6 @@ const BODY_LINES = 200;
 
 const EVENTS = path.join(FACTORY_HOME, 'events');
 const PIDS = path.join(FACTORY_HOME, 'caffeinate');
-const CONFIG = path.join(FACTORY_HOME, 'config.yaml');
 
 // ── events ───────────────────────────────────────────────────────────────────
 
@@ -147,11 +147,11 @@ async function gateItems(project: string, m: CoreMission): Promise<InboxItem[]> 
     const base = { project, origin: m.state.name, at };
     if (step === 'accept') {
       const body = await bodyOf(m.dir, 'findings.md');
-      items.push({ ...base, kind: 'triage', label: `triage r${m.state.round}`, plan: triagePlan(body) });
+      items.push({ ...base, kind: 'triage', step, label: `triage r${m.state.round}`, plan: triagePlan(body) });
       continue;
     }
     const body = gate.file ? await bodyOf(m.dir, gate.file) : [];
-    items.push({ ...base, kind: 'gate', label: `gate ${step}`, file: gate.file ?? '', lines: body.length, body });
+    items.push({ ...base, kind: 'gate', step, label: `gate ${step}`, file: gate.file ?? '', lines: body.length, body });
   }
   return items;
 }
@@ -236,13 +236,6 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
 
 // ── snapshot ─────────────────────────────────────────────────────────────────
 
-/** The mode the human chose. Read from the file every time: `c` rewrites it while we run. */
-async function caffeinateMode(): Promise<Caffeinate> {
-  const raw = await readFile(CONFIG, 'utf-8').catch(() => '');
-  const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
-  return value === 'on' || value === 'off' ? value : 'auto';
-}
-
 const parts = (states: Awaited<ReturnType<typeof scanProject>>): PartRow[] =>
   states.map((s) => ({
     name: s.part.name, type: s.part.type,
@@ -301,5 +294,5 @@ export async function buildSnapshot(): Promise<Snapshot> {
 
   ctx.inbox.sort((a, b) => a.at - b.at);
   ctx.activity.sort((a, b) => a.at - b.at);
-  return { projects, inbox: ctx.inbox, activity: ctx.activity, caffeinate: await caffeinateMode() };
+  return { projects, inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
 }

@@ -1,4 +1,8 @@
-/** What Mission Control draws. The wiring step fills these from state.json, events and manifests. */
+/** What Mission Control draws. `live.ts` fills these from state.json, events and manifests. */
+
+import type { Caffeinate } from '../core/config.js';
+
+export type { Caffeinate };
 
 export type RunState = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'skipped';
 
@@ -87,6 +91,8 @@ export interface InboxItem {
   kind: 'gate' | 'question' | 'triage';
   project: string;
   origin: string;
+  /** The workflow step an answer is recorded against; absent on a question. */
+  step?: string;
   label: string;
   at: number;
   answered?: boolean;
@@ -97,9 +103,6 @@ export interface InboxItem {
   tab?: string;
   plan?: TriageLine[];
 }
-
-/** AUTO holds the machine awake while a mission session runs, ON always, OFF never. */
-export type Caffeinate = 'auto' | 'on' | 'off';
 
 export interface Snapshot {
   projects: Project[];

@@ -1,4 +1,5 @@
 import { str, type Flags } from '../core/args.js';
+import type { InboxItem, Snapshot } from '../tui/model.js';
 
 /**
  * Mission Control. Live by default: the real projects, missions and sessions, refreshed as their
@@ -20,6 +21,20 @@ export async function control(flags: Flags): Promise<void> {
   const { run } = await import('../tui/screen.js');
   if (fixture) return run(snapshot);
 
+  const { arrivals, notify } = await import('../tui/notify.js');
   const { startLive } = await import('../tui/watch.js');
-  await run(snapshot, (apply) => startLive(snapshot, apply));
+
+  // The first snapshot is the backlog the human opened the screen to read; everything the rebuilds
+  // add after it is news, and news is worth a bell. Only the key of an item counts, not its age.
+  let seen: InboxItem[] | null = null;
+  const announce = (snap: Snapshot): void => {
+    for (const item of arrivals(seen, snap.inbox)) notify(item);
+    seen = snap.inbox;
+  };
+
+  announce(snapshot);
+  await run(snapshot, (apply) => startLive(snapshot, (next) => {
+    announce(next);
+    apply(next);
+  }));
 }

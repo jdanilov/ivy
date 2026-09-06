@@ -1,10 +1,9 @@
 import path from 'node:path';
-import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
+import { readManifest } from '../core/manifest.js';
 import { scanProject } from '../core/scanner.js';
-import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied, dropCreated } from '../core/linker.js';
-import { runUninit } from '../core/recipes.js';
+import { removeParts } from '../core/parts.js';
 import { Refusal } from '../core/mission.js';
-import { FACTORY_ROOT, dependants } from '../core/registry.js';
+import { dependants } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
 import { printPartResult, printSnippetInfo } from '../ui/format.js';
@@ -105,55 +104,20 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
   console.log(`${I}Uninstalling ${pluralize(selectedNames.length, 'part')}...`);
   console.log('');
 
-  // Agent files the install created: candidates for deletion once every snippet is out of them.
-  const created: string[] = [];
+  const removal = await removeParts(resolvedDir, selectedNames);
 
-  for (const name of selectedNames) {
-    const ps = installedStates.find((s) => s.part.name === name)!;
-    const part = ps.part;
-
-    // The manifest holds what the install actually wrote, vars resolved; the part.yaml may have moved on.
-    const entry = manifest.parts[name];
-    if (entry) {
-      await runUninit(name, entry.uninit, resolvedDir);
-      await unlinkPart(entry, resolvedDir, FACTORY_ROOT);
-      if (entry.hooks) await removeHooks(entry.hooks, resolvedDir);
-      if (entry.mcp) await removeMcp(entry.mcp.serverName, resolvedDir);
-      if (entry.settings) await removeSettings(entry.settings, resolvedDir);
-    }
-
-    delete manifest.parts[name];
-
-    printPartResult(part, { verb: 'removed' });
-
-    if (entry?.snippet?.created) created.push(entry.snippet.file);
-    if (entry?.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
-      printSnippetInfo(entry.snippet.file, 'removed');
-    }
+  for (const { name, snippet } of removal.parts) {
+    printPartResult(installedStates.find((s) => s.part.name === name)!.part, { verb: 'removed' });
+    if (snippet) printSnippetInfo(snippet, 'removed');
   }
-
-  for (const file of await dropEmptied(resolvedDir)) {
-    console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
-  }
-
-  // Write or delete manifest
-  const remainingCount = Object.keys(manifest.parts).length;
-  if (remainingCount === 0) {
-    await deleteManifest(resolvedDir);
-  } else {
-    manifest.updatedAt = new Date().toISOString();
-    await writeManifest(resolvedDir, manifest);
-  }
-
-  // Last, so the manifest is already gone and an untouched `.claude/` reads as empty.
-  for (const file of await dropCreated(created, resolvedDir)) {
+  for (const file of removal.emptied) {
     console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
   }
 
   console.log('');
   const removedStr = `${pluralize(selectedNames.length, 'part')} removed`;
-  if (remainingCount > 0) {
-    console.log(`${I}${colors.bold}Done.${colors.reset} ${removedStr}. ${remainingCount} remaining.`);
+  if (removal.remaining > 0) {
+    console.log(`${I}${colors.bold}Done.${colors.reset} ${removedStr}. ${removal.remaining} remaining.`);
   } else {
     console.log(`${I}${colors.bold}Done.${colors.reset} ${removedStr}.`);
   }

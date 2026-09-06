@@ -28,6 +28,7 @@ const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
 const exists = (p: string): Promise<boolean> => Bun.file(p).exists();
+const alive = (pid: number): boolean => { try { return process.kill(pid, 0); } catch { return false; } };
 const branchGone = async (dir: string, b: string): Promise<boolean> => (await git(dir, 'branch', '--list', b)) === '';
 
 /** The commands talk to a human; a case only cares about what they left behind. */
@@ -133,6 +134,97 @@ await check('the hook rings only when the parent session waits on the human', as
   ok((await fire('SubagentStop', { agent_type: 'Worker' })) === 2, 'a sub-agent finishing rang');
   await prompted(40);
   ok((await fire('Stop', {}, 'off')) === 2, 'SOUND=off rang');
+});
+
+await check('the hook holds the machine awake only as the caffeinate mode says', async () => {
+  const dir = path.join(TMP, 'caff');
+  const home = path.join(dir, 'home');
+  const bin = path.join(dir, 'bin');
+  const mission = path.join(dir, 'mission');
+  const pid = path.join(home, '.factory', 'caffeinate', 'S.pid');
+  await mkdir(bin, { recursive: true });
+  await mkdir(mission, { recursive: true });
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  // A fake holder first on PATH: the case proves the decision, never this machine's sleep.
+  await writeFile(path.join(bin, 'caffeinate'), '#!/bin/sh\nexec sleep 5\n', { mode: 0o755 });
+  await writeFile(path.join(mission, 'state.json'), JSON.stringify({ name: 'c', session: 'S', step: 'implement' }));
+
+  const hook = path.join(import.meta.dir, '..', 'parts', 'hook-factory', 'hook-factory.ts');
+  const fire = async (event: string): Promise<boolean> => {
+    const proc = Bun.spawn(['bun', hook, event], {
+      cwd: dir,
+      env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, SOUND: 'off', FACTORY_MISSION: mission },
+      stdin: new TextEncoder().encode(JSON.stringify({ session_id: 'S', cwd: dir })),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+    return exists(pid);
+  };
+  const mode = (value: string): Promise<void> => writeFile(path.join(home, '.factory', 'config.yaml'), `caffeinate: "${value}"\n`);
+
+  await mode('off');
+  ok(!(await fire('SessionStart')) && !(await fire('UserPromptSubmit')), 'off started one anyway');
+  await mode('on');
+  ok(await fire('SessionStart'), 'on did not start at the session start');
+  ok(await fire('Stop'), 'on let go at the end of a turn');
+  await rm(pid, { force: true });
+  await mode('auto');
+  ok(!(await fire('SessionStart')), 'auto started before the first prompt');
+  ok(await fire('UserPromptSubmit'), 'auto did not start on a prompt');
+  ok(!(await fire('Stop')), 'auto held on past the turn');
+});
+
+await check('c writes the mode, keeps vars and holds only its own pid', async () => {
+  const dir = path.join(TMP, 'caffc');
+  const home = path.join(dir, 'home');
+  const bin = path.join(dir, 'bin');
+  const pids = path.join(home, '.factory', 'caffeinate');
+  await mkdir(bin, { recursive: true });
+  await mkdir(path.join(home, '.factory'), { recursive: true });
+  await writeFile(path.join(bin, 'caffeinate'), '#!/bin/sh\nexec sleep 60\n', { mode: 0o755 });
+  await writeFile(path.join(home, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
+  // A pid the hook would have left behind: `auto` leaves it alone, `off` takes it down too.
+  const other = Bun.spawn(['sleep', '60']);
+  await Bun.write(path.join(pids, 'S.pid'), String(other.pid));
+
+  // os.homedir() is fixed when the process starts, so a scratch ~/.factory only reaches a child.
+  const script = path.join(dir, 'c.ts');
+  const actions = path.join(import.meta.dir, '..', 'src', 'tui', 'actions.ts');
+  await writeFile(script, `const { setCaffeinate } = await import('${actions}');\nawait setCaffeinate(process.argv[2] as never);\n`);
+  const press = async (mode: string): Promise<void> => {
+    const proc = Bun.spawn(['bun', script, mode], {
+      env: { HOME: home, PATH: `${bin}:${process.env.PATH}` }, stdout: 'ignore', stderr: 'ignore',
+    });
+    ok((await proc.exited) === 0, `c ${mode} exited non-zero`);
+  };
+  const gone = (proc: { exited: Promise<unknown> }): Promise<boolean> =>
+    Promise.race([proc.exited.then(() => true), Bun.sleep(1500).then(() => false)]);
+
+  await press('on');
+  const config = await Bun.file(path.join(home, '.factory', 'config.yaml')).text();
+  ok(config.includes('caffeinate: "on"'), `the mode did not land, got ${JSON.stringify(config)}`);
+  ok(config.includes('codegraph'), 'the rewrite lost vars');
+  const held = Number(await Bun.file(path.join(pids, 'control.pid')).text());
+  ok(held > 0 && alive(held), 'no live caffeinate behind control.pid');
+
+  await press('auto');
+  ok(!(await exists(path.join(pids, 'control.pid'))) && !alive(held), 'auto left control.pid running');
+  ok(alive(other.pid), 'auto killed a pid that was not its own');
+
+  await press('off');
+  ok(await gone(other), 'off left a session pid running');
+  ok(!(await exists(path.join(pids, 'S.pid'))), 'off left a pid file behind');
+});
+
+await check('a new inbox key is news, the first snapshot and an ageing item are not', async () => {
+  const { arrivals, inboxKey } = await import('../src/tui/notify.js');
+  const item = (origin: string, at: number) => ({ kind: 'gate' as const, project: 'p', origin, label: 'gate g', at });
+  const first = [item('a', 1)];
+  ok(inboxKey(item('a', 1)) === 'p/a/gate', `key is project/origin/kind, got ${inboxKey(item('a', 1))}`);
+  ok(arrivals(null, first).length === 0, 'the first snapshot announced its own backlog');
+  ok(arrivals(first, [item('a', 9)]).length === 0, 'an item that only aged read as new');
+  ok(arrivals(first, [item('a', 9), item('b', 9)]).map((i) => i.origin).join() === 'b', 'the new item was missed');
 });
 
 await check('the transcript tail parses each line once', async () => {

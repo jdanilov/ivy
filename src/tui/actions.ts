@@ -1,0 +1,147 @@
+import path from 'node:path';
+import { readdir, readFile, unlink } from 'node:fs/promises';
+import { gate } from '../commands/gate.js';
+import { install } from '../commands/install.js';
+import { removeParts } from '../core/parts.js';
+import { deviate, resolveMission, sessionLive, writeState } from '../core/mission.js';
+import { loadPreset, openSession } from '../core/spawn.js';
+import { writeCaffeinate, type Caffeinate } from '../core/config.js';
+import { FACTORY_HOME } from '../core/projects.js';
+import { id } from './format.js';
+import type { Attention, InboxItem } from './model.js';
+
+/**
+ * What a key actually does. Every action goes through the same functions the CLI runs — `gate`,
+ * `install`, `removeParts`, `openSession`, `writeState` — so the screen can never write a mission
+ * a command would have written differently. Each returns the line the toast shows; a refusal
+ * throws, and the caller toasts that instead.
+ */
+
+/** The commands talk to a human on stdout, and stdout is the screen. */
+async function quiet<T>(fn: () => Promise<T>): Promise<T> {
+  const log = console.log;
+  console.log = (): void => {};
+  try {
+    return await fn();
+  } finally {
+    console.log = log;
+  }
+}
+
+// ── gates ────────────────────────────────────────────────────────────────────
+
+/** `factory gate answer <step> <verdict>` with the project as its cwd. First answer wins there. */
+export async function answerGate(project: string, item: InboxItem, verdict: string, note: string): Promise<string> {
+  const step = item.step;
+  if (!step) throw new Error(`${item.label} is not a gate`);
+  const flags = { mission: item.origin, ...(note === '' ? {} : { note }) };
+  await quiet(() => gate('answer', [step, verdict], flags, project));
+  return `${item.origin} ${step} ${verdict}${note === '' ? '' : ` — ${note}`}`;
+}
+
+// ── sessions ─────────────────────────────────────────────────────────────────
+
+/** The preset `mission open` uses with no flag: a mission's session is the Orchestrator's. */
+const PRESET = 'orchestrator';
+
+export async function openTab(project: string, name: string): Promise<string> {
+  const mission = await resolveMission(project, name);
+  if (await sessionLive(mission.state.session)) return `factory-${name} is already open — switch to that tab`;
+
+  const spawn = await openSession(project, mission, await loadPreset(PRESET), false);
+  return spawn.warp ? `opened tab factory-${name}` : `no warp — run it from ${spawn.configPath}`;
+}
+
+/** A second `x` inside this window means the human watched SIGTERM do nothing. */
+const ESCALATE = 5000;
+const termed = new Map<string, number>();
+
+/**
+ * Only a process whose argv carries this session id: the pattern is the flag `claude` was spawned
+ * with, so no other process on the machine can match it by accident.
+ */
+export async function killSession(session: string): Promise<string> {
+  const proc = Bun.spawn(['pgrep', '-f', '--', `--session-id ${session}`], { stdout: 'pipe', stderr: 'ignore' });
+  const out = await new Response(proc.stdout).text();
+  await proc.exited;
+
+  const pids = out.split('\n').map(Number).filter((pid) => pid > 0 && pid !== process.pid);
+  if (pids.length === 0) return `no process for ${id(session)}`;
+
+  const hard = Date.now() - (termed.get(session) ?? 0) < ESCALATE;
+  const signal = hard ? 'SIGKILL' : 'SIGTERM';
+  const killed: number[] = [];
+  for (const pid of pids) {
+    try {
+      process.kill(pid, signal);
+      killed.push(pid);
+    } catch {
+      // Gone between the pgrep and the signal: nothing left to kill.
+    }
+  }
+  termed.set(session, Date.now());
+  return killed.length === 0 ? `no process for ${id(session)}` : `${signal} ${killed.join(' ')} · ${id(session)}`;
+}
+
+// ── parts ────────────────────────────────────────────────────────────────────
+
+/** The `--parts` install for what was ticked, the `uninstall` removal for what was unticked. */
+export async function applyParts(project: string, add: string[], drop: string[]): Promise<string> {
+  if (add.length > 0) await quiet(() => install(project, false, add));
+  if (drop.length > 0) await removeParts(project, drop);
+  const said = [add.length > 0 ? `installed ${add.join(', ')}` : '', drop.length > 0 ? `removed ${drop.join(', ')}` : ''];
+  return said.filter((s) => s !== '').join(' · ');
+}
+
+// ── caffeinate ───────────────────────────────────────────────────────────────
+
+const PIDS = path.join(FACTORY_HOME, 'caffeinate');
+/** Mission Control's own hold, next to the hook's one file per session. */
+const CONTROL = path.join(PIDS, 'control.pid');
+
+async function stop(file: string): Promise<void> {
+  const pid = Number(await readFile(file, 'utf-8').catch(() => ''));
+  try {
+    if (pid > 0) process.kill(pid);
+  } catch {
+    // Already dead; the file is the only thing left to clear.
+  }
+  await unlink(file).catch(() => {});
+}
+
+async function start(): Promise<void> {
+  const pid = Number(await readFile(CONTROL, 'utf-8').catch(() => ''));
+  try {
+    if (pid > 0 && process.kill(pid, 0)) return;
+  } catch {
+    // Not running: fall through and spawn one.
+  }
+  // nohup detaches it from this process, so quitting the screen does not put the Mac back to sleep.
+  const proc = Bun.spawn(['/bin/sh', '-c', 'nohup caffeinate -i >/dev/null 2>&1 & printf %s "$!"'], { stdout: 'pipe', stderr: 'ignore' });
+  const spawned = (await new Response(proc.stdout).text()).trim();
+  await proc.exited;
+  if (spawned !== '') await Bun.write(CONTROL, spawned);
+}
+
+/**
+ * The mode is the file: the hook reads it on its next event and the screen on its next rebuild.
+ * `off` also takes down what is already holding the machine awake, hook pids included — otherwise
+ * OFF would not read as off until every session ended.
+ */
+export async function setCaffeinate(mode: Caffeinate): Promise<string> {
+  await writeCaffeinate(mode);
+  if (mode === 'on') await start();
+  else if (mode === 'auto') await stop(CONTROL);
+  else for (const name of await readdir(PIDS).catch(() => [])) await stop(path.join(PIDS, name));
+  return `caffeinate ${mode.toUpperCase()}`;
+}
+
+// ── attention ────────────────────────────────────────────────────────────────
+
+export async function setAttention(project: string, name: string, attention: Attention): Promise<string> {
+  const mission = await resolveMission(project, name);
+  mission.state.attention = attention;
+  deviate(mission.state, `attention set to ${attention}`, 'set from Mission Control');
+  await writeState(mission.dir, mission.state);
+  return `${name} attention ${attention}`;
+}

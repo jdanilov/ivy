@@ -3,12 +3,12 @@
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
  1 running · 1 stub                                                                                                                         
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- PROJECTS                                                      │ PARTS  ivy  15/17                                                          
+ PROJECTS                                                      │ PARTS  ivy  15/17  ±2                                                      
  ──────────────────────────────────────────────────────────────│ ────────────────────────────────────────────────────────────────────────── 
    Inbox (3)                                                   │  archify         skill    ○ available  .claude/skills/archify/skill.md     
-                                                               │  browse          tool     ● installed  .claude/skills/browse/skill.md      
+                                                               │  browse          tool     ○ available  .claude/skills/browse/skill.md    ± 
  › ivy                                                         │  code-format     fixture  ● installed  .claude/code-format.md              
-    ● refit  story  implement r2                      14m  4.5M│  codegraph       mcp      ○ available  .claude/scripts/codegraph-gate.sh   
+    ● refit  story  implement r2                      14m  4.5M│  codegraph       mcp      ● installed  .claude/scripts/codegraph-gate.sh ± 
     ○ memory  stub                                             │  commit          skill    ● installed  .claude/skills/commit/skill.md      
                                                                │  docs-format     fixture  ● installed  .claude/docs-format.md              
    igs                                                         │  explain         skill    ● installed  .claude/skills/explain/skill.md     
@@ -23,8 +23,8 @@
                                                                │  validate        skill    ● installed  .claude/skills/validate/skill.md    
                                                                │  verify          skill    ● installed  .claude/skills/verify/skill.md      
                                                                │ ────────────────────────────────────────────────────────────────────────── 
-                                                               │ .claude/skills/archify/skill.md                                            
-                                                               │ .claude/skills/archify/template.html                                       
+                                                               │ apply: uninstall browse, install codegraph   y confirm  n cancel           
+                                                               │                                                                            
                                                                │                                                                            
                                                                │                                                                            
                                                                │                                                                            
@@ -38,5 +38,5 @@
                                                                │                                                                            
                                                                │                                                                            
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- ↑↓ Select  space Toggle  ↵ Apply  esc Back  q Quit                                                                                         
+ y Confirm  n Cancel  esc Back  q Quit                                                                                                      
                                                                                                                                             

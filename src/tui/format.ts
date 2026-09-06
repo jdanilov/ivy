@@ -42,15 +42,18 @@ export function len(cells: Cell[]): number {
   return cells.reduce((n, [text]) => n + [...text].length, 0);
 }
 
-/** Word-wraps a quoted block over at most `max` rows. Rows never wrap on their own. */
+/** Word-wraps over at most `max` rows, splitting a word too long to fit. Never truncates. */
 export function wrap(text: string, width: number, max: number): string[] {
   const out: string[] = [''];
-  for (const word of text.split(' ')) {
-    const last = out[out.length - 1]!;
-    if (!last) out[out.length - 1] = word;
-    else if (last.length + 1 + word.length <= width) out[out.length - 1] = `${last} ${word}`;
-    else if (out.length < max) out.push(word);
-    else break;
+  for (const word of text.split(/\s+/)) {
+    for (let rest = word; rest; rest = rest.slice(width)) {
+      const piece = rest.slice(0, width);
+      const last = out[out.length - 1]!;
+      if (!last) out[out.length - 1] = piece;
+      else if (last.length + 1 + piece.length <= width) out[out.length - 1] = `${last} ${piece}`;
+      else if (out.length < max) out.push(piece);
+      else return out;
+    }
   }
   return out;
 }

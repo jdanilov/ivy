@@ -19,12 +19,7 @@ export const C = {
 };
 
 export const GLYPH: Record<RunState, string> = {
-  pending: '○',
-  running: '●',
-  done: '✓',
-  failed: '✗',
-  blocked: '⊘',
-  skipped: '·',
+  pending: '○', running: '●', done: '✓', failed: '✗', blocked: '⊘', skipped: '·',
 };
 
 export function stateColor(state: RunState): string {
@@ -35,12 +30,7 @@ export function stateColor(state: RunState): string {
   return C.dim;
 }
 
-const KIND: Record<StepKind, string> = {
-  plain: '',
-  gate: C.warning,
-  implement: C.implement,
-  gatekeeper: C.gatekeeper,
-};
+const KIND: Record<StepKind, string> = { plain: '', gate: C.warning, implement: C.implement, gatekeeper: C.gatekeeper };
 
 /** A step's name reads as its role, its glyph reads as its life. Plain steps carry the life colour. */
 export function stepColor(kind: StepKind, state: RunState): string {

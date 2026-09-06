@@ -27,7 +27,7 @@ const refitEvents: EventRow[] = (
     [26 * M, 'SubagentStop', '[Validator]', '✓'], [38 * M, 'SubagentStop', '[Worker]', '✓'],
     [51 * M, 'Notification', 'gate intent open', '⊘'], [64 * M, 'SessionStart', 'preset orchestrator', ''],
   ] as const
-).map(([back, verb, detail, mark]) => ({ at: now - back, session: '75cb46e1', verb, detail, mark }));
+).map(([back, verb, detail, mark]) => ({ at: now - back, verb, detail, mark }));
 
 const authSteps = steps([
   ['grill', 'plain', 'done', 4 * M], ['implement', 'implement', 'done', 71 * M],
@@ -37,17 +37,25 @@ authSteps[3]!.gateOpen = true;
 
 const ivyParts: PartRow[] = (
   [
-    ['archify', 'skill', '.claude/skills/archify/skill.md'], ['browse', 'tool', '.claude/skills/browse/skill.md'],
-    ['code-format', 'fixture', '.claude/code-format.md'], ['codegraph', 'mcp', '.claude/scripts/codegraph-gate.sh'],
-    ['commit', 'skill', '.claude/skills/commit/skill.md'], ['docs-format', 'fixture', '.claude/docs-format.md'],
-    ['explain', 'skill', '.claude/skills/explain/skill.md'], ['hook-factory', 'fixture', '.claude/scripts/hook-factory.ts'],
-    ['hook-safe-bash', 'fixture', '.claude/scripts/safe-bash.sh'], ['mission', 'skill', '.claude/skills/mission/skill.md'],
-    ['permissions', 'fixture', '.claude/settings.json'], ['research', 'tool', '.claude/skills/research/skill.md'],
-    ['retro', 'skill', '.claude/skills/retro/skill.md'], ['roadmap', 'fixture', 'docs/roadmap.md'],
-    ['terminology', 'fixture', 'docs/terminology.md'], ['validate', 'skill', '.claude/skills/validate/skill.md'],
-    ['verify', 'skill', '.claude/skills/verify/skill.md'],
+    ['archify', 'skill', ['.claude/skills/archify/skill.md', '.claude/skills/archify/template.html']],
+    ['browse', 'tool', ['.claude/skills/browse/skill.md', '.claude/skills/browse/agent-browser.md']],
+    ['code-format', 'fixture', ['.claude/code-format.md']],
+    ['codegraph', 'mcp', ['.claude/scripts/codegraph-gate.sh', '.mcp.json']],
+    ['commit', 'skill', ['.claude/skills/commit/skill.md']],
+    ['docs-format', 'fixture', ['.claude/docs-format.md']],
+    ['explain', 'skill', ['.claude/skills/explain/skill.md']],
+    ['hook-factory', 'fixture', ['.claude/scripts/hook-factory.ts']],
+    ['hook-safe-bash', 'fixture', ['.claude/scripts/safe-bash.sh']],
+    ['mission', 'skill', ['.claude/skills/mission/skill.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md']],
+    ['permissions', 'fixture', ['.claude/settings.json']],
+    ['research', 'tool', ['.claude/skills/research/skill.md']],
+    ['retro', 'skill', ['.claude/skills/retro/skill.md']],
+    ['roadmap', 'fixture', ['docs/roadmap.md']],
+    ['terminology', 'fixture', ['docs/terminology.md']],
+    ['validate', 'skill', ['.claude/skills/validate/skill.md', '.claude/agents/Validator.md']],
+    ['verify', 'skill', ['.claude/skills/verify/skill.md', '.claude/agents/Verifier.md']],
   ] as const
-).map(([name, type, file]) => ({ name, type, file, status: name === 'archify' || name === 'codegraph' ? 'not-installed' : 'installed' }));
+).map(([name, type, files]) => ({ name, type, files: [...files], status: name === 'archify' || name === 'codegraph' ? 'not-installed' : 'installed' }));
 
 /** Everything a mission needs but a fixture rarely varies. */
 function mission(m: Partial<Mission> & Pick<Mission, 'name' | 'workflow'>): Mission {
@@ -77,7 +85,13 @@ const projects: Project[] = [
     name: 'igs',
     path: '~/dev/igs',
     parts: ivyParts.filter((p) => ['commit', 'mission', 'verify', 'permissions'].includes(p.name)),
-    sessions: [{ id: '8a9e6b42', preset: 'quick', idleSince: now - 12 * M }],
+    sessions: [
+      {
+        id: '8a9e6b42', preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
+        last: { at: now - 12 * M, verb: 'Notification', detail: 'waiting on the human', mark: '⊘' },
+        question: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
+      },
+    ],
     missions: [
       mission({
         name: 'auth', workflow: 'fix', state: 'blocked', step: 'merge', round: 2, session: '8a9e6b42',
@@ -100,47 +114,34 @@ const projects: Project[] = [
   },
 ];
 
-const retroBody = [
-  '# Retro',
-  '',
-  '## Tools',
-  '',
-  'The codegraph MCP paid for itself twice: both recovery designs came out of one query.',
-  'The browse tool timed out on the login flow, the Validator fell back to curl and said so.',
-  '',
-  '## Context',
-  '',
-  'AGENTS.md is doing the work a spec should do. Three steps quoted it back at me.',
-  'The Worker prompt is still under 40 lines and nobody complained.',
-  '',
-];
+const retroBody = `# Retro
+
+## Tools
+
+The codegraph MCP paid for itself twice: both recovery designs came out of one query.
+The browse tool timed out on the login flow, the Validator fell back to curl and said so.
+
+## Context
+
+AGENTS.md is doing the work a spec should do. Three steps quoted it back at me.
+The Worker prompt is still under 40 lines and nobody complained.
+
+## Workflow
+
+Two rounds of verify on a copy change is one round too many, the second found nothing.`.split('\n');
 
 const inbox: InboxItem[] = [
   {
-    kind: 'gate',
-    project: 'igs',
-    origin: 'auth',
-    label: 'gate merge',
-    at: now - 3 * M,
-    file: 'retro.md',
-    lines: 41,
-    body: retroBody,
+    kind: 'gate', project: 'igs', origin: 'auth', label: 'gate merge', at: now - 3 * M,
+    file: 'retro.md', lines: 41, body: retroBody,
   },
   {
-    kind: 'question',
-    project: 'igs',
-    origin: 'quick',
-    label: 'asks',
-    at: now - 8 * M,
-    text: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
+    kind: 'question', project: 'igs', origin: 'quick', label: 'asks', at: now - 8 * M,
+    text: 'Two recall strategies fit here, embeddings or a grep index. Embeddings need a model on the box and a rebuild whenever a note changes; a grep index is instant and dumb. Which do you want for v1?',
     tab: 'factory-igs-quick',
   },
   {
-    kind: 'triage',
-    project: 'igs',
-    origin: 'auth',
-    label: 'triage r2',
-    at: now - 1 * H,
+    kind: 'triage', project: 'igs', origin: 'auth', label: 'triage r2', at: now - 1 * H,
     plan: [
       { action: 'fix', text: 'A3 session cookie survives logout — Worker, one round' },
       { action: 'fix', text: 'A7 refresh token not rotated on reuse' },
@@ -151,4 +152,4 @@ const inbox: InboxItem[] = [
   },
 ];
 
-export const snapshot: Snapshot = { projects, inbox };
+export const snapshot: Snapshot = { projects, inbox, caffeinate: 'auto' };

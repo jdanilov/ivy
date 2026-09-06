@@ -16,16 +16,9 @@ export interface StepRow {
 
 export interface EventRow {
   at: number;
-  session: string;
   verb: string;
   detail: string;
   mark?: string;
-}
-
-export interface Tokens {
-  input: number;
-  cached: number;
-  output: number;
 }
 
 export interface Mission {
@@ -40,7 +33,7 @@ export interface Mission {
   worktree: string | null;
   caffeinate: boolean;
   wall: number;
-  tokens: Tokens;
+  tokens: { input: number; cached: number; output: number };
   steps: StepRow[];
   deviations: number;
   events: EventRow[];
@@ -51,14 +44,17 @@ export interface Mission {
 export interface Session {
   id: string;
   preset: string;
+  cwd: string;
   idleSince: number;
+  last?: EventRow;
+  question?: string;
 }
 
 export interface PartRow {
   name: string;
   type: string;
   status: 'installed' | 'not-installed' | 'modified';
-  file: string;
+  files: string[];
 }
 
 export interface Project {
@@ -89,7 +85,11 @@ export interface InboxItem {
   plan?: TriageLine[];
 }
 
+/** AUTO holds the machine awake while a mission session runs, ON always, OFF never. */
+export type Caffeinate = 'auto' | 'on' | 'off';
+
 export interface Snapshot {
   projects: Project[];
   inbox: InboxItem[];
+  caffeinate: Caffeinate;
 }

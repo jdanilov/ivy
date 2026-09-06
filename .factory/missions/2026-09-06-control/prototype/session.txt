@@ -1,28 +1,27 @@
- ● Mission Control  /opt/ed/ivy                                                        TIME 14m · Input 310.2K · Cached 4.1M · Output 48.0K 
+                                                                                                                                            
+ ⌬ Mission Control  ~/dev/igs                                                                                               caffeinate AUTO 
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- ● RUNNING  ███████████████████████████████████████████████████████████████████████████████████████████                           3/10 [+5] 
+ 1 waiting                                                                                                                                  
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- Missions                                                      │ Inbox (3)                                                                  
+ PROJECTS                                                      │ SESSION  quick                                                             
  ──────────────────────────────────────────────────────────────│ ────────────────────────────────────────────────────────────────────────── 
- ivy                                                           │  ⊘ igs/auth  gate merge                                             3m ago 
- ›● refit  story  implement r2                        14m  4.5M│  ⊘ igs/quick  asks                                                  8m ago 
-    wt ../ivy-refit · caffeinate on                            │  ⊘ igs/auth  triage r2                                              1h ago 
-  ○ memory  stub                                               │ ────────────────────────────────────────────────────────────────────────── 
- igs                                                           │ retro.md (41 lines)                                                        
-  ⊘ auth  fix  merge r2                             2h 4m  1.2M│ # Retro                                                                    
-    quick  unbound  #8a9e6b42  idle 12m                        │                                                                            
- cut                                                           │ ## Tools                                                                   
-  ✓ intro  closed 2d ago                                       │                                                                            
-                                                               │ The codegraph MCP paid for itself twice: both recovery designs came out o… 
-                                                               │ The browse tool timed out on the login flow, the Validator fell back to c… 
+   Inbox (3)                                                   │ session #8a9e6b42 · idle 12m                                               
+                                                               │ cwd ~/dev/igs                                                              
+   ivy                                                         │ last Notification  waiting on the human  12m ago                           
+    ● refit  story  implement r2                      14m  4.5M│ ────────────────────────────────────────────────────────────────────────── 
+    ○ memory  stub                                             │ asks                                                                       
+                                                               │ Two recall strategies fit here, embeddings or a grep index. Which do you   
+   igs                                                         │ want for v1?                                                               
+    ⊘ auth  fix  merge r2                           2h 4m  1.2M│                                                                            
+ ›  ○ quick  unbound  #8a9e6b42  idle 12m                      │                                                                            
                                                                │                                                                            
-                                                               │ ## Context                                                                 
-                                                               │                                                                            
-                                                               │ AGENTS.md is doing the work a spec should do. Three steps quoted it back … 
-                                                               │ The Worker prompt is still under 40 lines and nobody complained.           
+   cut                                                         │                                                                            
+    ✓ intro  closed 2d ago                                     │                                                                            
                                                                │                                                                            
                                                                │                                                                            
-                                                               │  accept    amend    reject                                                 
+                                                               │                                                                            
+                                                               │                                                                            
+                                                               │                                                                            
                                                                │                                                                            
                                                                │                                                                            
                                                                │                                                                            
@@ -39,4 +38,5 @@
                                                                │                                                                            
                                                                │                                                                            
  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 
- ↑↓ Select  ←→ Answer  ↵ Confirm  Tab Mode  q Quit                                                                                          
+ esc Back  c Caffeinate  q Quit                                                                                                             
+                                                                                                                                            

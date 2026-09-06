@@ -46,7 +46,7 @@ the fixture. Every id ends pass, fail or unchecked in `findings.md`.
 
 - A-DOC-1 | verify | `docs/design.md` carries the pane grid, the three semantic step colours, the `#3a3a3a` rule and the key bar; `docs/terminology.md` has rows Mission Control, Inbox, Activity, Caffeinate that match the screen | read | W2
 - A-DOC-2 | verify | README command table has `factory` and `factory menu`; AGENTS.md architecture block lists `src/tui/` and the `config.yaml` sentence names `caffeinate`; `docs/roadmap.md` no longer lists the Mission Control or tokens lines | read | W2
-- A-DOC-3 | verify | `src/tui/` plus `src/commands/control.ts` under 1700 lines; `bun x tsc --noEmit` clean; `bun scripts/test.ts` and `bash scripts/e2e.sh` exit 0 | run | W2
+- A-DOC-3 | verify | `src/tui/` plus `src/commands/control.ts` under 2200 lines (raised from 1700 after W1: read side is 600 lines); `bun x tsc --noEmit` clean; `bun scripts/test.ts` and `bash scripts/e2e.sh` exit 0 | run | W2
 
 ## Screen and prompts
 
@@ -55,3 +55,4 @@ the fixture. Every id ends pass, fail or unchecked in `findings.md`.
 - A-UI-3 | validate | Full activity hides header and status bar, `↑↓` scroll it, `↵`, `f` and `esc` restore the columns | key script under the test renderer | W3
 - A-UI-4 | verify | Each open mission row carries `+N −M` from `git diff --shortstat <trunk>...<branch>` in its checkout, refreshed on the poll and never awaited by the render | scratch mission with a committed change, read `live.ts` | W3
 - A-VAL-1 | verify | Validator.md instructs writing, indexing in `.factory/validator/scripts.md`, reusing and pruning short scripts under `.factory/validator/`; file under 80 lines; the two colour rows in agent prompts match the spec | read | W3
+- A-UI-5 | validate | An unbound session appears, and its question reaches MESSAGES, only while `sessionLive` says its process is alive; a session row and its inbox label carry the short id so two `quick` sessions in one project are told apart | scratch events for a dead and a live session, `--frames` | W3

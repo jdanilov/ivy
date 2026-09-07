@@ -149,7 +149,10 @@ status column is the scope, because scope is chosen there and nowhere else: one 
 while a global part is in `~/.claude`, warning while it is not there yet or its copy has drifted,
 dim for `project` and `off`. A status word beside it would say the same thing twice, so there is
 none and the description keeps the rest of the row; under the rule the selected part names its
-recommendation before its files. A graph row in MISSION ends in two right-aligned columns, tokens
+recommendation before its files. The rule and the lines under it keep the pane's bottom however
+long the list is, and the list is what a short terminal loses, clipped around the row the
+selection sits on: `↵` asks for a `Y` on the apply line, and an apply line drawn past the foot is
+one nobody can read. A graph row in MISSION ends in two right-aligned columns, tokens
 then wall time, so the numbers read down the pane, and a step the mission looped back to carries a
 dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each entry its own wrapped
 line, and is absent at zero. A session under a project is named by what `--name` or `/rename`

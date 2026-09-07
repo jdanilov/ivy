@@ -10,7 +10,7 @@ import { checkEnvVars } from '../core/env.js';
 import { Refusal } from '../core/mission.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
-import { printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
+import { partRow, printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
 
 /**
  * A part cannot be a project's and the user's at once: the same file in both places loads twice.
@@ -177,11 +177,8 @@ export async function install(targetDir: string, yes = false, only: string[] = [
 
     // `--yes` and `--parts` ask nothing, so a copy the project had edited is named here the way
     // `update` names it; the interactive path already asked with confirmModified.
-    if (!asked) {
-      for (const file of restored) {
-        console.log(`${I}${colors.green}${symbols.installed}${colors.reset} ${displayName(part).padEnd(nameCol())}restored ${file}`);
-      }
-    }
+    const named = !asked && restored.length > 0;
+    for (const file of named ? restored : []) partRow(symbols.installed, colors.green, displayName(part), `restored ${file}`);
 
     // Inject hooks if part has them
     if (part.hooks) {
@@ -216,9 +213,9 @@ export async function install(targetDir: string, yes = false, only: string[] = [
       newCount++;
     }
 
-    // Print result
+    // Print result. A restored part already has its row, and said more on it than a file list would.
     const suffix = wasInstalled ? ` ${colors.dim}(updated)${colors.reset}` : '';
-    printPartResult(part, { suffix });
+    if (!named) printPartResult(part, { suffix });
 
     if (part.hooks) {
       printHookInfo(hooksFileName(resolvedDir));

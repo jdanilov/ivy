@@ -63,7 +63,57 @@ function scopeCell(part: PartRow, status: string, ui: Ui): Cell {
   return [`${scope === 'off' ? '○' : '●'} ${scope.padEnd(11)}`, colour];
 }
 
-export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean): void {
+/** One row as drawn: a part's own rows carry its selection, so a clipped list keeps the highlight. */
+type Row = { cells: Cell[]; selected: boolean };
+
+/** The rows of one part: the row itself, then what it is for, wrapped under the description column. */
+function partBlock(p: Pane, part: PartRow, i: number, ui: Ui, global: boolean): Row[] {
+  const status = partStatus(part.name, part.status, ui);
+  const on = status !== 'not-installed';
+  const selected = i === ui.part && ui.focus === 'right';
+  const changed = global ? partScope(part, ui) !== part.scope : on !== (part.status !== 'not-installed');
+  // A part whose files no longer match the Factory is neither installed nor available: `update` fixes it.
+  const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
+  const head: Cell[] = [
+    marker(i === ui.part, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
+    global ? scopeCell(part, status, ui)
+      : [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
+  ];
+  // One column either way, so what a part is for takes the rest of the row and wraps under it:
+  // the pane where a part is chosen is the one that has to say what the part is.
+  const tail: Cell[] = [[changed ? '±' : ' ', C.accent]];
+  const indent = len(head);
+  const room = p.width - indent - len(tail) - 2;
+  const body = wrap(part.description, Math.max(20, room), DESCRIPTION_ROWS);
+  return [
+    { cells: spread([...head, [body[0] ?? '', C.dim]], tail, p.width), selected },
+    ...body.slice(1).map((text): Row => ({ cells: [[' '.repeat(indent), C.dim], [text, C.dim]], selected })),
+  ];
+}
+
+/** What the pane closes on: a pending change and the way out of it, else the selected part's files. */
+function footRows(parts: PartRow[], ui: Ui, changes: string[], global: boolean): Cell[][] {
+  if (ui.confirm) {
+    return [[['apply: ', C.dim], [changes.join(', '), C.bright], ['   Y ', C.accent], ['Confirm  ', C.dim], ['N ', C.accent], ['Cancel', C.dim]]];
+  }
+  if (changes.length > 0) return [[['↵ ', C.accent], ['Apply', C.dim], DOT, ['Esc ', C.accent], ['Discard', C.dim]]];
+  const part = parts[ui.part];
+  return [
+    ...(global && part ? [[['recommended ', C.dim], [part.recommended, C.accent]] as Cell[]] : []),
+    ...(part?.files ?? []).map((file): Cell[] => [[file, C.dim]]),
+  ];
+}
+
+/** The rows a short pane can draw: the list is what gets clipped, and the window holds whatever the
+ *  selection is on, so `Space` is never pressed on a row that is off the screen. */
+function clip(blocks: Row[][], room: number, sel: number): Row[] {
+  const size = (from: number, to: number): number => blocks.slice(from, to).reduce((n, b) => n + b.length, 0);
+  let start = 0;
+  while (start < sel && size(start, sel + 1) > room) start++;
+  return blocks.slice(start).flat().slice(0, room);
+}
+
+export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean, h: number): void {
   const parts = project.parts;
   const installed = parts.filter((part) => partStatus(part.name, part.status, ui) !== 'not-installed').length;
   const changes = pending(project, ui, global);
@@ -73,35 +123,12 @@ export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean): v
   ]);
   p.rule();
 
-  parts.forEach((part, i) => {
-    const status = partStatus(part.name, part.status, ui);
-    const on = status !== 'not-installed';
-    const selected = i === ui.part && ui.focus === 'right';
-    const changed = global ? partScope(part, ui) !== part.scope : on !== (part.status !== 'not-installed');
-    // A part whose files no longer match the Factory is neither installed nor available: `update` fixes it.
-    const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
-    const head: Cell[] = [
-      marker(i === ui.part, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
-      global ? scopeCell(part, status, ui)
-        : [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
-    ];
-    // One column either way, so what a part is for takes the rest of the row and wraps under it:
-    // the pane where a part is chosen is the one that has to say what the part is.
-    const tail: Cell[] = [[changed ? '±' : ' ', C.accent]];
-    const indent = len(head);
-    const room = p.width - indent - len(tail) - 2;
-    const body = wrap(part.description, Math.max(20, room), DESCRIPTION_ROWS);
-    p.row(spread([...head, [body[0] ?? '', C.dim]], tail, p.width), selected);
-    for (const text of body.slice(1)) p.row([[' '.repeat(indent), C.dim], [text, C.dim]], selected);
-  });
+  // The rule and what stands under it keep the pane's bottom however long the list is: `↵` asks for
+  // a `Y` on the apply line, and a confirmation drawn past the foot is one nobody can read.
+  const foot = footRows(parts, ui, changes, global);
+  const blocks = parts.map((part, i) => partBlock(p, part, i, ui, global));
+  for (const { cells, selected } of clip(blocks, Math.max(0, h - 3 - foot.length), ui.part)) p.row(cells, selected);
 
   p.rule();
-  if (ui.confirm) {
-    return p.row([['apply: ', C.dim], [changes.join(', '), C.bright], ['   Y ', C.accent], ['Confirm  ', C.dim], ['N ', C.accent], ['Cancel', C.dim]]);
-  }
-  // The files of the selected part, until something is pending: then the way out is what matters.
-  if (changes.length > 0) return p.row([['↵ ', C.accent], ['Apply', C.dim], DOT, ['Esc ', C.accent], ['Discard', C.dim]]);
-  const part = parts[ui.part];
-  if (global && part) p.row([['recommended ', C.dim], [part.recommended, C.accent]]);
-  for (const file of part?.files ?? []) p.row([[file, C.dim]]);
+  for (const cells of foot) p.row(cells);
 }

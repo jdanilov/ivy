@@ -2,6 +2,7 @@ import path from 'node:path';
 import { mkdir, unlink, readdir, rmdir, readFile, lstat } from 'node:fs/promises';
 import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet, SnippetRecord } from '../types.js';
 import { hashFile } from './scanner.js';
+import { Refusal } from './mission.js';
 import { scopeOf } from './projects.js';
 
 /** Hooks are the project's local business; at user level there is only `~/.claude/settings.json`. */
@@ -27,7 +28,7 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
  */
 async function ours(targetPath: string, manifestHash?: string, sourcePath?: string): Promise<boolean> {
   const hash = await hashFile(targetPath);
-  // Nothing to read is ours only from a dangling link: a directory or an unreadable file is theirs.
+  // Nothing to read is ours only from a dangling link; a directory at the path is the project's.
   if (hash === '') return (await lstat(targetPath).catch(() => null))?.isSymbolicLink() ?? false;
   if (hash === manifestHash) return true;
   return sourcePath !== undefined && hash === (await hashFile(sourcePath));
@@ -68,10 +69,12 @@ export async function copyPart(
     await mkdir(path.dirname(targetPath), { recursive: true });
 
     const at = await lstat(targetPath).catch(() => null);
+    // Bun.write onto a directory is a raw EISDIR, where every other refusal in the family is a line.
+    if (at?.isDirectory()) throw new Refusal(`${targetPath} is a directory — move it aside and rerun`);
     if (at) {
       if (!(await ours(targetPath, prev?.hashes[pf.target], sourcePath))) restored.push(pf.target);
       // A legacy install left a link into the Factory here, and writing through it edits the source.
-      // Only a link is unlinked: anything else Bun.write replaces, or names in its own error.
+      // Only a link is unlinked: any other file Bun.write replaces where it is.
       if (at.isSymbolicLink()) await unlink(targetPath);
     }
 

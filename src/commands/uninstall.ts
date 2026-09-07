@@ -6,7 +6,7 @@ import { Refusal } from '../core/mission.js';
 import { dependants } from '../core/registry.js';
 import { selectParts, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, statusColor, statusSymbol, displayName, pluralize } from '../ui/theme.js';
-import { printPartResult, printSnippetInfo } from '../ui/format.js';
+import { partNote, printPartResult, printSnippetInfo } from '../ui/format.js';
 
 export async function uninstall(targetDir: string, yes = false): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
@@ -113,7 +113,7 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
     const part = installedStates.find((s) => s.part.name === name)!.part;
     // A copy the project edited is its own now: it stays, named once, under the file column.
     if (kept.some((p) => p.name === name)) {
-      console.log(`${I}${colors.dim}! ${displayName(part).padEnd(nameCol())}left in place: ${left.join(', ')}${colors.reset}`);
+      partNote(displayName(part), `left in place: ${left.join(', ')}`);
     } else {
       printPartResult(part, { verb: 'removed', files: removed });
       if (left.length > 0) console.log(`${pad}${colors.dim}left in place: ${left.join(', ')}${colors.reset}`);

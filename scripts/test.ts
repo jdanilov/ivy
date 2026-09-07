@@ -496,12 +496,16 @@ await check('uninstall takes no credit for a part it left where it was', async (
   ok(report.includes('0 parts removed'), `the summary counted a part it left: ${report}`);
 });
 
-await check('a directory at a target is the project\'s, left and named', async () => {
+await check('a directory at a target is the project\'s: refused on the way in, named on the way out', async () => {
   const dir = await repo('dirtarget');
   await install(dir, false, ['verify']);
   const file = '.claude/agents/Verifier.md';
   await unlink(path.join(dir, file));
   await mkdir(path.join(dir, file));
+
+  const refused = await update(dir).then(() => null, (e: Error) => e);
+  ok(refused?.message === `${path.join(dir, file)} is a directory — move it aside and rerun`,
+    `update did not refuse the directory: ${refused?.message ?? 'none'}`);
 
   const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
   ok(await lstat(path.join(dir, file)).then(() => true, () => false), 'uninstall took a directory of the project\'s');
@@ -515,7 +519,10 @@ await check('install names an edited copy it had to restore when nobody was aske
   await writeFile(path.join(dir, file), 'mine now\n');
 
   const report = await printed(() => install(dir, false, ['verify']));
-  ok(report.includes(`restored ${file}`), `install clobbered an edited copy in silence: ${report}`);
+  const done = report.split('Installing')[1]!;
+  ok(done.includes(`restored ${file}`), `install clobbered an edited copy in silence: ${report}`);
+  const rows = done.split('\n').filter((l) => l.includes('/verify'));
+  ok(rows.length === 1, `install named the part it restored on more than one row: ${rows.join(' | ')}`);
 });
 
 await check('update reinstalls a part its dependant requires', async () => {
@@ -917,6 +924,18 @@ await check('writePartScope makes a block out of a flow-style parts line and kee
     resetConfig();
     const parts = (await loadConfig()).parts;
     ok(parts?.commit === 'project' && parts.research === 'off', `the choices read back as ${JSON.stringify(parts)}`);
+  });
+});
+
+await check('a config YAML cannot read is no config at all, and says so once', async () => {
+  await withConfig('parts: {commit: project\nvars:\n  a: b\n', async () => {
+    const said = await printed(async () => {
+      ok(Object.keys(await loadConfig()).length === 0, 'a config that does not parse resolved to something');
+      resetConfig();
+      await loadConfig();
+    });
+    ok(said.includes(CONFIG), `the parse error never named the file: ${said}`);
+    ok(said.split(CONFIG).length === 2, `the same broken config was named twice: ${said}`);
   });
 });
 

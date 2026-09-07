@@ -2,6 +2,7 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import type { ScopeChoice } from '../types.js';
 import { factoryHome } from './projects.js';
+import { I, colors } from '../ui/theme.js';
 
 /** `~/.factory/config.yaml`: machine-level facts — var overrides, scope per part, the caffeinate mode. */
 export interface FactoryConfig {
@@ -19,6 +20,23 @@ const configPath = (): string => path.join(factoryHome(), 'config.yaml');
 
 let cache: FactoryConfig | null = null;
 
+let warned = false;
+
+/**
+ * The one file a human hand-edits, read by every command: a typo in it is one dim line and no
+ * config, never a parse stack out of whatever command happened to read it. Named once per process,
+ * because the second telling says nothing the first did not.
+ */
+function parse(text: string): unknown {
+  try {
+    return Bun.YAML.parse(text);
+  } catch (err) {
+    if (!warned) console.log(`${I}${colors.dim}${configPath()} could not be read: ${err instanceof Error ? err.message : String(err)}${colors.reset}`);
+    warned = true;
+    return null;
+  }
+}
+
 /** A mapping's entries whose value `keep` accepts. Anything that is not a mapping is nothing. */
 function pairs<T>(raw: unknown, keep: (v: unknown) => boolean): Record<string, T> | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
@@ -32,7 +50,7 @@ export async function loadConfig(): Promise<FactoryConfig> {
   const file = Bun.file(configPath());
   if (!(await file.exists())) return (cache = {});
 
-  const raw = Bun.YAML.parse(await file.text());
+  const raw = parse(await file.text());
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return (cache = {});
 
   const { vars, parts } = raw as Record<string, unknown>;
@@ -50,7 +68,7 @@ export function resetConfig(): void {
 /** Read from the file every time, never the cache: Mission Control rewrites it while it runs. */
 export async function readCaffeinate(): Promise<Caffeinate> {
   const raw = await Bun.file(configPath()).text().catch(() => '');
-  const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
+  const value = raw === '' ? null : (parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
   return value === 'on' || value === 'off' ? value : 'auto';
 }
 

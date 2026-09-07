@@ -6,7 +6,8 @@ import { loadParts, withRequires, FACTORY_ROOT } from '../core/registry.js';
 import { existingProjects, home, scopeOf } from '../core/projects.js';
 import { copyPart, removePartFiles, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
 import { resolvePart, runInit, runUninit } from '../core/recipes.js';
-import { I, nameCol, colors, symbols, displayName, pluralize } from '../ui/theme.js';
+import { I, colors, symbols, displayName, pluralize } from '../ui/theme.js';
+import { partNote, partRow } from '../ui/format.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
 // Where the line sits, not what it displaced: a recorded `replaced` must not read as a move.
@@ -65,10 +66,6 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
   const liveFiles = new Set(parts.flatMap((p) => p.files.map((f) => f.target)));
   const liveHooks = new Set(parts.flatMap((p) => p.hooks ?? []).map(hookKey));
 
-  const line = (sym: string, color: string, name: string, text: string): void => {
-    console.log(`${I}${color}${sym}${colors.reset} ${name.padEnd(nameCol())}${text}`);
-  };
-
   let refreshed = 0;
   let removed = 0;
   let installed = 0;
@@ -83,15 +80,15 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       // Where each file comes from is recorded in the manifest, so only its absence needs the disk.
       const gone = await Promise.all(part.files.map((f) => lstat(path.join(resolvedDir, f.target)).then(() => false, () => true)));
       const { next, restored, snippetAdded, failure: initFailed } = await applyPart(part, entry, resolvedDir);
-      for (const file of restored) line(symbols.installed, colors.green, displayName(part), `restored ${file}`);
-      if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
+      for (const file of restored) partRow(symbols.installed, colors.green, displayName(part), `restored ${file}`);
+      if (snippetAdded) partRow(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
 
       // A var change rewrites the hook command, so the command we recorded last time has to go.
       const stale = (entry.hooks ?? []).filter((h) => !(next.hooks ?? []).some((n) => hookKey(n) === hookKey(h)));
       if (stale.length > 0) await removeHooks(stale, resolvedDir);
 
       if (entry.snippet && snippetKey(entry.snippet) !== snippetKey(next.snippet)) {
-        if (await removeSnippet(entry.snippet, resolvedDir)) line('-', colors.yellow, displayName(part), `${entry.snippet.file} → line removed`);
+        if (await removeSnippet(entry.snippet, resolvedDir)) partRow('-', colors.yellow, displayName(part), `${entry.snippet.file} → line removed`);
       }
 
       manifest.parts[name] = next;
@@ -101,7 +98,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       if (dropped.length > 0) {
         const gone = await removePartFiles({ ...entry, files: dropped }, resolvedDir, FACTORY_ROOT);
         for (const file of gone.removed) {
-          line('-', colors.yellow, displayName(part), file);
+          partRow('-', colors.yellow, displayName(part), file);
           removed++;
         }
       }
@@ -109,7 +106,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       if (initFailed) failure = initFailed;
 
       if (JSON.stringify(entry) !== JSON.stringify(next) || gone.includes(true)) {
-        line(symbols.installed, colors.green, displayName(part), 'refreshed');
+        partRow(symbols.installed, colors.green, displayName(part), 'refreshed');
         refreshed++;
       }
       if (failure) break;
@@ -122,36 +119,36 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     const result = await removePartFiles(orphan, resolvedDir, FACTORY_ROOT);
 
     for (const file of result.removed) {
-      line('-', colors.yellow, name, file);
+      partRow('-', colors.yellow, name, file);
       removed++;
     }
 
     const staleHooks = (entry.hooks ?? []).filter((h) => !liveHooks.has(hookKey(h)));
     if (staleHooks.length > 0 && (await removeHooks(staleHooks, resolvedDir)) > 0) {
-      line('-', colors.yellow, name, '.claude/settings.local.json → hook removed');
+      partRow('-', colors.yellow, name, '.claude/settings.local.json → hook removed');
       removed++;
     }
 
     if (entry.mcp) {
       await removeMcp(entry.mcp.serverName, resolvedDir);
-      line('-', colors.yellow, name, `.mcp.json → ${entry.mcp.serverName}`);
+      partRow('-', colors.yellow, name, `.mcp.json → ${entry.mcp.serverName}`);
       removed++;
     }
 
     if (entry.settings) {
       await removeSettings(entry.settings, resolvedDir);
-      line('-', colors.yellow, name, '.claude/settings.json → settings removed');
+      partRow('-', colors.yellow, name, '.claude/settings.json → settings removed');
       removed++;
     }
 
     if (entry.snippet && (await removeSnippet(entry.snippet, resolvedDir))) {
-      line('-', colors.yellow, name, `${entry.snippet.file} → line removed`);
+      partRow('-', colors.yellow, name, `${entry.snippet.file} → line removed`);
       removed++;
     }
 
     // Stop tracking the part either way: what the Factory will not remove it will not manage.
     delete manifest.parts[name];
-    if (result.left.length > 0) line('!', colors.dim, name, `left in place: ${result.left.join(', ')}`);
+    if (result.left.length > 0) partNote(name, `left in place: ${result.left.join(', ')}`);
   }
 
   // What an installed part requires has to be there too, default or not.
@@ -163,10 +160,10 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     if (!part.default && !needed.has(part.name)) continue;
 
     const { next, snippetAdded, failure: initFailed } = await applyPart(part, undefined, resolvedDir);
-    if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
+    if (snippetAdded) partRow(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
     manifest.parts[part.name] = next;
 
-    line(symbols.installed, colors.green, displayName(part), 'installed');
+    partRow(symbols.installed, colors.green, displayName(part), 'installed');
     installed++;
 
     if (initFailed) {
@@ -177,7 +174,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
 
   if (removed > 0) {
     for (const file of await dropEmptied(resolvedDir)) {
-      line('-', colors.yellow, '', `${file} → removed, nothing left in it`);
+      partRow('-', colors.yellow, '', `${file} → removed, nothing left in it`);
       removed++;
     }
   }

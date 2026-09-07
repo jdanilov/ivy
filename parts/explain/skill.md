@@ -1,7 +1,7 @@
 ---
 name: explain
 model: sonnet
-description: ♻ Research and visualize system flows with diagrams
+description: ♻ Explain system flows with ASCII diagrams
 ---
 
 # Explain

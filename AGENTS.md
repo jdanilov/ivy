@@ -76,7 +76,7 @@ skill stays under 120 lines, `Worker` under 40, `/retro` under 60, every other p
 
 ### Two command families
 
-`install | uninstall | status | update [project]` act on a project and fall back to the picker;
+`install | uninstall | status | update [project]` act on a project: the argument, else the cwd when it is registered, else the picker;
 `--global` stands where the project path would. `mission | step | gate | decision | handoff <sub>`
 act on the checkout you are standing in, never prompt, and exit 1 with a one-line `✗ …` on a
 refusal. Grammar and rules in `docs/parts.md` and `docs/missions.md`.

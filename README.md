@@ -28,7 +28,7 @@ projects live in `~/.factory/projects`.
 
 ## Commands
 
-`install`, `uninstall`, `status` and `update` take a project path and fall back to a picker.
+`install`, `uninstall`, `status` and `update` take a project path; without one they act on the current directory when it is a registered project, and open a picker otherwise.
 Everything else acts on the checkout you are standing in and never prompts.
 
 | Command                                        | Purpose                                                                     |

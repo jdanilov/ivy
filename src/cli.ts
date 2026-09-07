@@ -86,7 +86,10 @@ async function main() {
   const cmd = first === 'menu' ? await pickCommand() : first;
   // `--global` stands where the project path would: the home dir, and never in the projects list.
   const global = flags.global === true;
-  const targetDir = global ? home() : (positionals[1] ?? await pickProject(await loadProjects()));
+  // Standing in a registered project is the answer; the picker is for everywhere else.
+  const projects = await loadProjects();
+  const here = projects.includes(process.cwd()) ? process.cwd() : null;
+  const targetDir = global ? home() : (positionals[1] ?? here ?? await pickProject(projects));
   if (!global) await saveProject(targetDir);
 
   await dispatch(cmd, targetDir, flags);

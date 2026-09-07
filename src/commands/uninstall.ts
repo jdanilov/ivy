@@ -106,9 +106,11 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
 
   const removal = await removeParts(resolvedDir, selectedNames);
 
-  for (const { name, snippet } of removal.parts) {
+  for (const { name, snippet, left } of removal.parts) {
     printPartResult(installedStates.find((s) => s.part.name === name)!.part, { verb: 'removed' });
     if (snippet) printSnippetInfo(snippet, 'removed');
+    // A copy the project edited is its own now: it stays, and the report says which.
+    if (left.length > 0) console.log(`${I}${colors.dim}left in place: ${left.join(', ')}${colors.reset}`);
   }
   for (const file of removal.emptied) {
     console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);

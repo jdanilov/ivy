@@ -2,12 +2,13 @@
 // The e2e walk in one process: the commands and core functions imported, not spawned. One line per
 // case, non-zero when any of them fails. `scripts/e2e.sh` stays as the black-box check.
 import path from 'node:path';
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 // The scratch HOME lands before any module that reads it loads. `$TMPDIR` is honoured, so a caller
 // with a slow temp folder can point the whole run somewhere small. Resolved, because macOS hands
-// back a symlink and the linker builds relative symlink targets a logical path leaves dangling.
+// back `/var/folders/...` for `/private/var/folders/...` and a project is compared against the
+// path it really has.
 const TMP = await realpath(await mkdtemp(path.join(tmpdir(), 'factory-test-')));
 process.env.HOME = path.join(TMP, 'home');
 
@@ -24,8 +25,8 @@ await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
 await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
 
 const { install } = await import('../src/commands/install.js');
-const { scanProject } = await import('../src/core/scanner.js');
-const { update } = await import('../src/commands/update.js');
+const { hashFile, scanProject } = await import('../src/core/scanner.js');
+const { update, updateAll } = await import('../src/commands/update.js');
 const { uninstall } = await import('../src/commands/uninstall.js');
 const { step } = await import('../src/commands/step.js');
 const { gate } = await import('../src/commands/gate.js');
@@ -35,7 +36,7 @@ const { mission } = await import('../src/commands/mission.js');
 const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission, writeState } = await import('../src/core/mission.js');
 const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
-const { dependants, loadParts } = await import('../src/core/registry.js');
+const { dependants, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 
 let failed = 0;
@@ -43,6 +44,15 @@ const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(ms
 const exists = (p: string): Promise<boolean> => Bun.file(p).exists();
 const alive = (pid: number): boolean => { try { return process.kill(pid, 0); } catch { return false; } };
 const branchGone = async (dir: string, b: string): Promise<boolean> => (await git(dir, 'branch', '--list', b)) === '';
+
+/** What a command printed, for a case that asserts on the report and not only on the disk. */
+async function printed(fn: () => Promise<void>): Promise<string> {
+  const log = console.log;
+  const lines: string[] = [];
+  console.log = (...args: unknown[]) => { lines.push(args.join(' ')); };
+  try { await fn(); } finally { console.log = log; }
+  return lines.join('\n');
+}
 
 /** The commands talk to a human; a case only cares about what they left behind. */
 async function check(name: string, fn: () => Promise<void>): Promise<void> {
@@ -98,13 +108,20 @@ async function worktreePair(order: string[]): Promise<void> {
 
 const main = await repo('main');
 
-await check('install --yes links, snippets and records every source', async () => {
+await check('install --yes copies, snippets and records every source', async () => {
   await install(main, true);
   ok(await exists(path.join(main, '.claude/skills/mission/skill.md')), 'no mission skill');
   ok((await Bun.file(path.join(main, 'AGENTS.md')).text()).includes('@.claude/docs-format.md'), 'no snippet');
   const manifest = await readManifest(main);
   ok(manifest?.parts.mission?.sources?.['.claude/skills/mission/skill.md'] === 'parts/mission/skill.md', 'no source recorded');
   ok(!manifest?.parts.commit, 'a global part landed in a project');
+
+  // Nothing the project keeps may point back at this checkout: a plain file is the whole contract.
+  for (const [name, entry] of Object.entries(manifest!.parts)) {
+    for (const file of entry.files) {
+      ok((await lstat(path.join(main, file))).isFile(), `${name} put something other than a regular file at ${file}`);
+    }
+  }
 });
 
 await check('resolvePart expands the hooks shorthand and roots it in the project', async () => {
@@ -422,6 +439,47 @@ await check('writeSnippet and removeSnippet round trip', async () => {
   ok(!(await Bun.file(path.join(main, record.file)).text()).includes('## Scratch'), 'section left behind');
 });
 
+await check('update replaces a link into the Factory with a copy and leaves the source alone', async () => {
+  const file = '.claude/skills/mission/skill.md';
+  const target = path.join(main, file);
+  const source = path.join(FACTORY_ROOT, 'parts/mission/skill.md');
+  const before = await hashFile(source);
+
+  await unlink(target);
+  await symlink(source, target);
+  await update(main);
+
+  ok((await lstat(target)).isFile(), 'the link is still a link');
+  ok((await hashFile(source)) === before, 'writing the copy edited the Factory source');
+  ok((await hashFile(target)) === before, 'the copy does not hold the source bytes');
+});
+
+await check('an edited copy reads modified and update restores it by name', async () => {
+  const file = '.claude/skills/mission/skill.md';
+  const target = path.join(main, file);
+  const source = await Bun.file(target).text();
+  await writeFile(target, source + '\nedited by the project\n');
+
+  const state = (await scanProject(main)).find((s) => s.part.name === 'mission')!;
+  ok(state.status === 'modified', `an edited copy reads ${state.status}`);
+
+  const report = await printed(() => update(main));
+  ok(report.includes(`restored ${file}`), `update did not name what it restored: ${report}`);
+  ok((await Bun.file(target).text()) === source, 'update did not put the source bytes back');
+});
+
+await check('uninstall leaves an edited copy, names it and removes the rest', async () => {
+  const dir = await repo('edited');
+  await install(dir, false, ['verify']);
+  const mine = path.join(dir, '.claude/skills/verify/skill.md');
+  await writeFile(mine, 'mine now\n');
+
+  const report = await printed(() => uninstall(dir, true));
+  ok(await exists(mine), 'uninstall took a copy the project had edited');
+  ok(report.includes('left in place: .claude/skills/verify/skill.md'), `uninstall did not name it: ${report}`);
+  ok(!(await exists(path.join(dir, '.claude/agents/Verifier.md'))), 'an untouched copy was left behind');
+});
+
 await check('update reinstalls a part its dependant requires', async () => {
   const manifest = (await readManifest(main))!;
   delete manifest.parts.mission;
@@ -658,6 +716,23 @@ await check('uninstall takes an emptied docs/ and leaves one holding the project
   ok(!(await dropCreated([], dir)).includes('docs/'), 'a docs/ with something in it was removed');
 });
 
+await check('update --all walks every registered project and then the home dir', async () => {
+  const home = process.env.HOME!;
+  const a = await repo('all-a');
+  const b = await repo('all-b');
+  await install(a, false, ['verify']);
+  await install(b, false, ['verify']);
+  await install(home, false, ['commit']);
+
+  const stamp = async (dir: string): Promise<string> => (await readManifest(dir))!.updatedAt;
+  const before = await Promise.all([a, b, home].map(stamp));
+  await Bun.sleep(5);
+  await updateAll();
+
+  const after = await Promise.all([a, b, home].map(stamp));
+  ok(after.every((t, i) => t > before[i]!), `update --all skipped a target: ${before.join()} → ${after.join()}`);
+});
+
 await check('global parts install into the home dir and come back out', async () => {
   const home = process.env.HOME!;
   await install(home, true);
@@ -688,7 +763,7 @@ await check('global parts install into the home dir and come back out', async ()
   ok(!(await readManifest(project))?.parts.commit, 'update kept a part whose scope moved');
   await install(home, true);
 
-  // `update --global` relinks the home dir without ever reaching for a project part.
+  // `update --global` refreshes the home dir without ever reaching for a project part.
   await update(home);
   ok(Object.keys((await readManifest(home))!.parts).length === 5, 'update --global changed the home manifest');
 

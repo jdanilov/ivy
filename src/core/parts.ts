@@ -1,5 +1,5 @@
 import { readManifest, writeManifest, deleteManifest } from './manifest.js';
-import { unlinkPart, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied, dropCreated } from './linker.js';
+import { removePartFiles, removeHooks, removeMcp, removeSettings, removeSnippet, dropEmptied, dropCreated } from './linker.js';
 import { runUninit } from './recipes.js';
 import { FACTORY_ROOT } from './registry.js';
 
@@ -13,6 +13,8 @@ export interface Removed {
   name: string;
   /** The agent file whose snippet line went with it, when there was one. */
   snippet: string | null;
+  /** Files the project edited after the install: left where they are, and named. */
+  left: string[];
 }
 
 export interface Removal {
@@ -32,9 +34,10 @@ export async function removeParts(dir: string, names: string[]): Promise<Removal
 
   for (const name of names) {
     const entry = manifest.parts[name];
+    let left: string[] = [];
     if (entry) {
       await runUninit(name, entry.uninit, dir);
-      await unlinkPart(entry, dir, FACTORY_ROOT);
+      left = (await removePartFiles(entry, dir, FACTORY_ROOT)).left;
       if (entry.hooks) await removeHooks(entry.hooks, dir);
       if (entry.mcp) await removeMcp(entry.mcp.serverName, dir);
       if (entry.settings) await removeSettings(entry.settings, dir);
@@ -43,7 +46,7 @@ export async function removeParts(dir: string, names: string[]): Promise<Removal
 
     if (entry?.snippet?.created) created.push(entry.snippet.file);
     const snippet = entry?.snippet && (await removeSnippet(entry.snippet, dir)) ? entry.snippet.file : null;
-    parts.push({ name, snippet });
+    parts.push({ name, snippet, left });
   }
 
   const emptied = await dropEmptied(dir);

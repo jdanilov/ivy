@@ -27,7 +27,7 @@ export async function pickCommand(): Promise<Command> {
       { value: 'install' as Command, label: 'Install', hint: 'add parts to a project' },
       { value: 'uninstall' as Command, label: 'Uninstall', hint: 'remove parts from a project' },
       { value: 'status' as Command, label: 'Status', hint: 'show what\'s installed' },
-      { value: 'update' as Command, label: 'Update', hint: 'relink installed parts' },
+      { value: 'update' as Command, label: 'Update', hint: 'refresh installed parts' },
     ],
   }));
 }

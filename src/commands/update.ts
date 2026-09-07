@@ -3,10 +3,10 @@ import { lstat } from 'node:fs/promises';
 import type { HookConfig, ManifestPart, Part, SnippetRecord } from '../types.js';
 import { readManifest, writeManifest, deleteManifest } from '../core/manifest.js';
 import { loadParts, withRequires, FACTORY_ROOT } from '../core/registry.js';
-import { scopeOf } from '../core/projects.js';
-import { linkPart, unlinkPart, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
+import { existingProjects, home, scopeOf } from '../core/projects.js';
+import { copyPart, removePartFiles, injectHooks, removeHooks, injectMcp, removeMcp, injectSettings, removeSettings, writeSnippet, removeSnippet, dropEmptied } from '../core/linker.js';
 import { resolvePart, runInit, runUninit } from '../core/recipes.js';
-import { I, nameCol, colors, symbols, displayName } from '../ui/theme.js';
+import { I, nameCol, colors, symbols, displayName, pluralize } from '../ui/theme.js';
 
 const hookKey = (h: HookConfig): string => `${h.event}|${h.matcher}|${h.command}`;
 // Where the line sits, not what it displaced: a recorded `replaced` must not read as a move.
@@ -14,16 +14,16 @@ const snippetKey = (s?: SnippetRecord): string => (s ? `${s.file}|${s.section}|$
 
 /**
  * The one sequence that puts a part in place: vars resolved (a changed ~/.factory/config.yaml
- * re-points the project here), files linked, hooks, mcp and settings injected, snippet written,
+ * re-points the project here), files copied, hooks, mcp and settings injected, snippet written,
  * init run. The init error is returned, not thrown, because the caller still has a manifest to write.
  */
 async function applyPart(
   part: Part,
   prev: ManifestPart | undefined,
   targetDir: string,
-): Promise<{ next: ManifestPart; snippetAdded: boolean; failure: unknown }> {
+): Promise<{ next: ManifestPart; restored: string[]; snippetAdded: boolean; failure: unknown }> {
   const resolved = await resolvePart(part, targetDir);
-  const next = await linkPart(resolved, targetDir, FACTORY_ROOT);
+  const { entry: next, restored } = await copyPart(resolved, targetDir, FACTORY_ROOT, prev);
   if (resolved.hooks) await injectHooks(resolved.hooks, targetDir);
   if (resolved.mcp) await injectMcp(resolved.mcp, targetDir);
   if (resolved.settings) await injectSettings(resolved.settings, targetDir);
@@ -36,10 +36,10 @@ async function applyPart(
   }
 
   const failure = await runInit(resolved, prev, next, targetDir).then(() => null, (err: unknown) => err);
-  return { next, snippetAdded, failure };
+  return { next, restored, snippetAdded, failure };
 }
 
-/** Non-interactive refresh of an installed project: relink what stayed, unlink what the registry dropped. */
+/** Non-interactive refresh of an installed project: rewrite what stayed, remove what the registry dropped. */
 export async function update(targetDir: string, skip: string[] = []): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
   const manifest = await readManifest(resolvedDir);
@@ -58,7 +58,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     return;
   }
 
-  // Out of scope is out of the registry: a part that turned global unlinks here like a retired one.
+  // Out of scope is out of the registry: a part that turned global drops here like a retired one.
   const parts = (await loadParts()).filter((p) => p.scope === scopeOf(resolvedDir));
   const registry = new Map(parts.map((p) => [p.name, p]));
   // Dropped parts must not take files or hooks that a surviving part still owns.
@@ -69,7 +69,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     console.log(`${I}${color}${sym}${colors.reset} ${name.padEnd(nameCol())}${text}`);
   };
 
-  let relinked = 0;
+  let refreshed = 0;
   let removed = 0;
   let installed = 0;
   // A failing init stops the run with everything written so far kept, so a rerun picks up where it broke.
@@ -82,7 +82,8 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     if (part) {
       // Where each file comes from is recorded in the manifest, so only its absence needs the disk.
       const gone = await Promise.all(part.files.map((f) => lstat(path.join(resolvedDir, f.target)).then(() => false, () => true)));
-      const { next, snippetAdded, failure: initFailed } = await applyPart(part, entry, resolvedDir);
+      const { next, restored, snippetAdded, failure: initFailed } = await applyPart(part, entry, resolvedDir);
+      for (const file of restored) line(symbols.installed, colors.green, displayName(part), `restored ${file}`);
       if (snippetAdded) line(symbols.installed, colors.green, displayName(part), `${next.snippet!.file} → line added`);
 
       // A var change rewrites the hook command, so the command we recorded last time has to go.
@@ -95,10 +96,10 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
 
       manifest.parts[name] = next;
 
-      // A file the part stopped shipping leaves a dangling symlink behind unless someone else owns it.
+      // A file the part stopped shipping is left behind unless someone else owns it.
       const dropped = entry.files.filter((f) => !next.files.includes(f) && !liveFiles.has(f));
       if (dropped.length > 0) {
-        const gone = await unlinkPart({ ...entry, files: dropped }, resolvedDir, FACTORY_ROOT);
+        const gone = await removePartFiles({ ...entry, files: dropped }, resolvedDir, FACTORY_ROOT);
         for (const file of gone.removed) {
           line('-', colors.yellow, displayName(part), file);
           removed++;
@@ -108,8 +109,8 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
       if (initFailed) failure = initFailed;
 
       if (JSON.stringify(entry) !== JSON.stringify(next) || gone.includes(true)) {
-        line(symbols.installed, colors.green, displayName(part), 'relinked');
-        relinked++;
+        line(symbols.installed, colors.green, displayName(part), 'refreshed');
+        refreshed++;
       }
       if (failure) break;
       continue;
@@ -118,7 +119,7 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
     await runUninit(name, entry.uninit, resolvedDir);
 
     const orphan: ManifestPart = { ...entry, files: entry.files.filter((f) => !liveFiles.has(f)) };
-    const result = await unlinkPart(orphan, resolvedDir, FACTORY_ROOT);
+    const result = await removePartFiles(orphan, resolvedDir, FACTORY_ROOT);
 
     for (const file of result.removed) {
       line('-', colors.yellow, name, file);
@@ -193,10 +194,26 @@ export async function update(targetDir: string, skip: string[] = []): Promise<vo
   if (failure) throw failure;
 
   console.log('');
-  if (relinked === 0 && removed === 0 && installed === 0) {
+  if (refreshed === 0 && removed === 0 && installed === 0) {
     console.log(`${I}${colors.bold}Up to date.${colors.reset}`);
   } else {
-    console.log(`${I}${colors.bold}Done.${colors.reset} ${installed} installed, ${relinked} relinked, ${removed} removed.`);
+    console.log(`${I}${colors.bold}Done.${colors.reset} ${installed} installed, ${refreshed} refreshed, ${removed} removed.`);
   }
+  console.log('');
+}
+
+/**
+ * Every registered project, then the home dir, in one run: how a Factory change reaches the copies
+ * it already made, and the whole migration off an older install. The first failure ends the run,
+ * with everything before it kept, so a fix plus a rerun carries on.
+ */
+export async function updateAll(): Promise<void> {
+  const projects = await existingProjects();
+  for (const project of projects) await update(project);
+  await update(home());
+
+  console.log(`${I}${colors.bold}All done.${colors.reset} ${pluralize(projects.length, 'project')} and the home dir.`);
+  // Nothing global has ever been installed here, and `update` only refreshes what a manifest lists.
+  if (!(await readManifest(home()))) console.log(`${I}${colors.dim}The home dir holds no parts — factory install --global adds them.${colors.reset}`);
   console.log('');
 }

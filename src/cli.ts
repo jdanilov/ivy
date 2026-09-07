@@ -84,6 +84,14 @@ async function main() {
   setNameCol(await loadParts());
 
   const cmd = first === 'menu' ? await pickCommand() : first;
+
+  // `update --all` names its own targets: every registered project, then the home dir. No picker,
+  // and nothing added to the projects list.
+  if (cmd === 'update' && flags.all === true) {
+    const { updateAll } = await import('./commands/update.js');
+    return updateAll();
+  }
+
   // `--global` stands where the project path would: the home dir, and never in the projects list.
   const global = flags.global === true;
   // Standing in a registered project is the answer; the picker is for everywhere else.

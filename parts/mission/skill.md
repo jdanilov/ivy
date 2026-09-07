@@ -1,7 +1,7 @@
 ---
 name: mission
 model: fable
-description: ♻ Run a Mission end to end, from workflow and gates to triage and close
+description: ⌬ Run a Mission end to end, from workflow and gates to triage and close
 ---
 
 # Mission
@@ -57,7 +57,7 @@ factory decision add "<summary>" --confidence HIGH|MEDIUM|LOW [--step S] [--by R
 
 Workers run serially with clean context. Give each one its steps, `spec.md`, `acceptance.md` and the
 files it may touch, and never let one pick its own scope. Pass `model` on every spawn, the agent
-frontmatter is not honoured: opus for `@Worker` and `/validate`, sonnet for `/verify`, `@Investigator`
+frontmatter is not honoured: opus for `@Worker`, `/verify`, `/validate`, sonnet for `@Investigator`
 and `@Summarizer`. Never commit while a Worker or gatekeeper runs: between spawns, or by pathspec.
 
 Pack steps into one Worker: a spawn costs the context it rereads, so small serial tasks across many

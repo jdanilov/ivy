@@ -12,16 +12,16 @@ const now = Date.now();
 
 /** The kind and the runner are never spelled out here: the fixture reads both through the
  *  mappings the live snapshot uses, so a look review is a review of what ships. */
-function steps(spec: [name: string, status: StepRow['status'], wall?: number, of?: Omit<WorkflowStep, 'name'>][]): StepRow[] {
-  return spec.map(([name, status, wall, of]) => {
+function steps(spec: [name: string, status: StepRow['status'], wall?: number, of?: Omit<WorkflowStep, 'name'>, runs?: number][]): StepRow[] {
+  return spec.map(([name, status, wall, of, runs]) => {
     const step: WorkflowStep = { name, ...of };
-    return { name, status, wall, kind: stepKind(step), role: stepRole(step) };
+    return { name, status, wall, runs, kind: stepKind(step), role: stepRole(step) };
   });
 }
 
 const refitSteps = steps([
   ['intent', 'done', 12 * M, { gate: 'human' }], ['research', 'skipped', undefined, { role: 'investigator' }],
-  ['spec', 'done', 8 * M], ['implement', 'running', 6 * M, { role: 'worker' }],
+  ['spec', 'done', 8 * M], ['implement', 'running', 6 * M, { role: 'worker' }, 2],
   ['review', 'pending', undefined, { parallel: ['verify', 'validate'] }],
   ['verify', 'pending'], ['validate', 'pending'], ['merge', 'pending', undefined, { gate: 'human' }],
 ]);
@@ -165,7 +165,10 @@ const projects: Project[] = [
       mission({
         name: 'refit', workflow: 'story', state: 'running', step: 'implement', round: 2, session: '75cb46e1',
         preset: 'orchestrator', branch: 'mission/refit', worktree: '../ivy-refit', wall: 14 * M,
-        deviations: ['skipped research: the recovery design was already in the intent'],
+        deviations: [
+          'skipped research: the recovery design was already in the intent',
+          'added step polish after implement: the wrap rule landed after the spec was written',
+        ],
         autonomy: 'partial', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
         decisions: refitDecisions, diff: { added: 412, removed: 96 },
       }),

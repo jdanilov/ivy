@@ -17,8 +17,13 @@ export function liveFrames(snap: Snapshot): Frame[] {
     name: `${String(left).padStart(2, '0')}-${itemKey(item).replace(/[^a-z0-9]+/gi, '-')}`,
     left, focus: 'right',
   }));
+  // The key bar is built from the selected row's kind, so one left-focus frame of each kind shows it.
+  const kinds = new Map<string, number>();
+  leftItems(snap).forEach((item, left) => { if (!kinds.has(item.kind)) kinds.set(item.kind, left); });
+
   return [
     ...rows,
+    ...[...kinds].map(([kind, left]): Frame => ({ name: `keys-${kind}`, left, focus: 'left' })),
     { name: 'archived', left: 0, focus: 'left', set: (ui) => { ui.showArchived = true; } },
     { name: 'decisions-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; } },
     { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },

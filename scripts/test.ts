@@ -507,6 +507,25 @@ await check('an insert past a finished step takes the pointer with it', async ()
   ok((await resolveMission(dir, 't')).state.step === 'x', 'step add did not take the pointer');
 });
 
+await check('a step the mission looped back to counts its runs', async () => {
+  const dir = await repo('runs');
+  await mission('new', ['t'], { workflow: 'fix', 'no-open': true }, dir);
+  await step('start', ['intent'], { mission: 't' }, dir);
+  await gate('open', ['intent'], { mission: 't', file: 'intent.md' }, dir);
+  await gate('answer', ['intent', 'accept'], { mission: 't' }, dir);
+  await step('done', ['intent'], { mission: 't' }, dir);
+  await step('start', ['implement'], { mission: 't' }, dir);
+  ok((await resolveMission(dir, 't')).state.steps.implement?.runs === 1, 'the first start did not count a run');
+
+  await step('done', ['implement'], { mission: 't' }, dir);
+  await step('start', ['verify'], { mission: 't' }, dir);
+  await step('loop', ['verify'], { mission: 't', reason: 'findings to fix' }, dir);
+  ok((await resolveMission(dir, 't')).state.steps.implement?.runs === 1, 'the loop dropped the run count');
+
+  await step('start', ['implement'], { mission: 't' }, dir);
+  ok((await resolveMission(dir, 't')).state.steps.implement?.runs === 2, 'restarting after a loop did not count a second run');
+});
+
 await check('a waiting decision holds step start until it is answered', async () => {
   const dir = await repo('decisions');
   const m = await createMission(dir, { name: 'd', workflow: 'chore', autonomy: 'partial', worktree: false, stub: false });

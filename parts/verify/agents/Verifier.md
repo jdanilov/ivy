@@ -5,7 +5,7 @@ description: >
   contract and the quality baseline, and files ranked findings. Never edits code.
 tools: Read, Glob, Grep, Bash
 disallowedTools: Write, Edit, NotebookEdit
-model: sonnet
+model: opus
 color: yellow
 ---
 

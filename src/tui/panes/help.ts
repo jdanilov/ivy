@@ -6,7 +6,7 @@ import type { Pane } from './pane.js';
 
 /** Every key the screen answers, one key to a line on screen, under the pane it belongs to. */
 const HELP: [group: string, key: string, does: string][] = [
-  ['Global', '↑↓', 'Move the selection'], ['', '→', 'Enter the right pane'],
+  ['Global', '↑↓', 'Move the selection'], ['', '→', 'Enter the right pane, and in MISSION turn the autonomy dial'],
   ['', '↵', 'Open the selection, or apply what is pending'], ['', '←', 'Back to the left column'],
   ['', 'esc', 'Back, or discard the pending toggles first'], ['', 'C', 'Caffeinate auto → on → off'],
   ['', '?', 'This panel'], ['', 'Q', 'Quit'],

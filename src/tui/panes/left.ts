@@ -48,16 +48,16 @@ export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): vo
     if (i > 1) p.row([]); // a blank line between the Inbox, the global row and each project
     const head: Cell[] = item.kind === 'inbox'
       ? [['Inbox', C.bright], [` (${open})`, open ? C.warning : C.dim]]
-      : [[item.project.name, item.kind === 'global' ? C.dim : C.bright]];
+      : [[item.project.name, C.bright]];
     p.row([marker(selected, focused), ...head], selected && focused);
     // Nothing under a heading reads as a screen that failed to load: the hint names the way out,
     // indented where the row it stands in for would be. A session row is something under it.
     if (item.kind === 'project' && item.project.missions.length === 0 && item.project.sessions.length === 0) {
-      p.row([['    no missions · factory mission new <name>', C.dim]]);
+      p.row([['   no missions · factory mission new <name>', C.dim]]);
     }
   });
   if (snap.projects.length === 0) {
     p.row([]);
-    p.row([['   no projects · factory install <path>', C.dim]]);
+    p.row([['  no projects · factory install <path>', C.dim]]);
   }
 }

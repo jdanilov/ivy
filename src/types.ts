@@ -154,6 +154,8 @@ export interface GateState {
 
 export interface StepState {
   status: StepStatus;
+  /** Times `step start` has run it. A loop resets the status and keeps the count. */
+  runs?: number;
   startedAt?: string;
   endedAt?: string;
   reason?: string;

@@ -7,12 +7,19 @@ import { id } from './format.js';
 import { clamp, leftItems, itemKey } from './panes/pane.js';
 import { changes, partStatus, pending } from './panes/parts.js';
 import { act, draw, toast, type App } from './screen.js';
-import type { Autonomy, Caffeinate } from './model.js';
+import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
 
 /** What every key does. The screen draws; this is the only place a keypress changes anything. */
 
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
 const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
+
+/** The one focusable value in the MISSION pane. Turned at once and written behind that: the
+ *  rebuild that follows reads state.json back. */
+function cycleAutonomy(app: App, project: Project, m: Mission): void {
+  m.autonomy = AUTONOMY[(AUTONOMY.indexOf(m.autonomy) + 1) % AUTONOMY.length]!;
+  act(app, `${m.name} autonomy ${m.autonomy}…`, () => setAutonomy(project.path, m.name, m.autonomy));
+}
 
 export function handleKey(app: App, key: KeyEvent): void {
   const { snap, ui } = app;
@@ -42,6 +49,7 @@ export function handleKey(app: App, key: KeyEvent): void {
   const right = ui.focus === 'right';
   const inMessages = right && here.kind === 'inbox';
   const inParts = right && (here.kind === 'project' || here.kind === 'global');
+  const inMission = right && here.kind === 'mission';
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);
 
   if (inParts && ui.confirm) {
@@ -64,6 +72,8 @@ export function handleKey(app: App, key: KeyEvent): void {
       break;
     }
     case 'right':
+      // `→` enters the right pane; in MISSION the dial is what it landed on, so it turns that.
+      if (inMission) return cycleAutonomy(app, here.project, here.mission);
       ui.focus = 'right';
       break;
     case 'left':
@@ -120,13 +130,9 @@ export function handleKey(app: App, key: KeyEvent): void {
       return act(app, `${m.archived ? 'unarchiving' : 'archiving'} ${m.name}…`,
         () => archive(here.project.path, m.name, m.archived));
     }
-    case 't': {
+    case 't':
       if (here.kind !== 'mission') break;
-      const m = here.mission;
-      // Shown at once, written behind it: the rebuild that follows reads state.json back.
-      m.autonomy = AUTONOMY[(AUTONOMY.indexOf(m.autonomy) + 1) % AUTONOMY.length]!;
-      return act(app, `${m.name} autonomy ${m.autonomy}…`, () => setAutonomy(here.project.path, m.name, m.autonomy));
-    }
+      return cycleAutonomy(app, here.project, here.mission);
     case 'c': {
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;
       const mode = snap.caffeinate;

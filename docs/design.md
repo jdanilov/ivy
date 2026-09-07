@@ -21,7 +21,6 @@ to both surfaces so they read as one product. Terse-visual vocabulary: `● enti
 | selected row bg | `#b8b8b8` | 251      | inverted row background on focus                  |
 | selected row fg | `#141414` | 233      | text on an inverted row                           |
 | agent blue      | `#6b8fd9` | 68       | agent work: a step a sub-agent runs                |
-| cyan            | `#5fafaf` | 73       | HIGH confidence, the calm end of the decision scale |
 
 Sampled from solid fills (progress bar, orange dot) where anti-aliasing is negligible; small text
 undershoots these values on screen but the hierarchy holds.
@@ -62,24 +61,37 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 row 0        blank
 row 1        ⌬ FACTORY  <project or path>                        caffeinate AUTO [ON]
 row 2        ───────────────────────────────────────────────────────────────────────
-row 3        status: mission bar or project summary, or the toast that replaces it
+row 3        status: mission bar or project bar, or the toast that replaces it
 row 4        ───────────────────────────────────────────────────────────────────────
              PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | PARTS (60%)
-             inbox, ~ global,        │  a list above a detail block; a gate and a
+             inbox, Global,          │  a list above a detail block; a gate and a
              projects, missions,     │  decision each end in the command that
              sessions                │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             DECISIONS | ACTIVITY  <subject>   one third of the body, all of it on F
+             DECISIONS  ACTIVITY     one third of the body, all of it on F
 last row     ───────────────────────────────────────────────────────────────────────
              ↑↓ Select  ↵ Open  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  A Activity  F Full  ? Help  Q Quit
 ```
 
+- Two blank columns down the left of every row, none on the right and none under the key bar: the
+  screen breathes on the side the eye starts from and fills the rest.
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
   Two cells of padding on the left pane keep its right-aligned tokens off the divider.
-- `~ global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
+- `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `Z` asks for them.
-- The foot keeps a third of the body, never fewer than 5 rows; `F` gives it all of it. It draws
-  DECISIONS by default and ACTIVITY on `A`, and `↑↓` scroll whichever one is full.
+- The foot keeps a third of the body, never fewer than 5 rows; `F` gives it all of it. Its header
+  is the two tabs, the drawn one bright: DECISIONS by default, ACTIVITY on `A`, `D` back.
+
+### The status bar
+
+A mission is its state, a fixed eight-column word so the bar behind it never moves, then a
+progress bar of its done steps, the fraction, and the metrics right. `PENDING` takes a warning
+circle: a mission nobody has started is waiting on the human, where a pending *step* is only next
+in line.
+
+A project — or the Inbox, over every project — is one bar over its missions instead of the words
+alone: closed green, open amber, stub grey, one segment each. The counts stay behind it as the
+dim legend that names the colours.
 
 ### The foot: DECISIONS
 
@@ -87,37 +99,32 @@ One row per decision of whatever the left column has selected — a mission, a p
 project on the Inbox row — newest last, the mission column present only when more than one is in
 scope. A decision is a fork an agent took; the screen never answers one.
 
-A row is the verdict, the id, one confidence glyph and the decision itself. The step and the agent
-that filed it are in `decisions.md`; on screen they cost the columns the summary needs. Nothing is
-cut: a summary too long for the line wraps under its own column, so a row copies whole into the
-session that answers it.
+A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
+filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict
+already says whether anyone was asked. Nothing is cut: a summary too long for the line wraps under
+its own column, so a row copies whole into the session that answers it.
 
 ```
-✓ D2   ● Reuse readJson for the manifest rather than a second parser
-· D3   ● Do not implement auth here: the contract names one endpoint and the session store already
-         carries the flag — KISS and YAGNI
-✗ D4   ● Triage r2: fix F1 and F3, skip F2 as cosmetic — fix F2 too, it is on the contract
-  D1   ● Four workers, serial — one context per ground
+✓ D2   Reuse readJson for the manifest rather than a second parser
+? D3   Do not implement auth here: the contract names one endpoint and the session store already
+       carries the flag — KISS and YAGNI
+✗ D4   Triage r2: fix F1 and F3, skip F2 as cosmetic — fix F2 too, it is on the contract
+✓ D1   Four workers, serial — one context per ground
 ```
 
-| Status      | Glyph | Colour        | Row                                   |
-|-------------|-------|---------------|----------------------------------------|
-| `waiting`   | `·`   | warning amber | bright, it is holding the mission up   |
-| `accepted`  | `✓`   | success olive | bright                                 |
-| `overruled` | `✗`   | error red     | bright, the note follows the summary   |
-| `auto`      | none  | dim label     | dim: a record, not a question          |
-
-| Confidence | Glyph | Colour       | Reads as                                        |
-|------------|-------|--------------|--------------------------------------------------|
-| `LOW`      | `●`   | error red    | the agent wants a human on it                    |
-| `MEDIUM`   | `●`   | warning amber| a fork worth knowing about                       |
-| `HIGH`     | `●`   | cyan `#5fafaf` | it went the obvious way                        |
-| any, `auto`| `●`   | dim label    | never surfaced: the dial let it through          |
+| Status      | Glyph | Colour        | Row                                        |
+|-------------|-------|---------------|---------------------------------------------|
+| `waiting`   | `?`   | error red     | bright: the only one still asking something |
+| `accepted`  | `✓`   | success olive | bright                                      |
+| `overruled` | `✗`   | error red     | bright, the note follows the summary        |
+| `auto`      | `✓`   | dim label     | dim: settled by the dial, not by a human    |
 
 PARTS wraps its descriptions the same way, under the description column. A graph row in MISSION
-ends in two right-aligned columns, tokens then wall time, so the numbers read down the pane. A
-session under a project is named `session · <preset>`, never by its preset alone, and the
-`no missions` hint is absent while a session is standing there.
+ends in two right-aligned columns, tokens then wall time, so the numbers read down the pane, and a
+step the mission looped back to carries a dim `×N` after its name. Under the facts, a DEVIATIONS
+sub-panel gives each entry its own wrapped line, and is absent at zero. A session under a project
+is named `session · <preset>`, never by its preset alone, and the `no missions` hint is absent
+while a session is standing there.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.
@@ -142,7 +149,7 @@ step names a closed mission's workflow copy still carries keep the colours they 
 | technical   | `#6e6e6e` | orchestrator               | spec, an ungated merge — `condense` |
 
 Each graph row names its runner beside the step, and its model where the runner is not this
-session: `worker · opus`, `verifier · sonnet`, a bare `orchestrator`. Agent prompt colours follow
+session: `worker · opus`, `verifier · opus`, a bare `orchestrator`. Agent prompt colours follow
 the same reading: Worker blue, Investigator cyan, Verifier and Validator yellow, Summarizer
 magenta because Claude Code has no grey.
 
@@ -155,6 +162,7 @@ keys do, and none of these three do the same thing.
 |---------|------------------|------------------------------------------------------------------|
 | `↑↓`    | any              | move the selection; scroll the foot while it is full             |
 | `→`     | left             | enter the right pane                                             |
+| `→`     | MISSION          | turn the autonomy dial, the pane's one focusable value           |
 | `↵`     | any              | open the selection, or apply what Parts has pending              |
 | `←`     | right            | back to the left pane                                            |
 | `esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
@@ -164,7 +172,7 @@ keys do, and none of these three do the same thing.
 | `R`     | Parts            | reset the toggles                                                |
 | `O`     | mission row      | open the mission's Warp tab; a bound mission is refused          |
 | `X`     | mission, session | SIGTERM the session's process, SIGKILL on a second press         |
-| `T`     | mission row      | autonomy full → partial → none                                   |
+| `T`     | mission, MISSION | autonomy full → partial → none                                   |
 | `H`     | mission row      | archive a closed mission, or bring an archived one back          |
 | `Z`     | left             | show the archived missions                                       |
 | `C`     | any              | caffeinate auto → on → off                                       |
@@ -173,6 +181,10 @@ keys do, and none of these three do the same thing.
 | `F`     | any              | the foot at full height; header and status bar hidden            |
 | `?`     | any              | the KEYS panel                                                   |
 | `Q`     | any              | quit                                                             |
+
+The key bar is built from the kind of row selected, so it never offers a key whose whole reply
+would be a toast: a mission row answers `O X T H`, a session row `X`, a project, the Inbox and
+`Global` none of them.
 
 The panel is KEYS, then TERMS — one row per step kind in its own colour, then the words the screen
 uses — then HOW FACTORY WORKS. The primer is what a short terminal loses: all of it or none, never

@@ -43,7 +43,7 @@ export type LeftItem =
 
 /** The user's own parts as a project row: one PARTS pane, one apply path, the home dir as its root. */
 const globalRow = (snap: Snapshot): LeftItem =>
-  ({ kind: 'global', project: { name: '~ global', path: home(), missions: [], sessions: [], parts: snap.global } });
+  ({ kind: 'global', project: { name: 'Global', path: home(), missions: [], sessions: [], parts: snap.global } });
 
 export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
   return [
@@ -83,6 +83,7 @@ export function column(r: CliRenderer, width: number, extra: Record<string, unkn
 
 export type Pane = ReturnType<typeof column>;
 
+/** Two cells: the arrow a selection keeps while the focus is in the other pane, or room for it. */
 export function marker(selected: boolean, focused: boolean): Cell {
-  return [selected && !focused ? '›  ' : '   ', C.dim];
+  return [selected && !focused ? '› ' : '  ', C.dim];
 }

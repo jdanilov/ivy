@@ -122,6 +122,7 @@ function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): Ste
         kind: stepKind(step),
         status: (gateOpen ? 'blocked' : state?.status ?? 'pending') as RunState,
         role,
+        ...(state?.runs ? { runs: state.runs } : {}),
         ...(from ? { wall: to - from } : {}),
         ...(from && tail ? { tokens: sumUsage(tail.usage, from, to) } : {}),
         ...(gateOpen ? { gateOpen } : {}),

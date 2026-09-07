@@ -10,13 +10,11 @@ const VERB: Record<Activity['verb'], string> = {
   Tool: C.dim, Stop: C.success,
 };
 
-/** What the right pane and the foot pane are about. */
-function subject(here: LeftItem): string {
-  return here.kind === 'inbox' ? 'all projects'
-    : here.kind === 'session' ? here.session.preset
-    : here.kind === 'mission' ? here.mission.name
-    : here.project.name;
-}
+/** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch. */
+const tabs = (ui: Ui): Cell[] => [
+  ['DECISIONS', ui.foot === 'decisions' ? C.bright : C.dim], ['  ', C.dim],
+  ['ACTIVITY', ui.foot === 'activity' ? C.bright : C.dim],
+];
 
 /** Newest last, oldest scrolled off: both foot panes read the way they were written, and `↑↓`
  *  walk back through them while the foot is full. The clamp lives here because only this knows
@@ -38,28 +36,25 @@ function missionsOf(snap: Snapshot, here: LeftItem): Mission[] {
     : here.kind === 'project' ? here.project.missions : [];
 }
 
-/** Where a decision stands, left of its id: a blank margin is a fork nobody was asked about. */
+/** Where a decision stands, left of its id. A question the human still owes an answer to is the
+ *  only thing here that is not settled, so it is the only glyph that is not a verdict. */
 const VERDICT: Record<Decision['status'], [glyph: string, color: string]> = {
-  waiting: ['·', C.warning], accepted: ['✓', C.success], overruled: ['✗', C.error], auto: [' ', C.dim],
+  waiting: ['?', C.error], accepted: ['✓', C.success], overruled: ['✗', C.error], auto: ['✓', C.dim],
 };
-
-/** How sure the agent was, as one glyph: the word costs a column and says no more than the colour. */
-const SURE: Record<Decision['confidence'], string> = { LOW: C.error, MEDIUM: C.warning, HIGH: C.info };
 
 /** A summary long enough to need a fifth row is a paragraph nobody reads off a foot pane. */
 const SUMMARY_ROWS = 4;
 
 /**
- * `✓ D15 ● what was decided`: the verdict, the id, the confidence, then the decision itself. The
- * summary wraps under its own column instead of being cut, so a row copies whole into the session
- * that answers it. An `auto` row is a record, not a question, so it reads dim end to end.
+ * `✓ D15 what was decided`: the verdict, the id, then the decision itself. The summary wraps under
+ * its own column instead of being cut, so a row copies whole into the session that answers it. An
+ * `auto` row is a record, not a question, so it reads dim end to end.
  */
 function decisionLines(mission: string | null, d: Decision, width: number): Cell[][] {
   const auto = d.status === 'auto';
   const [glyph, color] = VERDICT[d.status];
   const head: Cell[] = [
     [`${glyph} `, color], [d.id.padEnd(5), auto ? C.dim : C.bright],
-    ['● ', auto ? C.dim : SURE[d.confidence]],
     ...(mission === null ? [] : ([[mission.padEnd(10), C.dim]] as Cell[])),
   ];
   // An overruled row without its note reads as a verdict with no reason.
@@ -76,8 +71,7 @@ function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui
   const rows = missions.flatMap((m) => m.decisions.map((d): [string, Decision] => [m.name, d]));
   const waiting = rows.filter(([, d]) => d.status === 'waiting').length;
 
-  p.row(spread([['DECISIONS', C.bright], [`  ${subject(here)}`, C.dim]],
-    [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
+  p.row(spread(tabs(ui), [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
   p.rule();
   // A wrapped row is more lines than rows, so the scroll and the room are counted in lines.
   const lines = rows.flatMap(([name, d]) => decisionLines(missions.length > 1 ? name : null, d, p.width));
@@ -106,7 +100,7 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
   const rows = snap.activity.filter((a) => owners.has(a.session)).sort((a, b) => a.at - b.at);
   const merged = owners.size > 1;
 
-  p.row(spread([['ACTIVITY', C.bright], [`  ${subject(here)}`, C.dim]], [[`${rows.length}`, C.dim]], p.width));
+  p.row(spread(tabs(ui), [[`${rows.length}`, C.dim]], p.width));
   p.rule();
   const shown = visible(rows, room, ui);
   for (const a of shown) {

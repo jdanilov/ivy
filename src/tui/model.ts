@@ -35,6 +35,8 @@ export interface StepRow {
   status: RunState;
   /** Who runs it, from `stepRole` and never guessed here; the model follows through `runnerLabel`. */
   role: string;
+  /** How many times `step start` has run it. Absent or 1 on a step the mission never looped back to. */
+  runs?: number;
   wall?: number;
   /** Transcript usage inside the step's own window. */
   tokens?: { input: number; cached: number; output: number };

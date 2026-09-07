@@ -20,14 +20,20 @@ function fact(p: Pane, label: string, cells: Cell[]): void {
   p.row([[label.padEnd(LABEL), C.dim], ...cells]);
 }
 
-export function missionPane(p: Pane, m: Mission): void {
+/** The step name column, wide enough for the longest name plus the `×N` of a step run again. */
+const NAME_COL = 13;
+
+export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
   p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
 
   for (const s of m.steps) {
+    // A step the mission looped back to says so: one run is the norm and carries no mark.
+    const again = (s.runs ?? 0) > 1 ? ` ×${s.runs}` : '';
     const cells: Cell[] = [
-      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name.padEnd(12), stepColor(s.kind)],
+      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind)], [again, C.dim],
+      [' '.repeat(Math.max(1, NAME_COL - s.name.length - again.length)), C.dim],
       [runner(s), C.dim], ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
     const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
@@ -42,12 +48,18 @@ export function missionPane(p: Pane, m: Mission): void {
   if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
 
   p.rule();
+  // The dial is the one thing this pane changes, so it is the one thing `→` can land on.
   fact(p, 'step', [[m.step ?? '—', C.bright], DOT, [runner(m.steps.find((s) => s.name === m.step)), C.dim],
-    DOT, [`round ${m.round}`, C.dim]]);
+    DOT, [`round ${m.round}`, C.dim], DOT, ['autonomy ', C.dim], [m.autonomy, C.bright, focused]]);
   fact(p, 'branch', [[m.branch ?? '—', C.bright], DOT, [`worktree ${m.worktree ?? '—'}`, C.dim]]);
   fact(p, 'session', [[m.preset ?? (m.session ? id(m.session) : '—'), C.bright], DOT,
     [`${m.state}${m.wall ? ` ${dur(m.wall)}` : ''}`, C.dim]]);
-  if (m.deviations.length) fact(p, 'deviations', [[`${m.deviations.length}`, C.bright], DOT, [m.deviations.join(' · '), C.dim]]);
+
+  // Why the mission left its workflow is worth a line each; a count and an ellipsis said neither.
+  if (!m.deviations.length) return;
+  p.rule();
+  p.row([['DEVIATIONS', C.bright], [`  ${m.deviations.length}`, C.dim]]);
+  for (const d of m.deviations) for (const l of wrap(d, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.dim]]);
 }
 
 export function sessionPane(p: Pane, s: Session): void {

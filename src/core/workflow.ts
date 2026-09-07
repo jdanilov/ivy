@@ -141,7 +141,7 @@ export const ROLE_MODEL: Record<string, string> = {
   orchestrator: 'fable',
   worker: 'opus',
   validator: 'opus',
-  verifier: 'sonnet',
+  verifier: 'opus',
   investigator: 'sonnet',
   summarizer: 'sonnet',
 };

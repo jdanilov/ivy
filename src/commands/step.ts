@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { MissionState, Workflow } from '../types.js';
+import type { MissionState, StepState, Workflow } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import { Refusal, deviate, missionWorkflow, notStub, now, pointAtInserted, resolveMission, writeState } from '../core/mission.js';
 import { allStepNames, dumpWorkflow, findStep, nextStep, ownerStep, validate } from '../core/workflow.js';
@@ -72,7 +72,7 @@ function start(state: MissionState, workflow: Workflow, name: string): void {
     throw new Refusal(`step ${name} is not the current step — the mission is at ${state.step}, start that with: factory step start ${state.step}`);
   }
 
-  state.steps[name] = { status: 'running', startedAt: now() };
+  state.steps[name] = { status: 'running', runs: (current?.runs ?? 0) + 1, startedAt: now() };
 }
 
 function done(state: MissionState, workflow: Workflow, name: string): void {
@@ -147,10 +147,14 @@ function loop(state: MissionState, workflow: Workflow, name: string, flags: Flag
     throw new Refusal(`round ${round} is past loop max ${definition.loop.max} on ${name} — open a human gate instead of looping again`);
   }
 
+  // Pending again, but not for the first time: the run count is what the graph shows as `×2`.
+  const again = (step: string, extra: Partial<StepState> = {}): StepState =>
+    ({ status: 'pending', runs: state.steps[step]?.runs, ...extra });
+
   state.round = round;
-  state.steps[name] = { status: 'pending', reason: str(flags, 'reason') };
-  for (const member of definition.parallel ?? []) state.steps[member] = { status: 'pending' };
-  state.steps[definition.loop.back] = { status: 'pending' };
+  state.steps[name] = again(name, { reason: str(flags, 'reason') });
+  for (const member of definition.parallel ?? []) state.steps[member] = again(member);
+  state.steps[definition.loop.back] = again(definition.loop.back);
   state.step = definition.loop.back;
 }
 

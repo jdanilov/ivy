@@ -39,23 +39,43 @@ function header(p: Pane, here: LeftItem, snap: Snapshot): void {
   p.row(spread(left, caffeinateCells(snap), p.width));
 }
 
-/** Missions of one project, or of all of them when the Inbox is selected. */
+/** The bar is a third of the line at most, and only what the words on either side leave. */
+const barRoom = (p: Pane, used: number): number => Math.min(Math.floor(p.width * 0.3), p.width - used - 6);
+
+/** Missions of one project, or of all of them when the Inbox is selected: a bar over what they
+ *  are, then the counts as the legend that names its colours. */
 function summary(p: Pane, missions: Mission[]): void {
-  const counts: [string, number][] = [
-    ['running', missions.filter((m) => m.state === 'running').length],
-    ['waiting', missions.filter((m) => m.state === 'blocked').length],
-    ['stub', missions.filter((m) => m.status === 'stub').length],
-    ['closed', missions.filter((m) => m.status === 'closed').length],
+  const closed = missions.filter((m) => m.status === 'closed').length;
+  const stub = missions.filter((m) => m.status === 'stub').length;
+  const counts: [string, number, string][] = [
+    ['running', missions.filter((m) => m.state === 'running').length, C.warning],
+    ['waiting', missions.filter((m) => m.state === 'blocked').length, C.warning],
+    ['stub', stub, C.track],
+    ['closed', closed, C.success],
   ];
-  p.row(counts.filter(([, n]) => n > 0).flatMap(([word, n], i): Cell[] =>
-    [...(i ? ([[' · ', C.rule]] as Cell[]) : []), [`${n} `, C.bright], [word, C.dim]]));
+  const legend: Cell[] = counts.filter(([, n]) => n > 0).flatMap(([word, n], i): Cell[] =>
+    [...(i ? ([[' · ', C.rule]] as Cell[]) : []), [`${n} `, C.dim], [word, C.dim]]);
+
+  const bar = barRoom(p, len(legend));
+  if (missions.length === 0 || bar <= 0) return p.row(legend);
+  // Each mission is one segment: closed behind it, stub not started yet, everything else open.
+  const width = (n: number): number => Math.round((bar * n) / missions.length);
+  const green = width(closed);
+  const grey = width(stub);
+  p.row([['█'.repeat(green), C.success], ['█'.repeat(Math.max(0, bar - green - grey)), C.warning],
+    ['█'.repeat(grey), C.track], ['  ', C.dim], ...legend]);
 }
+
+/** The state word varies in width and the bar behind it would move with it. */
+const STATE_W = 8;
 
 function missionBar(p: Pane, m: Mission): void {
   const total = m.steps.length;
   const done = m.steps.filter((s) => s.status === 'done').length;
   const word = m.status === 'stub' ? 'STUB' : m.status === 'closed' ? 'CLOSED' : m.state.toUpperCase();
-  const left: Cell[] = [[`${GLYPH[m.state]} `, stateColor(m.state)], [word, C.bright]];
+  // A mission open and not started is waiting on the human, where a pending step is only next in line.
+  const color = word === 'PENDING' ? C.warning : stateColor(m.state);
+  const left: Cell[] = [[`${GLYPH[m.state]} `, color], [word.padEnd(STATE_W), C.bright]];
   const count: Cell[] = total ? [['  ', C.dim], [`${done}/${total}`, C.bright]] : [];
   const metrics: Cell[] = [
     ['autonomy ', C.dim], [m.autonomy, C.dim], ['   ', C.dim],
@@ -65,8 +85,7 @@ function missionBar(p: Pane, m: Mission): void {
     ['Out ', C.dim], [tokens(m.tokens.output), C.bright],
   ];
 
-  // The bar fills what the words and the metrics leave, and never more than a third of the line.
-  const bar = Math.min(Math.floor(p.width * 0.3), p.width - len(left) - len(count) - len(metrics) - 6);
+  const bar = barRoom(p, len(left) + len(count) + len(metrics));
   const fill = total && bar > 0 ? Math.round((bar * done) / total) : 0;
   const middle: Cell[] = total && bar > 0
     ? [['  ', C.dim], ['█'.repeat(fill), C.success], ['█'.repeat(bar - fill), C.track]] : [];
@@ -85,6 +104,13 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   return summary(p, here.project.missions);
 }
 
+/** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
+ *  reply would be a toast saying the row is the wrong kind. */
+const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
+  inbox: [], global: [], project: [], mission: ['O', 'X', 'T', 'H'], session: ['X'],
+};
+const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], ['H', 'Archive']];
+
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. */
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
@@ -95,13 +121,15 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ f esc', 'Back'], ['Q', 'Quit']] :
-    !right ? [['↑↓', 'Select'], ['↵', 'Open'], ['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'],
-      ['H', 'Archive'], ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
+    !right ? [['↑↓', 'Select'], ['↵', 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
+      ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
     : parts ? [['↑↓', 'Select'], ['Space', 'Toggle'], ['↵', 'Apply'],
       ...(pending(here.project, ui).length ? [['R', 'Reset'], ['esc', 'Discard']] : [['←esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
-    : [['←esc', 'Back'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']];
+    // The mission pane has one thing to focus, and the row it sits on is the autonomy dial.
+    : [...(here.kind === 'mission' ? [['→ T', 'Autonomy']] : []),
+      ['←esc', 'Back'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']];
 
   const cells = (list: string[][]): Cell[] =>
     list.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]);
@@ -129,9 +157,9 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const actH = ui.full ? region : ui.help ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
   const bodyH = region - actH;
 
-  // The key bar sits on the last row and no box carries a background, so every cell the screen
-  // does not colour keeps the terminal's own.
-  const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 1, paddingRight: 1 });
+  // Two blank columns down the left and none anywhere else: the key bar sits on the last row and
+  // no box carries a background, so every cell the screen does not colour keeps the terminal's own.
+  const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 2, paddingRight: 0 });
   root.row([]);
   // A full-height foot is that pane and nothing else: the header and the status bar are rows it can have.
   if (!ui.full) {
@@ -152,7 +180,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     if (ui.help) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui);
-    else if (here.kind === 'mission') missionPane(right, here.mission);
+    else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');
     else sessionPane(right, here.session);
     body.add(left.box);
     const divider = column(r, 1, { width: 1, flexShrink: 0 });

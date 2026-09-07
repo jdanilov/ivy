@@ -1,4 +1,4 @@
-# ♻ Factory
+# ⌬ Factory
 
 **Minimalistic portable agent harness for Claude Code.**
 
@@ -31,38 +31,38 @@ projects live in `~/.factory/projects`.
 `install`, `uninstall`, `status` and `update` take a project path and fall back to a picker.
 Everything else acts on the checkout you are standing in and never prompts.
 
-| Command                                        | Purpose                                                                    |
-|------------------------------------------------|----------------------------------------------------------------------------|
-| `factory`                                      | Open Mission Control: every project, mission, session and open gate        |
-| `factory menu`                                 | The interactive picker: a command, then a project                          |
+| Command                                        | Purpose                                                                     |
+|------------------------------------------------|-----------------------------------------------------------------------------|
+| `factory`                                      | Open Mission Control: every project, mission, session and open gate         |
+| `factory menu`                                 | The interactive picker: a command, then a project                           |
 | `factory --fixture`, `factory --frames <dir>`  | Draw the demo snapshot; write the screen as text and exit, with no terminal |
-| `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                  |
-| `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm     |
-| `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out     |
-| `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions    |
-| `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone    |
-| `install\|uninstall\|status\|update --global`  | The same four over `~/.claude/`, on the parts marked `scope: global`       |
-| `mission new <name> [--autonomy L]`            | Create the folder, the `intent` workflow copy, `state.json`, branch, claim |
-| `mission new <name> --stub \| --quick`         | Intent skeleton with no branch, or the one-step `quick` workflow           |
-| `mission shape <preset> [--autonomy L]`        | Append a preset's steps behind `intent`, once, after the intent gate       |
-| `mission autonomy full\|partial\|none [name]`  | Move the dial that decides which decisions wait on the human               |
-| `mission open [name]`                          | Spawn the session in a Warp tab; a stub is promoted, a bound one refused   |
-| `mission list [--all]`                         | Every mission across `~/.factory/projects`, stubs last                     |
-| `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness      |
-| `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                          |
-| `mission resume [name]`                        | Check the branch back out and print the current step and open gates        |
-| `mission close [name] [--keep-branch]`         | Merge the branch, mark it closed, clear the claim, delete the branch       |
-| `mission archive\|unarchive <name>`            | Move a closed mission's folder into `.factory/archive/`, or back           |
-| `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                    |
-| `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                   |
-| `step loop <step>`                             | Record a round and send the mission back to the step's loop target         |
-| `gate open <step> --file F`                    | Put a gate's content up for an answer                                      |
-| `gate answer <step> accept\|amend\|reject`     | Answer a gate once; a conflicting second answer is refused                 |
-| `gate list`                                    | Every open gate across projects                                            |
-| `decision add "<s>" --confidence L`            | File a fork with its reason; the mission's autonomy decides if it waits    |
-| `decision answer <id> accept\|overrule`        | Answer once; a conflicting second answer is refused                        |
-| `decision list [--waiting]`                    | The mission's decisions, or only the ones waiting on the human             |
-| `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
+| `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                   |
+| `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm      |
+| `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out      |
+| `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions     |
+| `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone     |
+| `install\|uninstall\|status\|update --global`  | The same four over `~/.claude/`, on the parts marked `scope: global`        |
+| `mission new <name> [--autonomy L]`            | Create the folder, the `intent` workflow copy, `state.json`, branch, claim  |
+| `mission new <name> --stub \| --quick`         | Intent skeleton with no branch, or the one-step `quick` workflow            |
+| `mission shape <preset> [--autonomy L]`        | Append a preset's steps behind `intent`, once, after the intent gate        |
+| `mission autonomy full\|partial\|none [name]`  | Move the dial that decides which decisions wait on the human                |
+| `mission open [name]`                          | Spawn the session in a Warp tab; a stub is promoted, a bound one refused    |
+| `mission list [--all]`                         | Every mission across `~/.factory/projects`, stubs last                      |
+| `mission status [name]`                        | The workflow one step per row, with gates, round and session liveness       |
+| `mission adopt <name> --session <id>`          | Bind a running Claude Code session to the mission                           |
+| `mission resume [name]`                        | Check the branch back out and print the current step and open gates         |
+| `mission close [name] [--keep-branch]`         | Merge the branch, mark it closed, clear the claim, delete the branch        |
+| `mission archive\|unarchive <name>`            | Move a closed mission's folder into `.factory/archive/`, or back            |
+| `step start\|done\|skip <step>`                | Move a step to running, done or skipped                                     |
+| `step add <step> --after X --reason R`         | Insert a step the workflow does not have                                    |
+| `step loop <step>`                             | Record a round and send the mission back to the step's loop target          |
+| `gate open <step> --file F`                    | Put a gate's content up for an answer                                       |
+| `gate answer <step> accept\|amend\|reject`     | Answer a gate once; a conflicting second answer is refused                  |
+| `gate list`                                    | Every open gate across projects                                             |
+| `decision add "<s>" --confidence L`            | File a fork with its reason; the mission's autonomy decides if it waits     |
+| `decision answer <id> accept\|overrule`        | Answer once; a conflicting second answer is refused                         |
+| `decision list [--waiting]`                    | The mission's decisions, or only the ones waiting on the human              |
+| `handoff save <step>`                          | Write the handoff on stdin into the mission folder                          |
 
 Mission Control keys: `↑↓` select, `↵` open, `O` tab, `X` kill, `T` autonomy, `H` archive, `Z`
 show archived, `C` caffeinate, `D` decisions, `A` activity, `F` full height, `?` help, `Q` quit.
@@ -71,25 +71,25 @@ that raised them; the screen shows the command and records nothing itself.
 
 ## Parts
 
-| Part             | Type    | Model  | Description                                                  |
-|------------------|---------|--------|---------------------------------------------------------------|
-| `/mission`       | skill   | fable  | Orchestrator's manual: workflow, steps, gates, triage, close  |
-| `/verify`        | skill   | sonnet | Verifier over the diff, the `verify` recipe and the contract  |
-| `/validate`      | skill   | opus   | Validator drives the running system, evidence per assertion   |
-| `/retro`         | skill   | opus   | Sweeps closed missions' `retro.md` into one table the human answers   |
-| `/commit`        | skill   | sonnet | Structured git commits                                        |
-| `/explain`       | skill   | sonnet | Explains and visualizes system flows                          |
-| `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`        |
-| `/browse`        | tool    | sonnet | Drives a real or headless browser through `agent-browser`     |
+| Part             | Type    | Model  | Description                                                          |
+|------------------|---------|--------|----------------------------------------------------------------------|
+| `/mission`       | skill   | fable  | Orchestrator's manual: workflow, steps, gates, triage, close         |
+| `/verify`        | skill   | opus   | Verifier over the diff, the `verify` recipe and the contract         |
+| `/validate`      | skill   | opus   | Validator drives the running system, evidence per assertion          |
+| `/retro`         | skill   | opus   | Sweeps closed missions' `retro.md` into one table the human answers  |
+| `/commit`        | skill   | sonnet | Structured git commits                                               |
+| `/explain`       | skill   | sonnet | Explains and visualizes system flows                                 |
+| `/research`      | tool    | sonnet | Cited web research via Grok, saved to `docs/research/`               |
+| `/browse`        | tool    | sonnet | Drives a real or headless browser through `agent-browser`            |
 | `/archify`       | skill   | opus   | Architecture diagrams from a typed spec, cloned per project (opt-in) |
-| `code-format`    | fixture | —      | How code is written, referenced by every agent                |
-| `docs-format`    | fixture | —      | How agent-facing docs are written, referenced by every agent  |
-| `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent       |
-| `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent            |
-| `permissions`    | fixture | —      | Baseline tool allow list merged into `.claude/settings.json`  |
-| `hook-factory`   | fixture | —      | Session events to `~/.factory/events`, rings on a human wait  |
-| `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                              |
-| `codegraph`      | mcp     | —      | Code graph MCP plus prompt hook, per project index (opt-in)   |
+| `code-format`    | fixture | —      | How code is written, referenced by every agent                       |
+| `docs-format`    | fixture | —      | How agent-facing docs are written, referenced by every agent         |
+| `terminology`    | fixture | —      | Template `docs/terminology.md`, seeded only when absent              |
+| `roadmap`        | fixture | —      | Template `docs/roadmap.md`, seeded only when absent                  |
+| `permissions`    | fixture | —      | Baseline tool allow list merged into `.claude/settings.json`         |
+| `hook-factory`   | fixture | —      | Session events to `~/.factory/events`, rings on a human wait         |
+| `hook-safe-bash` | fixture | —      | Blocks destructive bash commands                                     |
+| `codegraph`      | mcp     | —      | Code graph MCP plus prompt hook, per project index (opt-in)          |
 
 Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summarizer` with
 `/mission`, `Verifier` with `/verify`, `Validator` with `/validate`, `Commit` with `/commit`.
@@ -98,12 +98,12 @@ Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summar
 are the user's, not a project's. `factory install --global` links them into `~/.claude/`, where every
 session on the machine reads them, and no project command ever lists them.
 
-| Type        | Prefix | What it is                                                       |
-|-------------|--------|-------------------------------------------------------------------|
-| **skill**   | `/`    | Prompt with a model directive — invoked as `/name` in Claude Code |
-| **tool**    | `/`    | Skill with supporting scripts or runtime                          |
-| **fixture** | —      | Project configuration: hooks, scripts, assets                     |
-| **mcp**     | —      | MCP server entry injected into `.mcp.json`                        |
+| Type        | Prefix | What it is                                                         |
+|-------------|--------|--------------------------------------------------------------------|
+| **skill**   | `/`    | Prompt with a model directive — invoked as `/name` in Claude Code  |
+| **tool**    | `/`    | Skill with supporting scripts or runtime                           |
+| **fixture** | —      | Project configuration: hooks, scripts, assets                      |
+| **mcp**     | —      | MCP server entry injected into `.mcp.json`                         |
 
 ## Snippets and vars
 

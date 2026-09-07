@@ -1,7 +1,7 @@
 ---
 name: retro
 model: opus
-description: ♻ Sweep closed missions' retro.md into one table the human answers in one go
+description: ⌬ Sweep closed missions' retro.md into one table the human answers in one go
 ---
 
 # Retro

@@ -1,7 +1,7 @@
 ---
 name: validate
 model: opus
-description: ♻ Run the Validator against the running system and the mission contract
+description: ⌬ Run the Validator against the running system and the mission contract
 ---
 
 # Validate

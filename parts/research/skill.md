@@ -1,7 +1,7 @@
 ---
 name: research
 model: sonnet
-description: ♻ Comprehensive up-to-date web research. Use for fact-checked research with citations from multiple sources.
+description: ⌬ Comprehensive up-to-date web research. Use for fact-checked research with citations from multiple sources.
 ---
 
 # Research

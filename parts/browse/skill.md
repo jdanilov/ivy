@@ -1,7 +1,7 @@
 ---
 name: browse
 model: sonnet
-description: ♻ Drive the user's own browser (logged-in Chrome/Brave profile) or a headless lab Chrome via agent-browser. Web tasks needing real logins, forms, scraping, screenshots, research.
+description: ⌬ Drive the user's own browser (logged-in Chrome/Brave profile) or a headless lab Chrome via agent-browser. Web tasks needing real logins, forms, scraping, screenshots, research.
 ---
 
 # Browse

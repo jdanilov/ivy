@@ -109,8 +109,10 @@ in its `intent.md` where the steps would be: two stubs differ by what they are f
 
 Every open gate, waiting decision and waiting question across all projects, keyed
 `project/origin/label`. Each names the session command that answers it; a question names the tab
-that owns it. A closed mission raises nothing: its session id is a record, and the session, if it
-still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
+that owns it. A turn that ended is a question only when its final message's last line ends in
+`?` or the turn put an AskUserQuestion to the human: most final messages are statements, and a
+statement rings nobody. A closed mission raises nothing: its session id is a record, and the
+session, if it still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
 `777;notify`. Messages, the right pane over it, shows the selected item's body and that command.
 
 ### The foot: DECISIONS
@@ -121,7 +123,12 @@ when more than one is in scope. A closed mission's decisions are its record: sel
 them. A decision is a fork an agent took; the screen never answers one.
 
 ACTIVITY is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`,
-`Tool` — plus the hook's `Stop`, newest last.
+`Tool` — plus the hook's own two rows, `You` for each prompt and `Stop` for each turn's end,
+newest last. A turn then reads as it happened: prompt, tools, the model's words, stop. A `Bash`
+row is the tool's description, what the model said it was doing, and only falls back to the
+command; an `Agent` row is `<type> · <description>`; a `Stop` row sums its turn, `turn 2m 38s ·
+5 tools`. Words — `You`, `Text`, `Ask` — are bright, tooling dim, `Edit` green as a change. A row
+wraps under its text column to two lines and no more.
 
 A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
 filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict

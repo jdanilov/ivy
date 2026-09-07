@@ -1,5 +1,5 @@
 import { C, GLYPH, stateColor, stepColor } from '../theme.js';
-import { ago, dur, id, spread, tokens, wrap, type Cell } from '../format.js';
+import { dur, id, spread, tokens, wrap, type Cell } from '../format.js';
 import { runnerLabel } from '../../core/workflow.js';
 import type { Pane } from './pane.js';
 import type { Mission, Session } from '../model.js';
@@ -76,9 +76,9 @@ export function sessionPane(p: Pane, s: Session): void {
     ...(s.busy ? ([['working', C.bright], ...(s.agent ? [DOT, [s.agent, C.dim]] : [])] as Cell[])
       : ([['idle ', C.dim], [dur(Date.now() - s.idleSince), C.bright]] as Cell[]))]);
   p.row([['cwd ', C.dim], [s.cwd, C.bright]]);
-  p.row([['last ', C.dim], [s.last ? `${s.last.verb}  ${s.last.detail}  ${ago(s.last.at)}` : '—', C.bright]]);
-  if (!s.question) return;
+  // Its last word, whole: a statement as often as a question, so the label claims neither.
+  if (!s.said) return;
   p.rule();
-  p.row([['asks', C.warning]]);
-  for (const l of wrap(s.question, p.width, 6)) p.row([[l, C.bright]]);
+  p.row([['said', C.dim]]);
+  for (const l of wrap(s.said, p.width, 6)) p.row([[l, C.bright]]);
 }

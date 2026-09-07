@@ -8,7 +8,7 @@ import { git, listArchived, listMissions, missionRowState, missionWorkflow, sess
 import { scanProject } from '../core/scanner.js';
 import { allParts, loadParts, projectOnly } from '../core/registry.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
-import { id } from './format.js';
+import { dur, id } from './format.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
 import type {
@@ -42,8 +42,12 @@ interface Ev {
   preset: string;
   /** Every Stop the session has logged: the one activity row the transcript does not carry. */
   stops: number[];
+  /** Every prompt the human sent, the other row the transcript does not carry as its own. */
+  prompts: { at: number; text: string }[];
   /** The final message of a Stop nobody has answered yet; `null` when nothing is waiting. */
   asks: string | null;
+  /** The final message of the last Stop, answered or not. */
+  said: string;
 }
 
 interface EventLine { at?: string; event?: string; cwd?: string; detail?: string | null }
@@ -73,6 +77,8 @@ async function readEvents(): Promise<Map<string, Ev>> {
     if (!last || Number.isNaN(at) || Date.now() - at > DAY) continue;
 
     const stops: number[] = [];
+    const prompts: Ev['prompts'] = [];
+    let said = '';
     let preset = 'quick';
     // What the session is waiting on the human with is the end of a turn, and only a prompt
     // answers it: an idle Notification after a Stop is the same question asked again, and one
@@ -83,24 +89,40 @@ async function readEvents(): Promise<Map<string, Ev>> {
       if (!line) continue;
       if (line.event === 'Stop') {
         stops.push(Date.parse(line.at ?? ''));
-        asks = line.detail ?? '';
+        asks = said = line.detail ?? '';
       }
-      if (line.event === 'UserPromptSubmit') asks = null;
+      if (line.event === 'UserPromptSubmit') {
+        asks = null;
+        prompts.push({ at: Date.parse(line.at ?? ''), text: line.detail ?? '' });
+      }
       if (line.event === 'SessionStart' && PRESETS.includes(line.detail ?? '')) preset = line.detail!;
     }
     const cwd = last.cwd ?? '';
     out.set(name.slice(0, -6), {
       session: name.slice(0, -6), cwd, real: await realpath(cwd).catch(() => cwd), at, event: last.event ?? '',
-      detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)), asks,
+      detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)),
+      prompts: prompts.filter((p) => !Number.isNaN(p.at)), asks, said,
     });
   }
   return out;
 }
 
-/** What a session is asking the human, from the hook's own record of the turn that ended: the Stop
- *  carries the exact final message, where the tail carries the last text it happened to have read. */
-const asking = (ev: Ev | undefined, tail: Tail | null): string =>
-  ev?.asks == null || working(tail) ? '' : ev.asks || tail?.text || '';
+/** The final message of the turn that ended: the tail has it whole, the hook's Stop has it clipped. */
+const said = (ev: Ev | undefined, tail: Tail | null): string => tail?.text || ev?.said || '';
+
+/**
+ * What a session is asking the human. A turn that ended is not a question by itself, most final
+ * messages are statements: it asks when its last line ends in `?`, or when the turn put an
+ * AskUserQuestion to the human. Nothing while a sub-agent is still out.
+ */
+function asking(ev: Ev | undefined, tail: Tail | null): string {
+  if (ev?.asks == null || working(tail)) return '';
+  const text = said(ev, tail);
+  const lastLine = text.trim().split('\n').filter((l) => l.trim() !== '').at(-1) ?? '';
+  const since = ev.prompts.at(-1)?.at ?? 0;
+  const askedTool = tail?.activity.some((a) => a.verb === 'Ask' && a.at > since) ?? false;
+  return /\?\s*$/.test(lastLine) || askedTool ? text : '';
+}
 
 /** The role of a sub-agent the session still has out in the background, if any. */
 function working(tail: Tail | null): string | undefined {
@@ -214,12 +236,22 @@ export async function settle(): Promise<void> {
 /** `logged` is per session: two missions can name one — a closed one and its successor. */
 interface Ctx { activity: Activity[]; inbox: InboxItem[]; logged: Set<string> }
 
-/** Rows the log shows for one session: its transcript blocks plus the hook's Stop lines. */
+/** The tool calls a turn made: everything in the log between a prompt and its Stop that is not prose. */
+const TOOLS = new Set<Activity['verb']>(['Bash', 'Edit', 'Read', 'Agent', 'Ask', 'Tool']);
+
+/** Rows the log shows for one session: its transcript blocks plus the hook's prompt and Stop lines.
+ *  A Stop row sums its turn — how long, how many tools — from the prompt that opened it. */
 function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: string): void {
   if (session === '' || ctx.logged.has(session)) return;
   ctx.logged.add(session);
   if (tail) ctx.activity.push(...tail.activity);
-  for (const at of ev?.stops ?? []) ctx.activity.push({ at, session, verb: 'Stop', text: '' });
+  for (const { at, text } of ev?.prompts ?? []) ctx.activity.push({ at, session, verb: 'You', text });
+  for (const at of ev?.stops ?? []) {
+    const from = ev!.prompts.filter((p) => p.at <= at).at(-1)?.at;
+    const tools = tail?.activity.filter((a) => TOOLS.has(a.verb) && a.at > (from ?? 0) && a.at <= at).length ?? 0;
+    const text = from === undefined ? '' : `turn ${dur(at - from)} · ${tools} tool${tools === 1 ? '' : 's'}`;
+    ctx.activity.push({ at, session, verb: 'Stop', text });
+  }
 }
 
 /** A stub's own words: the first paragraph under `## Why`, joined onto one line. */
@@ -294,8 +326,7 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
     preset: ev.preset,
     cwd: ev.cwd,
     idleSince: ev.stops.at(-1) ?? ev.at,
-    last: { at: ev.at, verb: ev.event, detail: ev.detail },
-    ...(asks ? { question: asks } : {}),
+    ...(said(ev, tail) ? { said: said(ev, tail) } : {}),
   };
 }
 

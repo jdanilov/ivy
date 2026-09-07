@@ -45,9 +45,11 @@ export async function pickProject(recentProjects: string[]): Promise<string> {
     hint: 'type a new project path',
   });
 
+  // A list taller than the pane cannot redraw in place: clack cannot move the cursor above row 0.
   const result = unwrap(await p.select({
     message: 'Select a project:',
     options,
+    maxItems: 8,
   }));
 
   if (result === '__custom__') {

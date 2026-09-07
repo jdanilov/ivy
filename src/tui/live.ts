@@ -44,6 +44,8 @@ interface Ev {
   stops: number[];
   /** Every prompt the human sent, the other row the transcript does not carry as its own. */
   prompts: { at: number; text: string }[];
+  /** Every background sub-agent that reported back: a turn starts there too, with nobody typing. */
+  reports: { at: number; text: string }[];
   /** The final message of a Stop nobody has answered yet; `null` when nothing is waiting. */
   asks: string | null;
   /** The final message of the last Stop, answered or not. */
@@ -78,6 +80,7 @@ async function readEvents(): Promise<Map<string, Ev>> {
 
     const stops: number[] = [];
     const prompts: Ev['prompts'] = [];
+    const reports: Ev['reports'] = [];
     let said = '';
     let preset = 'quick';
     // What the session is waiting on the human with is the end of a turn, and only a prompt
@@ -91,9 +94,12 @@ async function readEvents(): Promise<Map<string, Ev>> {
         stops.push(Date.parse(line.at ?? ''));
         asks = said = line.detail ?? '';
       }
-      if (line.event === 'UserPromptSubmit') {
+      if (line.event === 'UserPromptSubmit' || line.event === 'SubagentReport') {
         asks = null;
-        prompts.push({ at: Date.parse(line.at ?? ''), text: line.detail ?? '' });
+        // Lines from before the hook told the two apart: a notification's tag is its first word.
+        const report = line.event === 'SubagentReport' || (line.detail ?? '').startsWith('<task-notification>');
+        const text = report && line.event !== 'SubagentReport' ? 'a sub-agent reported back' : line.detail ?? '';
+        (report ? reports : prompts).push({ at: Date.parse(line.at ?? ''), text });
       }
       if (line.event === 'SessionStart' && PRESETS.includes(line.detail ?? '')) preset = line.detail!;
     }
@@ -101,7 +107,7 @@ async function readEvents(): Promise<Map<string, Ev>> {
     out.set(name.slice(0, -6), {
       session: name.slice(0, -6), cwd, real: await realpath(cwd).catch(() => cwd), at, event: last.event ?? '',
       detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)),
-      prompts: prompts.filter((p) => !Number.isNaN(p.at)), asks, said,
+      prompts: prompts.filter((p) => !Number.isNaN(p.at)), reports: reports.filter((r) => !Number.isNaN(r.at)), asks, said,
     });
   }
   return out;
@@ -119,7 +125,7 @@ function asking(ev: Ev | undefined, tail: Tail | null): string {
   if (ev?.asks == null || working(tail)) return '';
   const text = said(ev, tail);
   const lastLine = text.trim().split('\n').filter((l) => l.trim() !== '').at(-1) ?? '';
-  const since = ev.prompts.at(-1)?.at ?? 0;
+  const since = turnStart(ev, Infinity) ?? 0;
   const askedTool = tail?.activity.some((a) => a.verb === 'Ask' && a.at > since) ?? false;
   return /\?\s*$/.test(lastLine) || askedTool ? text : '';
 }
@@ -239,6 +245,10 @@ interface Ctx { activity: Activity[]; inbox: InboxItem[]; logged: Set<string> }
 /** The tool calls a turn made: everything in the log between a prompt and its Stop that is not prose. */
 const TOOLS = new Set<Activity['verb']>(['Bash', 'Edit', 'Read', 'Agent', 'Ask', 'Tool']);
 
+/** When the turn that ended at `at` began: the last prompt or sub-agent report before it. */
+const turnStart = (ev: Ev, at: number): number | undefined =>
+  [...ev.prompts, ...ev.reports].map((t) => t.at).filter((t) => t <= at).sort((a, b) => a - b).at(-1);
+
 /** Rows the log shows for one session: its transcript blocks plus the hook's prompt and Stop lines.
  *  A Stop row sums its turn — how long, how many tools — from the prompt that opened it. */
 function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: string): void {
@@ -246,8 +256,9 @@ function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: strin
   ctx.logged.add(session);
   if (tail) ctx.activity.push(...tail.activity);
   for (const { at, text } of ev?.prompts ?? []) ctx.activity.push({ at, session, verb: 'You', text });
+  for (const { at, text } of ev?.reports ?? []) ctx.activity.push({ at, session, verb: 'Agent', text: `↩ ${text}` });
   for (const at of ev?.stops ?? []) {
-    const from = ev!.prompts.filter((p) => p.at <= at).at(-1)?.at;
+    const from = turnStart(ev!, at);
     const tools = tail?.activity.filter((a) => TOOLS.has(a.verb) && a.at > (from ?? 0) && a.at <= at).length ?? 0;
     const text = from === undefined ? '' : `turn ${dur(at - from)} · ${tools} tool${tools === 1 ? '' : 's'}`;
     ctx.activity.push({ at, session, verb: 'Stop', text });

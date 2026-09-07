@@ -124,7 +124,9 @@ them. A decision is a fork an agent took; the screen never answers one.
 
 ACTIVITY is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`,
 `Tool` — plus the hook's own two rows, `You` for each prompt and `Stop` for each turn's end,
-newest last. A turn then reads as it happened: prompt, tools, the model's words, stop. A `Bash`
+newest last. A background sub-agent reporting back arrives as a prompt nobody typed; the hook logs
+it as `SubagentReport` and the row reads `Agent ↩ <what it was asked>`, never as `You`. A turn
+then reads as it happened: prompt, tools, the model's words, stop. A `Bash`
 row is the tool's description, what the model said it was doing, and only falls back to the
 command; an `Agent` row is `<type> · <description>`; a `Stop` row sums its turn, `turn 2m 38s ·
 5 tools`. Words — `You`, `Text`, `Ask` — are bright, tooling dim, `Edit` green as a change. A row

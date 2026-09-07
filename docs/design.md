@@ -39,6 +39,9 @@ undershoots these values on screen but the hierarchy holds.
 
 - Header row: brand glyph and product name pinned left, path or workflow name next, metrics
   right-aligned on the same line (`TIME 56m 54s · Input 324.0K · Cached 16.8M · Output 111.0K`).
+  `Input` is what the turns added, cache writes included; `Cached` is what they re-read. A graph
+  row's tokens are input plus output, so two steps compare and a late one is not heavier by
+  its history.
   Thin separator rule directly below.
 - Status bar: state dot and word left (`● RUNNING`), a two-tone progress bar (olive fill, `#404040`
   track) filling the middle, fraction and queued count right (`3/17 [+6]`).

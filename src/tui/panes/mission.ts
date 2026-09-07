@@ -43,7 +43,9 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
       [' '.repeat(Math.max(1, NAME_COL - s.name.length - again.length)), C.dim],
       [runner(s), C.dim], ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
-    const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
+    // What the step itself cost: tokens it added and produced. Cache reads re-send the whole
+    // history every turn, so counting them makes a late step look heavier than an early one.
+    const spend = s.tokens ? s.tokens.input + s.tokens.output : 0;
     // A duration is only news for a step that is getting somewhere: skipped and blocked both
     // measure a time nobody wants, and the word is what the row is for.
     const timed = s.status === 'running' || s.status === 'done';

@@ -111,10 +111,12 @@ export async function readTranscript(file: string, session: string, cwd: string)
     const key = line.message?.id ?? String(at);
     if (usage && !tail.seen.has(key)) {
       tail.seen.add(key);
+      // A cache write is a prompt token the model saw for the first time; only a cache read is
+      // context re-sent, and that is what grows with every turn. `input` is what the turn added.
       tail.usage.push({
         at,
-        input: usage.input_tokens ?? 0,
-        cached: (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+        input: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+        cached: usage.cache_read_input_tokens ?? 0,
         output: usage.output_tokens ?? 0,
       });
     }

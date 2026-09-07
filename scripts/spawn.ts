@@ -5,14 +5,14 @@
  * so `hook-factory` files a waiting decision and the `PostToolUse` hook injects it. Prints the
  * `additionalContext` the parent session received after the Agent tool result.
  *
- *   REAL_HOME=$HOME HOME=$(mktemp -d /private/tmp/vspawn.XXXXXX) bun /opt/ed/ivy/.factory/validator/spawn.ts
+ *   REAL_HOME=$HOME HOME=$(mktemp -d /private/tmp/vspawn.XXXXXX) bun scripts/spawn.ts
  *
  * Costs one real model run.
  */
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { readdir } from 'node:fs/promises';
-import { makeRepo, run } from './repo.js';
+import { makeRepo, run } from '../.factory/validator/repo.js';
 
 const HOME = homedir();
 const CLI = '/opt/ed/ivy/src/cli.ts';

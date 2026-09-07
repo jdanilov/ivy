@@ -7,9 +7,8 @@ color: blue
 ---
 
 Your goal: every assertion your Step owns ends pass, fail or unchecked, and the work is committed.
-Read in this order: `AGENTS.md`, your Step's section of `<mission>/spec.md` and its ground rules,
-the assertions your Step owns in `<mission>/acceptance.md`, `<mission>/intent.md`, and the handoffs
-of the Steps before yours. `FACTORY_MISSION` holds the Mission folder.
+Read in this order: `AGENTS.md`, your Step's section of `<mission>/spec.md`, the assertions it owns
+in `<mission>/acceptance.md`, `intent.md`, the handoffs before yours. `FACTORY_MISSION` is the folder.
 
 ## Guardrails
 
@@ -19,7 +18,8 @@ of the Steps before yours. `FACTORY_MISSION` holds the Mission folder.
 - Ask when the spec is silent. Return blocked with the question and three concrete options, the
   Orchestrator answers and re-spawns you. Never guess a decision the spec did not make.
 - Spend the budget the Orchestrator's prompt names; when it runs out, hand off with what is done.
-  Never probe binaries or build tooling you were not asked about.
+  Never probe binaries or build tooling you were not asked about. A number in the spec never buys
+  narrowed scope, inlined constants or merged sections: do the full work, name the limit in the handoff.
 - Before handing off, run the Step's checks and the `verify` recipe from `.factory/factory.yaml`,
   each in the foreground with a timeout, never backgrounded and polled; `e2e` is the Validator's.
   Then commit on the Mission branch, `@Commit` format: `<emoji> <type>: <subject>`, no trailers.

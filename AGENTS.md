@@ -12,6 +12,7 @@ in a manifest.
 - Missions: `docs/missions.md` — the mission family's grammar and invariants
 - Design: `docs/design.md` — palette, layout, keys, glyphs, formats for Mission Control
 - Roadmap: `docs/roadmap.md`
+- Memories: `docs/memories.md` — what closed missions learned, the seed corpus for the `mem` MCP
 
 Read the doc for the subsystem you touch before editing it; the invariants there are the tests.
 
@@ -46,8 +47,9 @@ scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, un
 scripts/tui-keys.ts     Mission Control headless: keys through `onKey`, every frame checked
 scripts/hook-inject.ts  hook-factory's decision paths as a child, or its own scratch self-check
 scripts/tui-snapshot.ts The fixture screen as plain text, for a look review with no tty
-.factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run — a nested
-               recipe reads back under its dotted path
+scripts/spawn.ts        The one real model run behind `e2e.spawn`: a @Worker's decision injected back
+.factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run, e2e.spawn — a
+               nested recipe reads back under its dotted path
 workflows/     intent, story, fix, chore, research, quick — the shipped workflow YAML: every
                mission starts on intent and `mission shape` appends a preset behind that step
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
@@ -108,10 +110,13 @@ refusal. Grammar and rules in `docs/parts.md` and `docs/missions.md`.
 - `bun scripts/test.ts` — the whole walk in one process, one line per case
 - `bash scripts/e2e.sh` — the same ground as a black box, through the CLI
 - `bun scripts/tui-keys.ts --fixture --quiet <keys>` — the screen under keys, frames checked
+- A script importing `src/tui/*` runs from inside the repo — from `/tmp` Bun resolves a second
+  `@opentui/core` out of its global cache and every `instanceof` fails silently
 - `bun scripts/hook-inject.ts` — a handoff's decisions filed and injected, scratch HOME and all
 - `bun x tsc --noEmit` — typecheck
 
-`e2e.run` is `scripts/e2e.sh` plus those two drivers; `verify` is `tsc`, `scripts/test.ts` and `status`.
+`e2e.run` is `scripts/e2e.sh` plus those two drivers, `e2e.spawn` is `scripts/spawn.ts` alone because
+it spends a real model run; `verify` is `tsc`, `scripts/test.ts` and `status`.
 
 ### What not to do
 

@@ -13,3 +13,6 @@ recipes:
       # decision paths fired the way Claude Code fires them. Both check themselves.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
       - bun scripts/hook-inject.ts
+    # Its own recipe, not part of `run`: the one check that spends a real model run.
+    spawn:
+      - REAL_HOME=$HOME HOME=$(mktemp -d /private/tmp/vspawn.XXXXXX) bun scripts/spawn.ts

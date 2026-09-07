@@ -45,7 +45,8 @@ reaches the thing under test costs one Bash call, and a manual pass costs a roun
 One line per `acceptance.md` assertion of kind `validate`, no exceptions:
 `pass` with what you saw, `fail` with what you saw instead, `unchecked` with what stopped you.
 Evidence is an observation: a screenshot path, the visible text, the exit code, the response body.
-"Looks right" is not evidence. Reading the implementation is not evidence.
+"Looks right" is not evidence, nor is reading the implementation, nor is the Worker's handoff: drive
+what it claims fixed and rerun what it claims it ran.
 
 ## 5. File the findings
 

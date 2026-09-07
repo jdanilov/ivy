@@ -3,12 +3,13 @@ import type { WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
 import type { Activity, Decision, InboxItem, Mission, PartRow, Project, Snapshot, StepRow } from './model.js';
 
-/** Fake data for the look-and-feel prototype. Ages are relative, so the screen reads right whenever it runs. */
+/** Fake data for the look-and-feel prototype. Every age is an offset from `now`, so the screen keeps its shape. */
 
 const M = 60_000;
 const H = 60 * M;
 const D = 24 * H;
-const now = Date.now();
+// A literal, not `Date.now()`: stamping at generation time rewrites every ACTIVITY row whenever frames are regenerated.
+const now = 1_788_782_400_000; // 2026-09-07T12:00:00Z
 
 /** The kind and the runner are never spelled out here: the fixture reads both through the
  *  mappings the live snapshot uses, so a look review is a review of what ships. */

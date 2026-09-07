@@ -1,11 +1,16 @@
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
+import type { ScopeChoice } from '../types.js';
 import { factoryHome } from './projects.js';
 
-/** `~/.factory/config.yaml`: machine-level facts — var overrides and the caffeinate mode. */
+/** `~/.factory/config.yaml`: machine-level facts — var overrides, scope per part, the caffeinate mode. */
 export interface FactoryConfig {
   vars?: Record<string, string>;
+  /** Where this machine wants each part, over what `part.yaml` recommends. `off` is nowhere. */
+  parts?: Record<string, ScopeChoice>;
 }
+
+const CHOICES: ScopeChoice[] = ['project', 'global', 'off'];
 
 /** AUTO holds the machine awake while a session is mid-turn, ON always, OFF never. */
 export type Caffeinate = 'auto' | 'on' | 'off';
@@ -13,6 +18,12 @@ export type Caffeinate = 'auto' | 'on' | 'off';
 const configPath = (): string => path.join(factoryHome(), 'config.yaml');
 
 let cache: FactoryConfig | null = null;
+
+/** A mapping's entries whose value `keep` accepts. Anything that is not a mapping is nothing. */
+function pairs<T>(raw: unknown, keep: (v: unknown) => boolean): Record<string, T> | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  return Object.fromEntries(Object.entries(raw).filter(([, v]) => keep(v))) as Record<string, T>;
+}
 
 /** Missing or unreadable file is `{}` — a machine without overrides is the normal case. */
 export async function loadConfig(): Promise<FactoryConfig> {
@@ -24,11 +35,16 @@ export async function loadConfig(): Promise<FactoryConfig> {
   const raw = Bun.YAML.parse(await file.text());
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return (cache = {});
 
-  const vars = (raw as Record<string, unknown>).vars;
-  if (typeof vars !== 'object' || vars === null || Array.isArray(vars)) return (cache = {});
+  const { vars, parts } = raw as Record<string, unknown>;
+  return (cache = {
+    vars: pairs<string>(vars, (v) => typeof v === 'string'),
+    parts: pairs<ScopeChoice>(parts, (v) => CHOICES.includes(v as ScopeChoice)),
+  });
+}
 
-  const entries = Object.entries(vars).filter(([, v]) => typeof v === 'string') as [string, string][];
-  return (cache = { vars: Object.fromEntries(entries) });
+/** Mission Control rewrites the file while it runs: whoever writes it drops the cache. */
+export function resetConfig(): void {
+  cache = null;
 }
 
 /** Read from the file every time, never the cache: Mission Control rewrites it while it runs. */
@@ -48,4 +64,31 @@ export async function writeCaffeinate(mode: Caffeinate): Promise<void> {
   const next = /^caffeinate:.*$/m.test(text) ? text.replace(/^caffeinate:.*$/m, line) : `${line}\n${text}`;
   await mkdir(factoryHome(), { recursive: true });
   await Bun.write(configPath(), next.endsWith('\n') ? next : `${next}\n`);
+}
+
+/**
+ * The same rule one level in: the part's line under `parts:` rewritten where it is, or inserted at
+ * the end of that block, or the block appended when the file has none. Only that line moves, and
+ * only inside the block — `vars` may hold a key named after a part. Quoted, because YAML reads a
+ * bare `off` as false.
+ */
+export async function writePartScope(name: string, choice: ScopeChoice): Promise<void> {
+  const text = await Bun.file(configPath()).text().catch(() => '');
+  const lines = text === '' ? [] : text.replace(/\n$/, '').split('\n');
+  const entry = `  ${name}: "${choice}"`;
+  const head = lines.findIndex((l) => l.startsWith('parts:'));
+
+  if (head === -1) {
+    lines.push('parts:', entry);
+  } else {
+    // The block runs while the lines stay indented; the part's own line is rewritten in place.
+    let end = head + 1;
+    while (end < lines.length && /^\s+\S/.test(lines[end]!)) end++;
+    const own = lines.slice(head + 1, end).findIndex((l) => l.trim().startsWith(`${name}:`));
+    if (own === -1) lines.splice(end, 0, entry);
+    else lines[head + 1 + own] = entry;
+  }
+
+  await mkdir(factoryHome(), { recursive: true });
+  await Bun.write(configPath(), lines.join('\n') + '\n');
 }

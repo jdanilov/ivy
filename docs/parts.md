@@ -9,7 +9,7 @@ with it. Read when touching `src/core/registry.ts`, `linker.ts`, `parts.ts`, `ma
 ```yaml
 type: skill          # skill | tool | fixture | mcp
 description: one line
-scope: project       # optional, project | global — global installs into ~/.claude/ instead
+scope: project       # optional, project | global — the recommendation; config.yaml overrides it
 default: true        # preselected in the install menu
 files:
   - source: skill.md         # relative to the part folder
@@ -63,12 +63,34 @@ manifest lists is a `conflict`.
 
 ## Scope
 
-A part's `scope` decides the target dir and nothing else: `project` copies into the project's
+A part's scope decides the target dir and nothing else: `project` copies into the project's
 `.claude/`, `global` into `~/.claude/`, where hooks and settings share one `settings.json` because
 there is no `settings.local.json` at user level. A project command never lists a global part and
 `--global` never lists a project one, so a part that changes scope is removed by the next `update`
 the same way a retired one is. A global part with a `snippet` or `recipes` is a registry error:
 nothing global has a project root to write a line in or run a command in.
+
+`scope:` in `part.yaml` is the author's recommendation — the author knows what the part is for, the
+machine's owner knows their machine — and `~/.factory/config.yaml` overrides it per part:
+
+```yaml
+parts:
+  commit: "project"    # the recommendation was global; this machine wants it per project
+  research: "off"      # nowhere at all
+```
+
+Resolution is the override, else `part.yaml`, else `project`, and it happens once, in the registry:
+`install`, `update`, `status` and the PARTS pane all read a part that already knows where it lives.
+`off` drops the part from the registry, so every reader sees what it sees for a part the Factory
+retired — `update` removes it, `status` stops listing it, and `install --parts` on it refuses by
+naming the file that turned it off. Only the `~ global` PARTS pane draws the choice, because the
+choice is the machine's: it lists every part, `Space` cycles `project → global → off` and `↵` applies.
+
+Moving a part is the collision rule played out in order, and the pane's `↵` runs exactly what a
+human would: the choice is written, then `update` on every project whose manifest still lists the
+part — that is what drops it there — then the home dir, refreshed for what left it and installed
+for what became global. By hand it is the same two steps: edit `config.yaml`, then `factory update
+--all`.
 
 ## `${name}` substitution
 

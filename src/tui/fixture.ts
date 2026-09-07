@@ -1,7 +1,7 @@
 import { stepRole } from '../core/workflow.js';
 import type { WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
-import type { Activity, Decision, InboxItem, Mission, PartRow, Project, Snapshot, StepRow } from './model.js';
+import type { Activity, Decision, InboxItem, Mission, PartRow, Project, Scope, ScopeChoice, Snapshot, StepRow } from './model.js';
 
 /** Fake data for the look-and-feel prototype. Every age is an offset from `now`, so the screen keeps its shape. */
 
@@ -123,8 +123,9 @@ const partFiles: Record<string, string[]> = {
   mission: ['.claude/skills/mission/skill.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md'],
 };
 
-const part = (name: string, type: string, description: string, status: PartRow['status'] = 'installed'): PartRow =>
-  ({ name, type, description, status, files: partFiles[name] ?? [`.claude/skills/${name}/skill.md`] });
+const part = (name: string, type: string, description: string, status: PartRow['status'] = 'installed',
+  scope: ScopeChoice = 'project', recommended: Scope = 'project'): PartRow =>
+  ({ name, type, description, status, scope, recommended, files: partFiles[name] ?? [`.claude/skills/${name}/skill.md`] });
 
 const ivyParts: PartRow[] = [
   part('archify', 'skill', 'architecture diagrams from a typed spec, html and svg', 'not-installed'),
@@ -141,13 +142,15 @@ const ivyParts: PartRow[] = [
   part('verify', 'skill', 'verifier gatekeeper over the diff and the contract'),
 ];
 
-/** The user's own parts, linked into `~/.claude/` and shared by every project. */
+/** The global row lists every part, because scope is chosen there: the ones copied into
+ *  `~/.claude/` and shared by every project, the ones a project keeps, and the ones turned off. */
 const globalParts: PartRow[] = [
-  part('commit', 'skill', 'structured git commits'),
-  part('explain', 'skill', 'visual code explanations and flow diagrams'),
-  part('hook-safe-bash', 'fixture', 'block destructive commands'),
-  part('permissions', 'fixture', 'baseline tool allow list in .claude/settings.json'),
-  part('research', 'tool', 'web research via Grok', 'not-installed'),
+  part('commit', 'skill', 'structured git commits', 'installed', 'global', 'global'),
+  part('explain', 'skill', 'visual code explanations and flow diagrams', 'installed', 'global', 'global'),
+  part('hook-safe-bash', 'fixture', 'block destructive commands', 'installed', 'global', 'global'),
+  part('mission', 'skill', 'run a mission end to end, from workflow and gates to close', 'not-installed'),
+  part('permissions', 'fixture', 'baseline tool allow list in .claude/settings.json', 'installed', 'global', 'global'),
+  part('research', 'tool', 'web research via Grok', 'not-installed', 'off', 'global'),
 ];
 
 /** Everything a mission needs but a fixture rarely varies. */

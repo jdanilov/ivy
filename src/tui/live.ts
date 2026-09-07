@@ -6,6 +6,7 @@ import { readDecisions, type Decision } from '../core/decision.js';
 import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
+import { allParts, loadParts } from '../core/registry.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
 import { id } from './format.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
@@ -293,8 +294,26 @@ const parts = async (dir: string): Promise<PartRow[]> =>
   (await scanProject(dir)).map((s) => ({
     name: s.part.name, type: s.part.type, description: s.part.description,
     status: s.status === 'installed' || s.status === 'modified' ? s.status : 'not-installed',
+    scope: s.part.scope, recommended: s.part.recommended,
     files: s.part.files.map((f) => f.target),
   }));
+
+/**
+ * The global row lists every part the Factory ships, the ones config turned `off` included: scope
+ * is chosen there, and a part nobody can see is a part nobody can turn back on. Only what resolves
+ * global has a status to read — the rest is somebody else's `.claude/`.
+ */
+async function globalParts(): Promise<PartRow[]> {
+  const scanned = new Map((await parts(home())).map((row) => [row.name, row]));
+  const inPlay = new Map((await loadParts()).map((p) => [p.name, p]));
+  return (await allParts()).map((part): PartRow => ({
+    name: part.name, type: part.type, description: part.description,
+    status: scanned.get(part.name)?.status ?? 'not-installed',
+    scope: inPlay.get(part.name)?.scope ?? 'off',
+    recommended: part.recommended,
+    files: part.files.map((f) => f.target),
+  }));
+}
 
 interface Dir { dir: string; real: string }
 
@@ -356,5 +375,5 @@ export async function buildSnapshot(): Promise<Snapshot> {
 
   ctx.inbox.sort((a, b) => a.at - b.at);
   ctx.activity.sort((a, b) => a.at - b.at);
-  return { projects, global: await parts(home()), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
+  return { projects, global: await globalParts(), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
 }

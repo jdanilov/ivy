@@ -4,7 +4,7 @@ import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
 import { copyPart, injectHooks, injectMcp, injectSettings, hooksFileName, writeSnippet } from '../core/linker.js';
 import { resolvePart, runInit } from '../core/recipes.js';
-import { FACTORY_ROOT, loadParts, withRequires } from '../core/registry.js';
+import { allParts, FACTORY_ROOT, loadParts, withRequires } from '../core/registry.js';
 import { existingProjects, scopeOf } from '../core/projects.js';
 import { checkEnvVars } from '../core/env.js';
 import { Refusal } from '../core/mission.js';
@@ -81,6 +81,9 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     // A name the other scope owns is a wrong-command mistake, not a typo: say which command it is.
     const elsewhere = (await loadParts()).find((p) => unknown.includes(p.name));
     if (elsewhere) throw new Refusal(`${elsewhere.name} is a ${elsewhere.scope} part — factory install ${elsewhere.scope === 'global' ? '--global' : '<project>'}`);
+    // Off is a choice, not a typo: the fix is the file that holds it, not another command.
+    const off = (await allParts()).find((p) => unknown.includes(p.name));
+    if (off) throw new Refusal(`${off.name} is off in ~/.factory/config.yaml`);
     throw new Refusal(`no such part: ${unknown.join(', ')}`);
   }
   const asked = only.length === 0 && !yes;

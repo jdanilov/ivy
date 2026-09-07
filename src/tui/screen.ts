@@ -133,8 +133,9 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
       ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
-    : parts ? [['↑↓', 'Select'], ['Space', 'Toggle'], ['↵', 'Apply'],
-      ...(pending(here.project, ui).length ? [['R', 'Reset'], ['esc', 'Discard']] : [['←esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
+    // Space picks the scope on the global row and the install on a project's: one key, two panes.
+    : parts ? [['↑↓', 'Select'], ['Space', here.kind === 'global' ? 'Scope' : 'Toggle'], ['↵', 'Apply'],
+      ...(pending(here.project, ui, here.kind === 'global').length ? [['R', 'Reset'], ['esc', 'Discard']] : [['←esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
     // The mission pane has one thing to focus, and the row it sits on is the autonomy dial.
     : [...(here.kind === 'mission' ? [['→ T', 'Autonomy']] : []),
       ['←esc', 'Back'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']];
@@ -185,7 +186,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     leftPane(left, items, snap, ui);
     if (ui.help) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
-    else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui);
+    else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global');
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');
     else sessionPane(right, here.session);
     body.add(left.box);

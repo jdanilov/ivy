@@ -38,6 +38,7 @@ const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/l
 const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
+const { loadConfig, resetConfig, writePartScope } = await import('../src/core/config.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
@@ -769,6 +770,103 @@ await check('global parts install into the home dir and come back out', async ()
 
   await uninstall(home, true);
   ok(!(await exists(path.join(home, '.claude'))), 'uninstall left the home .claude behind');
+});
+
+// ── scope per part ───────────────────────────────────────────────────────────
+
+const CONFIG = path.join(process.env.HOME!, '.factory', 'config.yaml');
+const BASE_CONFIG = 'vars:\n  codegraph: codegraph\n';
+
+/** The config is cached and every scope resolves through it: a case that writes one drops the
+ *  cache and puts the file back, or every case after it reads the override too. */
+async function withConfig(text: string, fn: () => Promise<void>): Promise<void> {
+  await writeFile(CONFIG, text);
+  resetConfig();
+  try {
+    await fn();
+  } finally {
+    await writeFile(CONFIG, BASE_CONFIG);
+    resetConfig();
+  }
+}
+
+await check('an override wins over part.yaml, and off is in no scope at all', async () => {
+  const home = process.env.HOME!;
+  const dir = await repo('scope');
+  await withConfig(`${BASE_CONFIG}parts:\n  commit: "project"\n  research: "off"\n`, async () => {
+    const parts = await loadParts();
+    const commit = parts.find((p) => p.name === 'commit');
+    ok(commit?.scope === 'project' && commit.recommended === 'global',
+      `commit resolved ${commit?.scope}, recommending ${commit?.recommended}`);
+    ok(!parts.some((p) => p.name === 'research'), 'an off part is still in the registry');
+
+    const inProject = (await scanProject(dir)).map((s) => s.part.name);
+    const inHome = (await scanProject(home)).map((s) => s.part.name);
+    ok(inProject.includes('commit') && !inHome.includes('commit'), 'commit did not move to the project scan');
+    ok(!inProject.includes('research') && !inHome.includes('research'), 'an off part is in a scan');
+  });
+  ok((await loadParts()).find((p) => p.name === 'commit')?.scope === 'global', 'the override outlived its config');
+});
+
+await check('update drops a part the config turned off', async () => {
+  const home = process.env.HOME!;
+  await install(home, false, ['research']);
+  const skill = path.join(home, '.claude/skills/research/skill.md');
+  ok(await exists(skill), 'research never reached the home dir');
+
+  await withConfig(`${BASE_CONFIG}parts:\n  research: "off"\n`, async () => {
+    await update(home);
+    ok(!(await readManifest(home))?.parts.research, 'the manifest kept an off part');
+    ok(!(await exists(skill)), 'an off part was left on disk');
+  });
+});
+
+await check('install --parts refuses a part that is off or lives in the other scope', async () => {
+  const dir = await repo('refuse');
+  const elsewhere = await install(dir, false, ['commit']).then(() => null, (e: Error) => e);
+  ok(elsewhere?.message === 'commit is a global part — factory install --global', `no scope refusal: ${elsewhere?.message ?? 'none'}`);
+
+  await withConfig(`${BASE_CONFIG}parts:\n  research: "off"\n`, async () => {
+    const off = await install(dir, false, ['research']).then(() => null, (e: Error) => e);
+    ok(off?.message === 'research is off in ~/.factory/config.yaml', `no off refusal: ${off?.message ?? 'none'}`);
+  });
+});
+
+await check('writePartScope rewrites one line and leaves the rest of the config byte for byte', async () => {
+  const kept = 'caffeinate: "on"\nvars:\n  codegraph: codegraph\n';
+  await withConfig(kept, async () => {
+    await writePartScope('commit', 'project');
+    await writePartScope('commit', 'off');
+    await writePartScope('research', 'global');
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text.startsWith(kept), `the rewrite moved what was already there: ${JSON.stringify(text)}`);
+    ok(text.endsWith('parts:\n  commit: "off"\n  research: "global"\n'), `the block reads ${JSON.stringify(text)}`);
+
+    resetConfig();
+    const parts = (await loadConfig()).parts;
+    ok(parts?.commit === 'off' && parts.research === 'global', `the choices read back as ${JSON.stringify(parts)}`);
+  });
+});
+
+await check('applyScopes moves a part, updates the project that held it and names both', async () => {
+  const { applyScopes } = await import('../src/tui/actions.js');
+  const home = process.env.HOME!;
+  const dir = await repo('mover');
+  await install(dir, false, ['browse']);
+  ok(await exists(path.join(dir, '.claude/skills/browse/skill.md')), 'browse never reached the project');
+
+  try {
+    const said = await applyScopes([{ name: 'browse', choice: 'global' }]);
+    ok((await loadConfig()).parts?.browse === 'global', 'the choice never reached the config');
+    ok(!(await readManifest(dir))?.parts.browse, 'the project kept a part that went global');
+    ok(await exists(path.join(home, '.claude/skills/browse/skill.md')), 'browse never reached the home dir');
+    ok(said.includes('mover') && said.includes('installed browse in ~/.claude'), `the toast said ${JSON.stringify(said)}`);
+  } finally {
+    await writeFile(CONFIG, BASE_CONFIG);
+    resetConfig();
+    await update(home);
+  }
 });
 
 await check('install --parts takes exactly the named parts', async () => {

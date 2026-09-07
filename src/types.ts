@@ -61,14 +61,20 @@ export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 /** Where a part installs: into a project's `.claude/`, or into the user's own `~/.claude/`. */
 export type Scope = 'project' | 'global';
 
+/** What the machine's owner may choose per part in `~/.factory/config.yaml`: a scope, or nowhere. */
+export type ScopeChoice = Scope | 'off';
+
 /** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
 export type Settings = Record<string, unknown>;
 
 export interface Part {
   name: string;
   type: PartType;
-  /** `global` parts belong to the user, not a project: no snippet, no recipes, no project root. */
+  /** Where it installs: the config's choice, else what `part.yaml` recommends.
+   *  `global` parts belong to the user, not a project: no snippet, no recipes, no project root. */
   scope: Scope;
+  /** What `part.yaml` says, the author's recommendation — the config overrides it, per machine. */
+  recommended: Scope;
   description: string;
   default: boolean;        // enabled by default in install menu
   files: PartFile[];

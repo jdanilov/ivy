@@ -3,9 +3,9 @@
 import type { Caffeinate } from '../core/config.js';
 import { stepRole } from '../core/workflow.js';
 import type { Decision } from '../core/decision.js';
-import type { WorkflowStep } from '../types.js';
+import type { ScopeChoice, Scope, WorkflowStep } from '../types.js';
 
-export type { Caffeinate, Decision };
+export type { Caffeinate, Decision, Scope, ScopeChoice };
 
 export type RunState = 'pending' | 'running' | 'done' | 'blocked' | 'skipped';
 
@@ -105,6 +105,9 @@ export interface PartRow {
   type: string;
   description: string;
   status: 'installed' | 'not-installed' | 'modified';
+  /** Where the machine has it: the config's choice, else what the part recommends. */
+  scope: ScopeChoice;
+  recommended: Scope;
   files: string[];
 }
 

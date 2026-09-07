@@ -1,9 +1,0 @@
-name: story
-steps:
-  - grill
-  - intent: { gate: human }
-  - spec
-  - implement: { role: worker }
-  - accept: { parallel: [verify, validate], loop: { back: implement, max: 3, human_from: 2 } }
-  - condense: { role: summarizer }
-  - merge: { gate: human }

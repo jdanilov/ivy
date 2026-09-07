@@ -81,6 +81,12 @@ export async function writePartScope(name: string, choice: ScopeChoice): Promise
   if (head === -1) {
     lines.push('parts:', entry);
   } else {
+    // A flow mapping — `parts: {commit: project}` — closes on its own line, so an indented line
+    // under it is not YAML: it becomes a block holding the same entries before anything is added.
+    if (lines[head]!.slice('parts:'.length).trim() !== '') {
+      const flow = (Bun.YAML.parse(lines[head]!) as { parts?: Record<string, unknown> } | null)?.parts ?? {};
+      lines.splice(head, 1, 'parts:', ...Object.entries(flow).map(([k, v]) => `  ${k}: "${v}"`));
+    }
     // The block runs while the lines stay indented; the part's own line is rewritten in place.
     let end = head + 1;
     while (end < lines.length && /^\s+\S/.test(lines[end]!)) end++;

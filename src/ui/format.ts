@@ -44,14 +44,15 @@ function pad(): string {
 
 /**
  * Print a part's result line with file list, MCP info, or plain name.
- * Used by both install (with suffix like "(updated)") and uninstall (with prefix like "removed").
+ * Used by both install (with suffix like "(updated)") and uninstall (with prefix like "removed"),
+ * which names the files it actually removed rather than every file the part ships.
  */
 export function printPartResult(
   part: Part,
-  opts: { verb?: string; suffix?: string } = {},
+  opts: { verb?: string; suffix?: string; files?: string[] } = {},
 ): void {
   const dname = displayName(part);
-  const fileList = part.files.map((f) => f.target);
+  const fileList = opts.files ?? part.files.map((f) => f.target);
   const suffix = opts.suffix ?? '';
   const verb = opts.verb ? `${opts.verb} ` : '';
 

@@ -476,10 +476,46 @@ await check('uninstall leaves an edited copy, names it and removes the rest', as
   const mine = path.join(dir, '.claude/skills/verify/skill.md');
   await writeFile(mine, 'mine now\n');
 
-  const report = await printed(() => uninstall(dir, true));
+  // The report's removal block only: the listing above it names every file the part ships.
+  const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
   ok(await exists(mine), 'uninstall took a copy the project had edited');
   ok(report.includes('left in place: .claude/skills/verify/skill.md'), `uninstall did not name it: ${report}`);
+  ok(report.split('.claude/skills/verify/skill.md').length === 2, `a file was named both removed and left: ${report}`);
   ok(!(await exists(path.join(dir, '.claude/agents/Verifier.md'))), 'an untouched copy was left behind');
+});
+
+await check('uninstall takes no credit for a part it left where it was', async () => {
+  const dir = await repo('kept');
+  await install(dir, false, ['verify']);
+  const files = ['.claude/skills/verify/skill.md', '.claude/agents/Verifier.md'];
+  for (const file of files) await writeFile(path.join(dir, file), 'mine now\n');
+
+  const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
+  ok(files.every((f) => report.split(f).length === 2), `a file was named twice or not at all: ${report}`);
+  ok(!report.includes('removed .claude/'), `uninstall claimed a file it never removed: ${report}`);
+  ok(report.includes('0 parts removed'), `the summary counted a part it left: ${report}`);
+});
+
+await check('a directory at a target is the project\'s, left and named', async () => {
+  const dir = await repo('dirtarget');
+  await install(dir, false, ['verify']);
+  const file = '.claude/agents/Verifier.md';
+  await unlink(path.join(dir, file));
+  await mkdir(path.join(dir, file));
+
+  const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
+  ok(await lstat(path.join(dir, file)).then(() => true, () => false), 'uninstall took a directory of the project\'s');
+  ok(report.includes(`left in place: ${file}`), `uninstall did not name it: ${report}`);
+});
+
+await check('install names an edited copy it had to restore when nobody was asked', async () => {
+  const dir = await repo('clobber');
+  await install(dir, false, ['verify']);
+  const file = '.claude/skills/verify/skill.md';
+  await writeFile(path.join(dir, file), 'mine now\n');
+
+  const report = await printed(() => install(dir, false, ['verify']));
+  ok(report.includes(`restored ${file}`), `install clobbered an edited copy in silence: ${report}`);
 });
 
 await check('update reinstalls a part its dependant requires', async () => {
@@ -867,6 +903,20 @@ await check('writePartScope rewrites one line and leaves the rest of the config 
     resetConfig();
     const parts = (await loadConfig()).parts;
     ok(parts?.commit === 'off' && parts.research === 'global', `the choices read back as ${JSON.stringify(parts)}`);
+  });
+});
+
+await check('writePartScope makes a block out of a flow-style parts line and keeps the rest', async () => {
+  const kept = 'caffeinate: "on"\n';
+  await withConfig(`${kept}parts: {commit: project}\n`, async () => {
+    await writePartScope('research', 'off');
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text === `${kept}parts:\n  commit: "project"\n  research: "off"\n`, `the flow block became ${JSON.stringify(text)}`);
+
+    resetConfig();
+    const parts = (await loadConfig()).parts;
+    ok(parts?.commit === 'project' && parts.research === 'off', `the choices read back as ${JSON.stringify(parts)}`);
   });
 });
 

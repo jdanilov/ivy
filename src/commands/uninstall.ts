@@ -106,18 +106,26 @@ export async function uninstall(targetDir: string, yes = false): Promise<void> {
 
   const removal = await removeParts(resolvedDir, selectedNames);
 
-  for (const { name, snippet, left } of removal.parts) {
-    printPartResult(installedStates.find((s) => s.part.name === name)!.part, { verb: 'removed' });
+  // A part whose every file the project had edited is not removed: no tick, and it counts nowhere.
+  const kept = removal.parts.filter((p) => p.removed.length === 0 && p.left.length > 0);
+
+  for (const { name, snippet, removed, left } of removal.parts) {
+    const part = installedStates.find((s) => s.part.name === name)!.part;
+    // A copy the project edited is its own now: it stays, named once, under the file column.
+    if (kept.some((p) => p.name === name)) {
+      console.log(`${I}${colors.dim}! ${displayName(part).padEnd(nameCol())}left in place: ${left.join(', ')}${colors.reset}`);
+    } else {
+      printPartResult(part, { verb: 'removed', files: removed });
+      if (left.length > 0) console.log(`${pad}${colors.dim}left in place: ${left.join(', ')}${colors.reset}`);
+    }
     if (snippet) printSnippetInfo(snippet, 'removed');
-    // A copy the project edited is its own now: it stays, and the report says which.
-    if (left.length > 0) console.log(`${I}${colors.dim}left in place: ${left.join(', ')}${colors.reset}`);
   }
   for (const file of removal.emptied) {
     console.log(`${I}${colors.dim}removed ${file}, nothing left in it${colors.reset}`);
   }
 
   console.log('');
-  const removedStr = `${pluralize(selectedNames.length, 'part')} removed`;
+  const removedStr = `${pluralize(removal.parts.length - kept.length, 'part')} removed`;
   if (removal.remaining > 0) {
     console.log(`${I}${colors.bold}Done.${colors.reset} ${removedStr}. ${removal.remaining} remaining.`);
   } else {

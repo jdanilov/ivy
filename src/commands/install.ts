@@ -173,7 +173,15 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     const previous = manifest.parts[name];
 
     // Copy the files in: the project stands on its own, the manifest is the only link back.
-    const { entry: manifestPart } = await copyPart(part, resolvedDir, FACTORY_ROOT, previous);
+    const { entry: manifestPart, restored } = await copyPart(part, resolvedDir, FACTORY_ROOT, previous);
+
+    // `--yes` and `--parts` ask nothing, so a copy the project had edited is named here the way
+    // `update` names it; the interactive path already asked with confirmModified.
+    if (!asked) {
+      for (const file of restored) {
+        console.log(`${I}${colors.green}${symbols.installed}${colors.reset} ${displayName(part).padEnd(nameCol())}restored ${file}`);
+      }
+    }
 
     // Inject hooks if part has them
     if (part.hooks) {

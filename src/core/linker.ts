@@ -27,7 +27,9 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
  */
 async function ours(targetPath: string, manifestHash?: string, sourcePath?: string): Promise<boolean> {
   const hash = await hashFile(targetPath);
-  if (hash === '' || hash === manifestHash) return true;
+  // Nothing to read is ours only from a dangling link: a directory or an unreadable file is theirs.
+  if (hash === '') return (await lstat(targetPath).catch(() => null))?.isSymbolicLink() ?? false;
+  if (hash === manifestHash) return true;
   return sourcePath !== undefined && hash === (await hashFile(sourcePath));
 }
 
@@ -65,10 +67,12 @@ export async function copyPart(
 
     await mkdir(path.dirname(targetPath), { recursive: true });
 
-    if (await lstat(targetPath).catch(() => null)) {
+    const at = await lstat(targetPath).catch(() => null);
+    if (at) {
       if (!(await ours(targetPath, prev?.hashes[pf.target], sourcePath))) restored.push(pf.target);
       // A legacy install left a link into the Factory here, and writing through it edits the source.
-      await unlink(targetPath);
+      // Only a link is unlinked: anything else Bun.write replaces, or names in its own error.
+      if (at.isSymbolicLink()) await unlink(targetPath);
     }
 
     await Bun.write(targetPath, Bun.file(sourcePath));

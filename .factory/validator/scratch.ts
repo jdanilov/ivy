@@ -102,8 +102,32 @@ if (import.meta.main && process.argv[2] === 'bulk') {
     const r = cli(args, alpha);
     if (r.code !== 0) console.log(`✗ ${args.join(' ')} → ${r.code}\n${r.out}`);
   }
+  // Every decision status the foot renders, on the mission the screen opens on.
+  for (const args of [
+    ['decision', 'add', 'Four workers, serial — one context per ground', '--confidence', 'HIGH', '--step', 'spec'],
+    ['decision', 'add', 'Reuse readJson for the manifest', '--confidence', 'MEDIUM', '--step', 'implement', '--by', 'worker'],
+    ['decision', 'add', 'Do not implement auth here, KISS and YAGNI', '--confidence', 'LOW', '--step', 'implement', '--by', 'worker'],
+    ['decision', 'add', 'Triage r2: fix F1 and F3, skip F2 as cosmetic', '--confidence', 'LOW', '--step', 'review'],
+    ['decision', 'answer', 'D2', 'accept'],
+    ['decision', 'answer', 'D4', 'overrule', '--note', 'fix F2 too, it is on the contract'],
+  ]) {
+    const r = cli(args, alpha);
+    if (r.code !== 0) console.log(`✗ ${args.join(' ')} → ${r.code}\n${r.out}`);
+  }
+
   cli(['mission', 'new', 'bstub', '--stub', '--workflow', 'chore'], beta);
-  await repo('gamma'); // registered, never missioned: the empty-project hint has somewhere to draw
+  const gamma = await repo('gamma'); // its one mission is closed: the archive keys have a row to act on
+  for (const args of [
+    ['mission', 'new', 'gclosed', '--workflow', 'chore', '--no-open'],
+    ['step', 'start', 'intent'], ['gate', 'open', 'intent', '--file', 'README.md'],
+    ['gate', 'answer', 'intent', 'accept'], ['step', 'done', 'intent'],
+    ['step', 'start', 'implement'], ['step', 'done', 'implement'],
+    ['step', 'start', 'merge'], ['step', 'done', 'merge'],
+    ['mission', 'close', 'gclosed'],
+  ]) {
+    const r = cli(args, gamma);
+    if (r.code !== 0) console.log(`✗ gamma ${args.join(' ')} → ${r.code}\n${r.out}`);
+  }
 
   await appendFile(path.join(HOME, '.factory', 'projects'), `${path.join(HOME, 'gone')}\n`);
 
@@ -114,5 +138,5 @@ if (import.meta.main && process.argv[2] === 'bulk') {
   await transcript(live, alpha);
   await transcript(stale, alpha);
 
-  console.log(JSON.stringify({ HOME, alpha, beta, gamma: path.join(HOME, 'gamma'), live, stale }, null, 2));
+  console.log(JSON.stringify({ HOME, alpha, beta, gamma, live, stale }, null, 2));
 }

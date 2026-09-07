@@ -94,9 +94,11 @@ function missionBar(p: Pane, m: Mission): void {
 
 /** A session has no steps to bar: its state word, then whose tab it is and how long it has waited. */
 function sessionBar(p: Pane, s: Session): void {
-  const left: Cell[] = [[`${GLYPH.pending} `, C.dim], ['IDLE'.padEnd(STATE_W), C.bright],
-    ['  ', C.dim], [id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [' · ', C.rule], [s.cwd, C.dim]];
-  p.row(spread(left, [['since ', C.dim], [dur(Date.now() - s.idleSince), C.bright]], p.width));
+  const word = s.working ? 'WORKING' : 'IDLE';
+  const left: Cell[] = [s.working ? [`${GLYPH.running} `, C.accent] : [`${GLYPH.pending} `, C.dim], [word.padEnd(STATE_W), C.bright],
+    ['  ', C.dim], [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [' · ', C.rule], [s.cwd, C.dim]];
+  const right: Cell[] = s.working ? [[s.working, C.bright]] : [['since ', C.dim], [dur(Date.now() - s.idleSince), C.bright]];
+  p.row(spread(left, right, p.width));
 }
 
 function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {

@@ -100,7 +100,13 @@ async function readEvents(): Promise<Map<string, Ev>> {
 /** What a session is asking the human, from the hook's own record of the turn that ended: the Stop
  *  carries the exact final message, where the tail carries the last text it happened to have read. */
 const asking = (ev: Ev | undefined, tail: Tail | null): string =>
-  ev?.asks == null ? '' : ev.asks || tail?.text || '';
+  ev?.asks == null || working(tail) ? '' : ev.asks || tail?.text || '';
+
+/** The role of a sub-agent the session still has out in the background, if any. */
+function working(tail: Tail | null): string | undefined {
+  const [agent] = tail?.running ?? [];
+  return agent === undefined ? undefined : tail?.agents.get(agent) ?? 'agent';
+}
 
 // ── steps ────────────────────────────────────────────────────────────────────
 
@@ -278,8 +284,11 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   const asks = asking(ev, tail);
   if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
+  const busy = working(tail);
   return {
     id: ev.session,
+    ...(tail.title ? { name: tail.title } : {}),
+    ...(busy ? { working: busy } : {}),
     preset: ev.preset,
     cwd: ev.cwd,
     idleSince: ev.at,

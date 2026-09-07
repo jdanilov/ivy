@@ -93,6 +93,10 @@ export interface Mission {
 /** A session known through hook events with no mission bound to it. */
 export interface Session {
   id: string;
+  /** What `--name` or `/rename` called it; absent, the row shows the id. */
+  name?: string;
+  /** The role of a sub-agent still out in the background: the session is working, not idle. */
+  working?: string;
   preset: string;
   cwd: string;
   idleSince: number;

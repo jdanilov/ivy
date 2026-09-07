@@ -32,6 +32,11 @@ export interface Tail {
   agents: Map<string, string>;
   /** Agent tool_use id → role, until its result arrives with the agent id. */
   spawns: Map<string, string>;
+  /** Sub-agents launched in the background whose task notification has not come back: while one
+   *  is out, the turn that ended is not the session asking anything. */
+  running: Set<string>;
+  /** What `--name` or `/rename` called the session, from Claude Code's own `custom-title` record. */
+  title: string;
 }
 
 /** A first read never parses more than this, and a session never keeps more rows than that. */
@@ -46,7 +51,7 @@ interface Block {
 }
 
 interface Line {
-  type?: string; timestamp?: string; isSidechain?: boolean; agentId?: string;
+  type?: string; timestamp?: string; isSidechain?: boolean; agentId?: string; customTitle?: string;
   message?: { id?: string; content?: Block[] | string; usage?: Record<string, number> };
 }
 
@@ -90,7 +95,9 @@ function parse(line: string): Line | null {
   }
 }
 
-const fresh = (): Tail => ({ activity: [], usage: [], text: '', offset: 0, seen: new Map(), agents: new Map(), spawns: new Map() });
+const fresh = (): Tail => ({
+  activity: [], usage: [], text: '', offset: 0, seen: new Map(), agents: new Map(), spawns: new Map(), running: new Set(), title: '',
+});
 
 /** The text of a tool result, whichever shape Claude Code wrote it in. */
 const resultText = (block: Block): string =>
@@ -132,14 +139,25 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
   for (const raw of lines) {
     const line = raw === '' ? null : parse(raw);
     if (!line) continue;
+    if (line.type === 'custom-title') {
+      tail.title = text(line.customTitle);
+      continue;
+    }
     const blocks = Array.isArray(line.message?.content) ? line.message.content : [];
-    // An Agent result comes back as a user line naming the id its file is written under.
+    // An Agent result comes back as a user line naming the id its file is written under; one
+    // launched in the background reports back later as a task notification on a user line too.
     if (line.type === 'user') {
       for (const block of blocks) {
         const role = block.type === 'tool_result' && block.tool_use_id ? tail.spawns.get(block.tool_use_id) : undefined;
-        const agent = role ? /agentId: ([a-z0-9]+)/.exec(resultText(block))?.[1] : undefined;
-        if (role && agent) tail.agents.set(agent, role);
+        const body = role ? resultText(block) : '';
+        const agent = /agentId: ([a-z0-9]+)/.exec(body)?.[1];
+        if (role && agent) {
+          tail.agents.set(agent, role);
+          if (body.includes('in the background')) tail.running.add(agent);
+        }
       }
+      const whole = typeof line.message?.content === 'string' ? line.message.content : blocks.map((b) => text(b.text)).join(' ');
+      for (const [, done] of whole.matchAll(/<task-id>([a-z0-9]+)<\/task-id>/g)) tail.running.delete(done!);
       continue;
     }
     if (line.type !== 'assistant') continue;

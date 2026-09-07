@@ -152,8 +152,11 @@ none and the description keeps the rest of the row; under the rule the selected 
 recommendation before its files. A graph row in MISSION ends in two right-aligned columns, tokens
 then wall time, so the numbers read down the pane, and a step the mission looped back to carries a
 dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each entry its own wrapped
-line, and is absent at zero. A session under a project is named `session · <preset>`, never by its
-preset alone, and the `no missions` hint is absent while a session is standing there.
+line, and is absent at zero. A session under a project is named by what `--name` or `/rename`
+called it, else by its id, then `· <preset>`, never by its preset alone: two quick sessions must
+not read the same. The `no missions` hint is absent while a session is standing there. A session
+with a sub-agent out in the background reads `● working · <role>` instead of idle, and the turn
+that ended is not a question: the Inbox lists it only once the last sub-agent has reported back.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.

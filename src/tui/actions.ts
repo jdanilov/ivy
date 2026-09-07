@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readdir, readFile, unlink } from 'node:fs/promises';
 import { install } from '../commands/install.js';
 import { removeParts } from '../core/parts.js';
-import { archiveMission, resolveMission, sessionLive, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { archiveMission, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { writeCaffeinate, type Caffeinate } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
@@ -47,15 +47,17 @@ const ESCALATE = 5000;
 const termed = new Map<string, number>();
 
 /**
- * Only a process whose argv carries this session id: the pattern is the flag `claude` was spawned
- * with, so no other process on the machine can match it by accident.
+ * A process whose argv carries this session id, the flag `claude` was spawned with, so no other
+ * process on the machine can match it by accident; or the pid the hook logged, for a session the
+ * human started by hand and the Factory only adopted.
  */
 export async function killSession(session: string): Promise<string> {
   const proc = Bun.spawn(['pgrep', '-f', '--', `--session-id ${session}`], { stdout: 'pipe', stderr: 'ignore' });
   const out = await new Response(proc.stdout).text();
   await proc.exited;
 
-  const pids = out.split('\n').map(Number).filter((pid) => pid > 0 && pid !== process.pid);
+  const logged = await sessionPid(session);
+  const pids = [...new Set([...out.split('\n').map(Number), logged ?? 0])].filter((pid) => pid > 0 && pid !== process.pid);
   if (pids.length === 0) return `no process for ${id(session)}`;
 
   const hard = Date.now() - (termed.get(session) ?? 0) < ESCALATE;

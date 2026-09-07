@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { mkdir, readdir, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
 import type { Autonomy, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
 import { factoryHome, loadProjects, saveProject } from './projects.js';
 import { dumpWorkflow, loadWorkflow, readWorkflowFile } from './workflow.js';
@@ -189,6 +189,27 @@ export async function sessionLive(session: string | null): Promise<boolean> {
   if (!session) return false;
   const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
   return info !== null && Date.now() - info.mtimeMs < LIVE_WINDOW_MS;
+}
+
+/**
+ * The Claude process behind a session, from the pid the hook logs on every event line. A session
+ * started by hand has no `--session-id` in its argv, so this is the only way to find it; the pid
+ * counts only while a process named `claude` still holds it, since pids get reused.
+ */
+export async function sessionPid(session: string): Promise<number | null> {
+  const text = await readFile(path.join(eventsDir(), `${session}.jsonl`), 'utf-8').catch(() => '');
+  const last = text.trimEnd().split('\n').at(-1) ?? '';
+  let pid: unknown;
+  try {
+    pid = (JSON.parse(last) as { pid?: unknown }).pid;
+  } catch {
+    return null;
+  }
+  if (typeof pid !== 'number' || pid <= 0) return null;
+  const proc = Bun.spawn(['ps', '-o', 'comm=', '-p', String(pid)], { stdout: 'pipe', stderr: 'ignore' });
+  const comm = (await new Response(proc.stdout).text()).trim();
+  await proc.exited;
+  return path.basename(comm) === 'claude' ? pid : null;
 }
 
 // ── finding missions ─────────────────────────────────────────────────────────

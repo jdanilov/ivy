@@ -112,6 +112,24 @@ async function adoptSession(mission: Bound, session: string): Promise<void> {
 
 // ── caffeinate ───────────────────────────────────────────────────────────────
 
+/**
+ * The Claude process this hook runs under: a session the human started by hand carries no
+ * `--session-id` in its argv, so its pid on the event line is the only handle `X` has on it. The
+ * hook is a child of the shell Claude Code spawned, so walk up until the command is `claude`.
+ */
+async function claudePid(): Promise<number | null> {
+  let pid = process.ppid;
+  for (let hop = 0; hop < 6 && pid > 1; hop++) {
+    const proc = Bun.spawn(['ps', '-o', 'ppid=,comm=', '-p', String(pid)], { stdout: 'pipe', stderr: 'ignore' });
+    const [ppid, comm] = (await new Response(proc.stdout).text()).trim().split(/\s+/, 2);
+    await proc.exited;
+    if (!comm) return null;
+    if (path.basename(comm) === 'claude') return pid;
+    pid = Number(ppid);
+  }
+  return null;
+}
+
 const pidFile = (session: string): string => path.join(PIDS, `${session}.pid`);
 
 const alive = (pid: number): boolean => {
@@ -382,6 +400,7 @@ async function main(): Promise<void> {
       at: new Date().toISOString(),
       event,
       session,
+      pid: await claudePid(),
       cwd,
       mission: mission?.name ?? null,
       step: mission?.step ?? null,

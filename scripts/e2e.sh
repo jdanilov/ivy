@@ -54,8 +54,12 @@ f mission open x
 for ignored in .factory/claim .factory/missions/ .factory/archive/; do
    git -C "$REPO" check-ignore -q "$ignored" || die "$ignored is not ignored"
 done
-# A second open would rebind the mission to an empty tab and strand the session already on it.
+# A second open while that session is live would strand it, so it is refused; a dead one is replaced.
+SESSION="$(sed -n 's/.*"session": "\([^"]*\)".*/\1/p' "$REPO"/.factory/missions/*-x/state.json)"
+mkdir -p "$HOME/.factory/events" && : > "$HOME/.factory/events/$SESSION.jsonl"
 refuses "$REPO" 'is bound to session' mission open x
+rm "$HOME/.factory/events/$SESSION.jsonl"
+f mission open x --dry-run
 
 # No tty to offer a worktree to, so the caller is told to ask for one.
 refuses "$REPO" 'add --worktree' mission new b --no-open

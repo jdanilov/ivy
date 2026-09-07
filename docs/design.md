@@ -246,7 +246,7 @@ in the session that raised them, and `←`, `→` and `↵` on one write nothing
 ## CLI rules
 
 - `factory status`: unchanged 3-space `I` indent and `statusSymbol`/`statusColor` from `theme.ts`.
-  Add a Missions block using the same row-state glyphs: `●` running, `○` pending, `✓` done, `✗` failed,
+  Add a Missions block using the same row-state glyphs: `●` running, `○` pending, `✓` done,
   `⊘` blocked. A mission with no live session prints `no session` in dim label color.
 - `factory mission status`: header row is the brand glyph, mission name, and workflow name left,
   wall time, step, and round right, thin rule below. Steps print as a vertical list, not two panes,
@@ -272,4 +272,4 @@ in the session that raised them, and `←`, `→` and `↵` on one write nothing
 | Progress Log    | Events                  | `~/.factory/events/<session>.jsonl`, rendered as a log pane   |
 | Features pane   | Steps pane              | the right-hand checklist of the workflow                      |
 | Workers pane    | Sessions                | the roster of sub-agent runs for the mission                  |
-| RUNNING/Success/Failed | running/done/failed | row-state words, see Row states                              |
+| RUNNING/Success/Failed | running/done/blocked | row-state words, see Row states; the Factory has no failed state |

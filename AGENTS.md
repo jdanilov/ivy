@@ -225,10 +225,11 @@ factory handoff save <step>            # reads the handoff from stdin
   rather than a suggestion. The hook is unaffected — it binds by claim, not by the projects list.
 - `mission open --dry-run` writes nothing at all, a stub's promotion included, and `mission open`
   on a closed mission refuses. Either way `state.json` is byte-identical afterwards.
-- `mission open` on a mission whose `state.json` already names a session refuses with `mission X is
-  bound to session <id> — factory mission adopt X --session <id> to rebind`: a second open would
-  point the mission at an empty tab and every event of the session already on it would go nowhere.
-  Mission Control's `O` raises the same refusal as a toast. `mission resume` is how a tab comes back.
+- `mission open` on a mission whose `state.json` names a session that is still live refuses with
+  `mission X is bound to session <id> — factory mission adopt X --session <id> to rebind`: a second
+  open would point the mission at an empty tab and every event of the session already on it would go
+  nowhere. A recorded session with no live events file is replaced, so a mission whose tab was closed
+  opens again. Mission Control's `O` raises the same refusal as a toast.
 - `mission new` on a claimed checkout with no tty on stdin refuses with `add --worktree` instead of
   hanging on a prompt nobody can answer, and leaves no folder behind.
 - `mission archive <name>` refuses unless the mission is closed and renames its folder into

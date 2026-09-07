@@ -12,16 +12,20 @@ const now = Date.now();
 
 /** The kind and the runner are never spelled out here: the fixture reads both through the
  *  mappings the live snapshot uses, so a look review is a review of what ships. */
-function steps(spec: [name: string, status: StepRow['status'], wall?: number, of?: Omit<WorkflowStep, 'name'>, runs?: number][]): StepRow[] {
-  return spec.map(([name, status, wall, of, runs]) => {
+function steps(spec: [name: string, status: StepRow['status'], wall?: number, of?: Omit<WorkflowStep, 'name'>,
+  tokens?: StepRow['tokens'], runs?: number][]): StepRow[] {
+  return spec.map(([name, status, wall, of, tokens, runs]) => {
     const step: WorkflowStep = { name, ...of };
-    return { name, status, wall, runs, kind: stepKind(step), role: stepRole(step) };
+    return { name, status, wall, tokens, runs, kind: stepKind(step), role: stepRole(step) };
   });
 }
 
+// The two finished steps carry their spend, so the graph's tokens column is on screen in a look review.
 const refitSteps = steps([
-  ['intent', 'done', 12 * M, { gate: 'human' }], ['research', 'skipped', undefined, { role: 'investigator' }],
-  ['spec', 'done', 8 * M], ['implement', 'running', 6 * M, { role: 'worker' }, 2],
+  ['intent', 'done', 12 * M, { gate: 'human' }, { input: 24_000, cached: 260_000, output: 4_800 }],
+  ['research', 'skipped', undefined, { role: 'investigator' }],
+  ['spec', 'done', 8 * M, undefined, { input: 41_500, cached: 620_000, output: 9_300 }],
+  ['implement', 'running', 6 * M, { role: 'worker' }, undefined, 2],
   ['review', 'pending', undefined, { parallel: ['verify', 'validate'] }],
   ['verify', 'pending'], ['validate', 'pending'], ['merge', 'pending', undefined, { gate: 'human' }],
 ]);

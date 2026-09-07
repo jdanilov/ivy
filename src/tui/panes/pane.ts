@@ -59,6 +59,16 @@ export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
   ];
 }
 
+/**
+ * The rows and the one the right pane and the foot are about. The screen and the keys both need it,
+ * and both would otherwise clamp `ui.left` themselves: one clamp, one owner.
+ */
+export function select(snap: Snapshot, ui: Ui): { items: LeftItem[]; here: LeftItem } {
+  const items = leftItems(snap, ui.showArchived);
+  ui.left = clamp(ui.left, items.length);
+  return { items, here: items[ui.left]! };
+}
+
 /** Identity of a row, so the selection survives a list that changed under it. */
 export function itemKey(item: LeftItem): string {
   return item.kind === 'inbox' ? 'inbox'

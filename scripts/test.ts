@@ -618,20 +618,24 @@ await check('the Factory\'s own files are ignored, once and committed', async ()
   ok((await ensureIgnored(dir)) === null, 'a second call wrote the lines again');
 });
 
-await check('open refuses a mission a session is already bound to', async () => {
+await check('open replaces a dead session and refuses a live one', async () => {
   const dir = await repo('bound');
   await mission('new', ['b1'], { 'no-open': true }, dir);
   const m = await resolveMission(dir, 'b1');
   m.state.session = 'S-1';
   await writeState(m.dir, m.state);
 
-  const refused = await mission('open', ['b1'], {}, dir).then(() => null, (e: Error) => e);
+  // No events file, so that tab is gone: the mission is opened again rather than stranded.
+  const opened = await mission('open', ['b1'], { 'dry-run': true }, dir).then(() => null, (e: Error) => e);
+  ok(opened === null, `a dead session was not replaced: ${opened?.message ?? ''}`);
+
+  const events = path.join(process.env.HOME!, '.factory', 'events', 'S-1.jsonl');
+  await mkdir(path.dirname(events), { recursive: true });
+  await writeFile(events, `${JSON.stringify({ at: new Date().toISOString(), event: 'Stop', session: 'S-1' })}\n`);
+  const refused = await mission('open', ['b1'], { 'dry-run': true }, dir).then(() => null, (e: Error) => e);
   ok(refused?.message === 'mission b1 is bound to session S-1 — factory mission adopt b1 --session <id> to rebind',
-    `open rebound it: ${refused?.message ?? 'no refusal'}`);
+    `open rebound a live session: ${refused?.message ?? 'no refusal'}`);
   ok((await resolveMission(dir, 'b1')).state.session === 'S-1', 'the refusal still rewrote the session');
-  // resume is the way back into a mission whose tab is gone, and it never touches the binding.
-  await mission('resume', ['b1'], {}, dir);
-  ok((await resolveMission(dir, 'b1')).state.session === 'S-1', 'resume rebound the mission');
 });
 
 await check('a hand-copied template reads as installed with no manifest', async () => {

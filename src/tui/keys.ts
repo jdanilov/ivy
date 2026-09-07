@@ -4,7 +4,7 @@ import type { KeyEvent } from '@opentui/core';
 import { applyParts, archive, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import { clamp, leftItems, itemKey } from './panes/pane.js';
+import { clamp, itemKey, leftItems, select } from './panes/pane.js';
 import { changes, partStatus, pending } from './panes/parts.js';
 import { act, draw, toast, type App } from './screen.js';
 import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
@@ -21,7 +21,7 @@ function cycleAutonomy(app: App, project: Project, m: Mission): void {
   act(app, `${m.name} autonomy ${m.autonomy}…`, () => setAutonomy(project.path, m.name, m.autonomy));
 }
 
-export function handleKey(app: App, key: KeyEvent): void {
+function handleKey(app: App, key: KeyEvent): void {
   const { snap, ui } = app;
 
   // The panel holds the right pane until it is asked to leave; nothing else acts behind it.
@@ -43,9 +43,7 @@ export function handleKey(app: App, key: KeyEvent): void {
     return draw(app);
   }
 
-  const items = leftItems(snap, ui.showArchived);
-  ui.left = clamp(ui.left, items.length);
-  const here = items[ui.left]!;
+  const { items, here } = select(snap, ui);
   const right = ui.focus === 'right';
   const inMessages = right && here.kind === 'inbox';
   const inParts = right && (here.kind === 'project' || here.kind === 'global');

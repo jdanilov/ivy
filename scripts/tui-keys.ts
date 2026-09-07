@@ -84,7 +84,7 @@ for (const key of keys) {
     // The watcher does this in the real screen; headless, an action's write needs asking for again.
     app.snap = await rebuild();
   } else {
-    onKey(app, { name: key === '?' ? '?' : key, ctrl: false, meta: false, shift: false, sequence: key } as KeyEvent);
+    onKey(app, { name: key, ctrl: false, meta: false, shift: false, sequence: key } as KeyEvent);
   }
   await Bun.sleep(wait);
   await frame(key);

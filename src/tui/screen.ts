@@ -2,7 +2,7 @@ import { BoxRenderable, createCliRenderer, type CliRenderer, type KeyEvent } fro
 import path from 'node:path';
 import { C, GLYPH, stateColor } from './theme.js';
 import { dur, len, spread, tokens, type Cell } from './format.js';
-import { clamp, column, leftItems, newUi, type LeftItem, type Pane, type Ui } from './panes/pane.js';
+import { column, newUi, select, type LeftItem, type Pane, type Ui } from './panes/pane.js';
 import { leftPane } from './panes/left.js';
 import { messagesPane } from './panes/messages.js';
 import { missionPane, sessionPane } from './panes/mission.js';
@@ -146,9 +146,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   for (const child of [...r.root.getChildren()]) child.destroyRecursively();
 
   const w = r.terminalWidth - 2;
-  const items = leftItems(snap, ui.showArchived);
-  ui.left = clamp(ui.left, items.length);
-  const here = items[ui.left]!;
+  const { items, here } = select(snap, ui);
 
   // Everything under the status rule and above the key-bar rule. The foot keeps a third of it,
   // the columns take the rest — and either one takes all of it: `f` gives the foot the screen,

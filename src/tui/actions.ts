@@ -33,7 +33,7 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
 /** The preset `mission open` uses with no flag: a mission's session is the Orchestrator's. */
 const PRESET = 'orchestrator';
 
-/** A bound mission is never reopened: `openSession` refuses and the toast is that refusal. */
+/** A mission whose tab is still live is not reopened; one whose session died gets a new tab. */
 export async function openTab(project: string, name: string): Promise<string> {
   const mission = await resolveMission(project, name);
   if (await sessionLive(mission.state.session)) return `factory-${name} is already open — switch to that tab`;

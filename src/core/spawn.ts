@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { mkdir, stat } from 'node:fs/promises';
 import type { Mission, Preset } from '../types.js';
-import { Refusal, mainCheckout, now, readClaim, writeClaim, writeState } from './mission.js';
+import { Refusal, mainCheckout, now, readClaim, sessionLive, writeClaim, writeState } from './mission.js';
 import { FACTORY_ROOT } from './registry.js';
 import { home } from './projects.js';
 
@@ -93,14 +93,17 @@ export async function warpInstalled(): Promise<boolean> {
 
 /**
  * The session id is written to state.json before the tab exists, so the hook events the
- * new session emits always find a mission already bound to them. A mission already carrying one
- * is never rebound here: the old session keeps sending events at a mission that has moved on, and
- * every one of them goes nowhere. `mission adopt` is the deliberate rebind, and it says so.
+ * new session emits always find a mission already bound to them. A mission carrying a *live*
+ * session is never rebound here: the old tab keeps sending events at a mission that has moved on,
+ * and every one of them goes nowhere. `mission adopt` is the deliberate rebind, and it says so.
+ * A recorded session whose tab is gone is simply replaced, or the mission could never be reopened.
  */
 export async function openSession(cwd: string, mission: Mission, preset: Preset, dryRun: boolean): Promise<Spawn> {
   const bound = mission.state.session;
   const mine = mission.state.name;
-  if (bound) throw new Refusal(`mission ${mine} is bound to session ${bound} — factory mission adopt ${mine} --session <id> to rebind`);
+  if (bound && (await sessionLive(bound))) {
+    throw new Refusal(`mission ${mine} is bound to session ${bound} — factory mission adopt ${mine} --session <id> to rebind`);
+  }
 
   const session = crypto.randomUUID();
   const checkout = mission.state.worktree ?? (await mainCheckout(cwd));

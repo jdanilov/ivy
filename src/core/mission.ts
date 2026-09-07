@@ -156,22 +156,29 @@ export async function clearClaim(main: string): Promise<void> {
   await unlink(claimPath(main)).catch(() => {});
 }
 
+/** What the Factory writes into a project and the project never tracks: the claim it holds the
+ *  checkout with, and every mission folder — live and archived — which belong to the machine
+ *  that ran them, not to the history of the code. */
+export const IGNORED = ['.factory/claim', '.factory/missions/', '.factory/archive/'];
+
 /**
- * The Factory writes the claim, so the project must ignore it: a tracked claim reads as dirty and
- * blocks every close. The line is committed on the spot when `.gitignore` is otherwise clean, since
+ * A tracked claim or mission folder reads as dirty and blocks every close, so the project ignores
+ * all three. Missing lines are committed on the spot when `.gitignore` is otherwise clean, since
  * the edit would itself be the dirt that blocks the close. Returns what happened, for one printed line.
  */
-export async function ensureClaimIgnored(checkout: string): Promise<'added' | 'committed' | null> {
-  if (await gitOk(checkout, 'check-ignore', '-q', '.factory/claim')) return null;
+export async function ensureIgnored(checkout: string): Promise<'added' | 'committed' | null> {
+  const missing: string[] = [];
+  for (const line of IGNORED) if (!(await gitOk(checkout, 'check-ignore', '-q', line))) missing.push(line);
+  if (missing.length === 0) return null;
 
   const clean = (await git(checkout, 'status', '--porcelain', '--', '.gitignore')) === '';
   const file = path.join(checkout, '.gitignore');
   const current = await Bun.file(file).text().catch(() => '');
-  await Bun.write(file, `${current}${current === '' || current.endsWith('\n') ? '' : '\n'}.factory/claim\n`);
+  await Bun.write(file, `${current}${current === '' || current.endsWith('\n') ? '' : '\n'}${missing.join('\n')}\n`);
   if (!clean) return 'added';
 
   const done = await gitOk(checkout, 'add', '--', '.gitignore')
-    && await gitOk(checkout, 'commit', '-m', '🧹 chore: ignore .factory/claim', '--', '.gitignore');
+    && await gitOk(checkout, 'commit', '-m', '🧹 chore: ignore the Factory\'s own files', '--', '.gitignore');
   return done ? 'committed' : 'added';
 }
 
@@ -397,12 +404,9 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
   const trunk = await trunkBranch(main);
   const log: string[] = [];
 
-  const rel = path.relative(main, mission.dir);
-  let merged = (await git(main, 'branch', '--merged', trunk, '--format=%(refname:short)')).split('\n').includes(state.branch);
-  const committed = await gitOk(main, 'cat-file', '-e', `${trunk}:${rel}/state.json`);
-
-  // A branch with no commits of its own reads as merged, so the folder commit is the real postcondition.
-  if (!(merged && committed)) {
+  // The mission folder is ignored, never committed and never checked out: `status: closed` in its
+  // own state.json is what says this mission is finished, and a rerun after a crash reads it back.
+  if (state.status !== 'closed') {
     const open = Object.entries(state.gates).filter(([, g]) => g.status === 'open').map(([s]) => s);
     if (open.length > 0) throw new Refusal(`gate open on ${open.join(', ')} — answer it with: factory gate answer <step> accept`);
 
@@ -411,25 +415,18 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
     const lastState = state.steps[last]?.status;
     if (lastState !== 'done' && lastState !== 'skipped') throw new Refusal(`step "${last}" is ${lastState ?? 'pending'} — the final step must be done or skipped before close`);
 
-    // The mission folder rides along on the branch. Anything else dirty would not survive the checkout.
+    // Work the branch is carrying would not survive the checkout back to the trunk.
     const dirty = [
       ...(await git(main, 'diff', '--name-only', 'HEAD')).split('\n'),
       ...(await git(main, 'ls-files', '--others', '--exclude-standard')).split('\n'),
     ].filter((f) => f !== '');
-    // Everything under `.factory/` is the Factory's own: the claim this close clears, this mission's
-    // folder, and a sibling's folder that belongs to whoever is running it in another worktree.
+    // Everything under `.factory/` is the Factory's own: the claim this close clears, this
+    // mission's folder, and a sibling's that belongs to whoever is running it in another worktree.
     const outside = dirty.filter((f) => !f.startsWith('.factory/'));
     if (outside.length > 0) throw new Refusal(`dirty outside the mission folder, commit or stash first: ${outside.join(', ')}`);
-
-    const own = dirty.filter((f) => f === rel || f.startsWith(`${rel}/`));
-    if (own.length > 0 && (await currentBranch(main)) === state.branch) {
-      await git(main, 'add', '--', rel);
-      await git(main, 'commit', '-m', `📦 chore: close mission ${state.name}`, '--', rel);
-      log.push(`committed ${rel} on ${state.branch}`);
-      merged = false;
-    }
   }
 
+  const merged = (await git(main, 'branch', '--merged', trunk, '--format=%(refname:short)')).split('\n').includes(state.branch);
   const was = await currentBranch(main);
   if (was !== trunk) await git(main, 'checkout', trunk);
 
@@ -442,12 +439,7 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
     if (state.status !== 'closed') {
       state.status = 'closed';
       await writeState(mission.dir, state);
-    }
-
-    await git(main, 'add', '--', rel);
-    if ((await git(main, 'status', '--porcelain', '--', rel)) !== '') {
-      await git(main, 'commit', '-m', `🏗️ chore: close mission ${state.name}`, '--', rel);
-      log.push(`committed ${rel} on ${trunk}`);
+      log.push(`closed ${path.relative(main, mission.dir)}`);
     }
   } finally {
     // Never leave the main checkout on a branch another mission is not using.
@@ -481,9 +473,9 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
 // ── archive ──────────────────────────────────────────────────────────────────
 
 /**
- * A closed mission steps out of the way: one `git mv` between `.factory/missions/` and
- * `.factory/archive/`, so the history follows the folder instead of reading as a delete and an add.
- * The commit only happens when the tree is otherwise clean — nobody else's work rides along with it.
+ * A closed mission steps out of the way: one rename between `.factory/missions/` and
+ * `.factory/archive/`. Both are ignored, so git has nothing to say about it — the folder is the
+ * machine's record of a run, not part of the history of the code.
  */
 export async function archiveMission(cwd: string, name: string, back = false): Promise<string[]> {
   const main = await mainCheckout(cwd);
@@ -500,18 +492,9 @@ export async function archiveMission(cwd: string, name: string, back = false): P
   if (mission.state.status !== 'closed') throw new Refusal(`mission ${name} is ${mission.state.status} — close it first`);
 
   const target = path.join(to, path.basename(mission.dir));
-  const clean = (await git(main, 'status', '--porcelain')) === '';
   await mkdir(to, { recursive: true });
-  await git(main, 'mv', path.relative(main, mission.dir), path.relative(main, target));
-
-  const log = [`${back ? 'unarchived' : 'archived'} ${path.relative(main, target)}`];
-  if (clean) {
-    await git(main, 'commit', '-m', `🗄️ chore: ${back ? 'unarchive' : 'archive'} mission ${name}`);
-    log.push(`committed on ${await currentBranch(main)}`);
-  } else {
-    log.push('tree is dirty — the move is staged, commit it yourself');
-  }
-  return log;
+  await rename(mission.dir, target);
+  return [`${back ? 'unarchived' : 'archived'} ${path.relative(main, target)}`];
 }
 
 /** Local calendar date, so a folder matches the day the human started the mission. */

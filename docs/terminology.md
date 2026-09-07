@@ -19,7 +19,7 @@ Single source of names for the Factory. Agents and humans use these words and no
 | Decision  | One fork an agent took that a reviewer might have taken differently: a row in `decisions.md` with a confidence and its reason. `auto` when the mission's autonomy leaves it to the agent, `waiting` when the human owes an answer, then `accepted` or `overruled` with a note. A round's fix-or-skip plan over findings is one decision, never one per finding. |
 | Autonomy  | Mission-level dial: `full`, `partial`, `none`. Decides which decisions wait on the human. Set at shape time, moved with `mission autonomy L`. |
 | Recipe    | A project command list in `factory.yaml`: `verify`, `e2e`, `deliver`.                                     |
-| Claim     | `.factory/claim` naming the mission that owns the main checkout. Other missions are offered a worktree.   |
+| Claim     | `.factory/claim` naming the mission that owns the main checkout, ignored with the mission folders. Other missions are offered a worktree. |
 | Snippet   | One line a part owns in the project's `AGENTS.md`, under a section the part names. Installed and removed with the part's files. |
 | Roadmap   | `docs/roadmap.md`, a plain checklist of decided and unstarted work. `/retro` appends, a human prunes.     |
 
@@ -28,9 +28,9 @@ Single source of names for the Factory. Agents and humans use these words and no
 | Term         | Meaning                                                                                                  |
 |--------------|----------------------------------------------------------------------------------------------------------|
 | Session      | One Claude Code process in a Warp tab. Known to the Factory through hook events, spawned or adopted.     |
-| Mission      | One unit of tracked work. Folder `.factory/missions/<YYYY-MM-DD-name>/` in the main checkout, branch `mission/<name>`. One workflow, one session. |
+| Mission      | One unit of tracked work. Folder `.factory/missions/<YYYY-MM-DD-name>/` in the main checkout, ignored by git, branch `mission/<name>`. One workflow, one session. |
 | Stub         | A mission with an intent and no branch: folder, workflow copy, `status: stub`, no claim. `mission open` promotes it. |
-| Archive      | `.factory/archive/<dir>`, where `mission archive` git-moves a closed mission's folder so the history follows it. Only `mission list --all` reads it; `mission unarchive` puts the folder back. |
+| Archive      | `.factory/archive/<dir>`, where `mission archive` renames a closed mission's folder. Ignored like `.factory/missions/`, so no commit is involved. Only `mission list --all` reads it; `mission unarchive` puts the folder back. |
 | Orchestrator | The interactive Fable session bound to a mission. Plans, delegates, asks, triages, records steps, amends the workflow. Never implements. Never merges by hand. |
 | Worker       | Opus sub-agent that implements one step with clean context. Serial, one at a time per mission.           |
 | Gatekeeper   | Verifier or Validator. Checks work it did not produce against `acceptance.md`. Never edits code.        |
@@ -74,7 +74,7 @@ Agent-facing except intent.md. Short, reasoning-first. Format in the `docs-forma
 | Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No daemon in v1.        |
 | Mission Control | The Factory TUI on OpenTUI, `factory` with no arguments. One screen: the Inbox, `~ global`, projects, missions and unbound sessions left; Messages, Mission, Session or Parts right; the foot across the bottom. Reads the files the CLI writes and writes through the CLI's own functions. |
 | Messages        | The right pane over the Inbox: the selected item's body and the command that answers it in the session. Read-only — Mission Control answers nothing. |
-| Inbox           | Every open gate, waiting decision and waiting question across all projects, keyed `project/origin/label`. Each names the session command that answers it; a question names the tab that owns it. A key the last snapshot did not have rings the bell and raises a desktop notification. |
+| Inbox           | Every open gate, waiting decision and waiting question across all projects, keyed `project/origin/label`. Each names the session command that answers it; a question names the tab that owns it. A key the last snapshot did not have rings the terminal bell and Warp's own `777;notify`. |
 | Foot            | The pane along the bottom, DECISIONS by default and ACTIVITY on `A`, for whatever the left column has selected. Decisions are the mission's `decisions.md` rows; Activity is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`, `Tool` — plus the hook's `Stop`, newest last. `F` gives either the whole body. |
 | Caffeinate      | Whether the Mac is held awake, `~/.factory/config.yaml` key `caffeinate`, cycled with `C`. `auto` holds it for the length of a turn, `on` from a session's start, `off` never. Pids live in `~/.factory/caffeinate/`, one per session plus Mission Control's own `control.pid`. |
 | Changes         | Warp's own diff panel. The Factory does not render diffs.                                      |

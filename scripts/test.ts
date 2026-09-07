@@ -32,7 +32,7 @@ const { gate } = await import('../src/commands/gate.js');
 const { decision } = await import('../src/commands/decision.js');
 const { answerDecision, readDecisions, waits } = await import('../src/core/decision.js');
 const { mission } = await import('../src/commands/mission.js');
-const { archiveMission, closeMission, createMission, currentBranch, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission } = await import('../src/core/mission.js');
+const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission, writeState } = await import('../src/core/mission.js');
 const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, loadParts } = await import('../src/core/registry.js');
@@ -62,6 +62,8 @@ async function repo(name: string, register = true): Promise<string> {
   await writeFile(path.join(dir, 'README.md'), '# test\n');
   await git(dir, 'add', '-A');
   await git(dir, 'commit', '-qm', 'init');
+  // What `mission new` does to a project on its first mission: the Factory's own files, ignored.
+  await ensureIgnored(dir);
   // Mission commands refuse outside `~/.factory/projects`, which is what the scratch HOME sandboxes.
   if (register) await saveProject(dir);
   return dir;
@@ -130,8 +132,17 @@ await check('the hook rings only when the parent session waits on the human', as
   const prompted = (secondsAgo: number): Promise<void> =>
     writeFile(events, `${JSON.stringify({ at: new Date(Date.now() - secondsAgo * 1000).toISOString(), event: 'UserPromptSubmit', session: 'S' })}\n`);
 
-  /** Fires one hook and returns how many times the player has been called in all. */
-  const fire = async (event: string, input: object, SOUND = sound): Promise<number> => {
+  const played = async (): Promise<number> =>
+    (await Bun.file(log).text().catch(() => '')).split('\n').filter((l) => l !== '').length;
+
+  /**
+   * Fires one hook and returns how many times the player has been called in all. The player is
+   * detached and never waited on — by design, a hook must not block the session — so the count is
+   * polled up to a second for the one `want` expects instead of raced against a fixed sleep. A
+   * case that expects no new ring reads the count straight back, and the next one that does
+   * expect one would see a late line as its own.
+   */
+  const fire = async (event: string, input: object, want: number, SOUND = sound): Promise<number> => {
     const proc = Bun.spawn(['bun', hook, event], {
       cwd: dir,
       env: { PATH: `${bin}:${process.env.PATH}`, HOME: home, SOUND, QUIET: '30' },
@@ -140,18 +151,18 @@ await check('the hook rings only when the parent session waits on the human', as
       stderr: 'ignore',
     });
     await proc.exited;
-    await Bun.sleep(300); // the player is detached, so its line lands after the hook is gone
-    return (await Bun.file(log).text().catch(() => '')).split('\n').filter((l) => l !== '').length;
+    for (let waited = 0; waited < 1000 && (await played()) < want; waited += 20) await Bun.sleep(20);
+    return played();
   };
 
   await prompted(40);
-  ok((await fire('Stop', {})) === 1, 'a long turn ending did not ring');
+  ok((await fire('Stop', {}, 1)) === 1, 'a long turn ending did not ring');
   await prompted(5);
-  ok((await fire('Stop', {})) === 1, 'a short turn rang');
-  ok((await fire('Notification', { notification_type: 'permission_prompt' })) === 2, 'a permission prompt did not ring');
-  ok((await fire('SubagentStop', { agent_type: 'Worker' })) === 2, 'a sub-agent finishing rang');
+  ok((await fire('Stop', {}, 1)) === 1, 'a short turn rang');
+  ok((await fire('Notification', { notification_type: 'permission_prompt' }, 2)) === 2, 'a permission prompt did not ring');
+  ok((await fire('SubagentStop', { agent_type: 'Worker' }, 2)) === 2, 'a sub-agent finishing rang');
   await prompted(40);
-  ok((await fire('Stop', {}, 'off')) === 2, 'SOUND=off rang');
+  ok((await fire('Stop', {}, 2, 'off')) === 2, 'SOUND=off rang');
 });
 
 await check('a handoff never overwrites the one before it', async () => {
@@ -370,6 +381,39 @@ await check('the transcript tail parses each line once', async () => {
   ok(tail.offset === Bun.file(file).size && tail.usage.length === 3, 'offset and usage follow the file');
 });
 
+await check('a session asks with its last Stop, and only a prompt clears it', async () => {
+  const { transcriptPath } = await import('../src/tui/transcript.js');
+  const { buildSnapshot } = await import('../src/tui/live.js');
+  const dir = await repo('asks');
+  const session = 'Q';
+  const at = (back: number): string => new Date(Date.now() - back * 60_000).toISOString();
+
+  // The shape H-7 came off: a skill preamble is a user record, and it is the last text on file.
+  const file = transcriptPath(dir, session);
+  await mkdir(path.dirname(file), { recursive: true });
+  const said = (type: string, text: string, back: number): string =>
+    `${JSON.stringify({ type, timestamp: at(back), message: { id: `${type}${back}`, content: [{ type: 'text', text }] } })}\n`;
+  await writeFile(file, said('assistant', 'An earlier turn', 30) + said('user', 'Base directory for this skill', 20));
+
+  const events = path.join(process.env.HOME!, '.factory', 'events', `${session}.jsonl`);
+  await mkdir(path.dirname(events), { recursive: true });
+  const logged = (event: string, detail: string | null, back: number): string =>
+    `${JSON.stringify({ at: at(back), event, session, cwd: dir, mission: null, step: null, detail })}\n`;
+  await writeFile(events, logged('Stop', 'An earlier turn', 8) + logged('UserPromptSubmit', 'carry on', 6)
+    + logged('Stop', 'Reply sent, thread labeled DONE', 2));
+
+  const asks = async (): Promise<string[]> =>
+    (await buildSnapshot()).inbox.filter((i) => i.kind === 'question' && i.project === 'asks').map((i) => i.text ?? '');
+  ok((await asks()).join() === 'Reply sent, thread labeled DONE', `asks reads ${(await asks()).join() || 'nothing'}`);
+
+  // An idle notification is the same question asked again, not a second one.
+  await writeFile(events, logged('Notification', 'idle_prompt: waiting for your input', 1), { flag: 'a' });
+  ok((await asks()).join() === 'Reply sent, thread labeled DONE', 'an idle notification changed the question');
+
+  await writeFile(events, logged('UserPromptSubmit', 'answered', 0), { flag: 'a' });
+  ok((await asks()).length === 0, 'answering did not clear the question');
+});
+
 await check('writeSnippet and removeSnippet round trip', async () => {
   const snippet = { section: '## Scratch', line: '- Scratch: @docs/scratch.md' };
   const { record } = await writeSnippet(snippet, main);
@@ -399,11 +443,15 @@ await check('a stub takes no branch and promote gives it one', async () => {
 
 await check('close merges, cleans the tree and drops the branch', async () => {
   await walk(main, 'x');
-  await closeMission(main, await resolveMission(main, 'x'));
+  const closed = await resolveMission(main, 'x');
+  await closeMission(main, closed);
   ok((await currentBranch(main)) === 'main', 'close left the mission branch');
   ok(await branchGone(main, 'mission/x'), 'close kept the branch');
   ok((await git(main, 'status', '--porcelain')) === '', 'close left the tree dirty');
-  ok((await git(main, 'log', '--format=%s', 'main')).includes('close mission x'), 'close did not land on main');
+  // The folder is ignored: the state file says closed, and git was never told about any of it.
+  ok((await resolveMission(main, 'x')).state.status === 'closed', 'close did not record the status');
+  ok((await git(main, 'ls-files', '--', '.factory')) === '', 'close committed the mission folder');
+  ok(await exists(path.join(closed.dir, 'state.json')), 'close took the folder with it');
 });
 
 await check('--keep-branch keeps it', async () => {
@@ -529,8 +577,10 @@ await check('a closed mission archives, comes back and is idempotent either way'
   ok(early?.name === 'Refusal', 'an open mission was archived');
 
   await closeMission(dir, await resolveMission(dir, 'a'));
+  const head = await git(dir, 'rev-parse', 'HEAD');
   const log = await archiveMission(dir, 'a');
-  ok(log.some((l) => l.startsWith('committed')), `a clean tree was not committed: ${log.join(' · ')}`);
+  ok(log.length === 1 && log[0]!.startsWith('archived .factory/archive/'), `archive said ${log.join(' · ')}`);
+  ok((await git(dir, 'rev-parse', 'HEAD')) === head, 'archive committed something');
   ok((await git(dir, 'status', '--porcelain')) === '', 'archive left the tree dirty');
   ok((await listArchived(dir)).map((m) => m.state.name).join() === 'a', 'the archive does not hold it');
   ok((await listMissions(dir)).length === 0, 'the missions folder still holds it');
@@ -538,6 +588,31 @@ await check('a closed mission archives, comes back and is idempotent either way'
 
   await archiveMission(dir, 'a', true);
   ok((await listMissions(dir)).length === 1 && (await listArchived(dir)).length === 0, 'unarchive did not put it back');
+});
+
+await check('the Factory\'s own files are ignored, once and committed', async () => {
+  const dir = await repo('ignore');
+  const file = path.join(dir, '.gitignore');
+  ok((await Bun.file(file).text()) === '.factory/claim\n.factory/missions/\n.factory/archive/\n',
+    `the ignore file reads ${JSON.stringify(await Bun.file(file).text())}`);
+  ok((await git(dir, 'status', '--porcelain')) === '', 'the lines were left uncommitted on a clean tree');
+  ok((await ensureIgnored(dir)) === null, 'a second call wrote the lines again');
+});
+
+await check('open refuses a mission a session is already bound to', async () => {
+  const dir = await repo('bound');
+  await mission('new', ['b1'], { 'no-open': true }, dir);
+  const m = await resolveMission(dir, 'b1');
+  m.state.session = 'S-1';
+  await writeState(m.dir, m.state);
+
+  const refused = await mission('open', ['b1'], {}, dir).then(() => null, (e: Error) => e);
+  ok(refused?.message === 'mission b1 is bound to session S-1 — factory mission adopt b1 --session <id> to rebind',
+    `open rebound it: ${refused?.message ?? 'no refusal'}`);
+  ok((await resolveMission(dir, 'b1')).state.session === 'S-1', 'the refusal still rewrote the session');
+  // resume is the way back into a mission whose tab is gone, and it never touches the binding.
+  await mission('resume', ['b1'], {}, dir);
+  ok((await resolveMission(dir, 'b1')).state.session === 'S-1', 'resume rebound the mission');
 });
 
 await check('a hand-copied template reads as installed with no manifest', async () => {

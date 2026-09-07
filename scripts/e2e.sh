@@ -51,7 +51,11 @@ cmp -s "$TMP/state.before" "$REPO"/.factory/missions/*-x/state.json || die 'a dr
 [ ! -e "$REPO/.factory/claim" ] || die 'a dry run claimed the checkout'
 f mission open x
 [ "$(git -C "$REPO" rev-parse --abbrev-ref HEAD)" = 'mission/x' ] || die 'open did not promote the stub'
-git -C "$REPO" check-ignore -q .factory/claim || die '.factory/claim is not ignored'
+for ignored in .factory/claim .factory/missions/ .factory/archive/; do
+   git -C "$REPO" check-ignore -q "$ignored" || die "$ignored is not ignored"
+done
+# A second open would rebind the mission to an empty tab and strand the session already on it.
+refuses "$REPO" 'is bound to session' mission open x
 
 # No tty to offer a worktree to, so the caller is told to ask for one.
 refuses "$REPO" 'add --worktree' mission new b --no-open
@@ -68,14 +72,17 @@ f mission close x
 [ "$(git -C "$REPO" rev-parse --abbrev-ref HEAD)" = 'main' ] || die 'close left the mission branch'
 ! git -C "$REPO" show-ref --verify --quiet refs/heads/mission/x || die 'close kept the branch'
 [ -z "$(git -C "$REPO" status --porcelain)" ] || die "close left the tree dirty: $(git -C "$REPO" status --porcelain | tr '\n' ' ')"
-grep -q 'close mission x' <(git -C "$REPO" log --format=%s main) || die 'close did not land on main'
+# The mission folder is ignored: it stays on disk, closed, and git never hears about it.
+grep -q '"status": "closed"' "$REPO"/.factory/missions/*-x/state.json || die 'close did not record the status'
+[ -z "$(git -C "$REPO" ls-files -- .factory)" ] || die 'close committed the mission folder'
 refuses "$REPO" 'mission x is closed' mission open x
 
 # Closed work steps aside with its history and comes back the same way.
+HEAD_BEFORE="$(git -C "$REPO" rev-parse HEAD)"
 f mission archive x
 [ -d "$REPO"/.factory/archive/*-x ] || die 'archive did not move the folder'
-[ -z "$(git -C "$REPO" status --porcelain)" ] || die 'archive left the move uncommitted on a clean tree'
-grep -q 'archive mission x' <(git -C "$REPO" log --format=%s main) || die 'archive did not commit'
+[ -z "$(git -C "$REPO" status --porcelain)" ] || die 'archive left the tree dirty'
+[ "$(git -C "$REPO" rev-parse HEAD)" = "$HEAD_BEFORE" ] || die 'archive committed something'
 says "$REPO" mission list --all | grep -q 'archived' || die 'list --all does not show the archived row'
 f mission unarchive x
 [ -d "$REPO"/.factory/missions/*-x ] || die 'unarchive did not put it back'

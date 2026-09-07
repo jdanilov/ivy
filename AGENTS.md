@@ -36,6 +36,9 @@ src/           CLI source (entry: src/cli.ts)
 parts/<name>/  One folder per part: part.yaml plus the files it installs
 scripts/test.ts In-process: the same walk plus worktree pairs, one line per case
 scripts/e2e.sh One throwaway repo: install --yes, a chore mission end to end, uninstall --yes
+scripts/tui-keys.ts     Mission Control headless: keys through `onKey`, every frame checked
+scripts/hook-inject.ts  hook-factory's decision paths as a child, or its own scratch self-check
+scripts/tui-snapshot.ts The fixture screen as plain text, for a look review with no tty
 .factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run — a nested
                recipe reads back under its dotted path
 workflows/     intent, story, fix, chore, research, quick — the shipped workflow YAML: every
@@ -46,7 +49,9 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
                events/<session>.jsonl, caffeinate/<session>.pid and control.pid
 ~/.claude/     Where `scope: global` parts install: the same links, `.factory-manifest.json` and
                one `settings.json` holding both the hooks and the allow list
-.factory/archive/<dir>  a closed mission's folder, git-moved there by `mission archive`
+.factory/archive/<dir>  a closed mission's folder, renamed there by `mission archive`. Both it
+               and `.factory/missions/` are ignored: a run's record belongs to the machine that
+               ran it, not to the history of the code
 ~/.warp/tab_configs/factory-<mission>.toml   written by `mission open`, opened by URI
 ```
 
@@ -189,15 +194,18 @@ factory handoff save <step>            # reads the handoff from stdin
   save of one name takes `-2`, the third `-3`.
 - A claimed mission whose `state.json` has `session: null` adopts the first session to send a
   `SessionStart` or `UserPromptSubmit`; a session already recorded is never overwritten.
-- `mission new` and the promotion in `mission open` add `.factory/claim` to the project `.gitignore`
-  when nothing ignores it yet, committing that line when the file is otherwise clean, and `mission
-  close` never counts the claim as dirt: the Factory's own file cannot block the Factory.
+- `mission new` and the promotion in `mission open` add `.factory/claim`, `.factory/missions/` and
+  `.factory/archive/` to the project `.gitignore`, only the lines nothing ignores yet, committing
+  them when the file is otherwise clean, and `mission close` never counts anything under
+  `.factory/` as dirt: the Factory's own files cannot block the Factory.
 - A stub is a mission with `status: stub` and `branch: null`: folder, workflow copy and an
   `intent.md` skeleton, no branch and no claim. Every command that needs a branch refuses with
   `mission <name> is a stub, open it first`; `mission open` promotes it and then proceeds as usual,
   landing in the same state `mission new` would have.
-- `mission close` commits a dirty mission folder on the mission branch before it leaves the branch,
-  and refuses when anything outside the folder is dirty, naming the paths.
+- `mission close` commits nothing and never `git add`s the mission folder, which is ignored:
+  `status: closed` in its own `state.json` is the postcondition a rerun reads back. It refuses
+  when anything outside `.factory/` is dirty, naming the paths, and merges the branch when the
+  trunk does not already hold it.
 - `mission close` deletes `mission/<name>` last, after the worktree is gone and the merge landed;
   `--keep-branch` keeps it, and a branch git will not delete is reported, never forced.
 - `mission new` without `--workflow` copies `intent.yaml`, one human-gated step and nothing after
@@ -215,12 +223,15 @@ factory handoff save <step>            # reads the handoff from stdin
   rather than a suggestion. The hook is unaffected — it binds by claim, not by the projects list.
 - `mission open --dry-run` writes nothing at all, a stub's promotion included, and `mission open`
   on a closed mission refuses. Either way `state.json` is byte-identical afterwards.
+- `mission open` on a mission whose `state.json` already names a session refuses with `mission X is
+  bound to session <id> — factory mission adopt X --session <id> to rebind`: a second open would
+  point the mission at an empty tab and every event of the session already on it would go nowhere.
+  Mission Control's `O` raises the same refusal as a toast. `mission resume` is how a tab comes back.
 - `mission new` on a claimed checkout with no tty on stdin refuses with `add --worktree` instead of
   hanging on a prompt nobody can answer, and leaves no folder behind.
-- `mission archive <name>` refuses unless the mission is closed, `git mv`s its folder to
-  `.factory/archive/` so the history follows, and commits only when the tree is otherwise clean —
-  else it says the move is staged. `unarchive` is the reverse, both are idempotent, and only
-  `mission list --all` reads the archive.
+- `mission archive <name>` refuses unless the mission is closed and renames its folder into
+  `.factory/archive/`; git is not involved, both folders are ignored. `unarchive` is the reverse,
+  both are idempotent, and only `mission list --all` reads the archive.
 - `mission list` and `gate list` skip a registered project whose path is gone. The projects file keeps it.
 
 ## Conventions
@@ -249,7 +260,11 @@ factory handoff save <step>            # reads the handoff from stdin
   `step start|done`, `gate open|answer` and `mission close` — the mission flow end to end
 - `bun scripts/test.ts` — the whole walk in one process, one line per case
 - `bash scripts/e2e.sh` — the same ground as a black box, through the CLI
+- `bun scripts/tui-keys.ts --fixture --quiet <keys>` — the screen under keys, frames checked
+- `bun scripts/hook-inject.ts` — a handoff's decisions filed and injected, scratch HOME and all
 - `bun x tsc --noEmit` — typecheck
+
+`e2e.run` is `scripts/e2e.sh` plus those two drivers; `verify` is `tsc`, `scripts/test.ts` and `status`.
 
 ### What not to do
 

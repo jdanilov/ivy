@@ -3,11 +3,11 @@ import * as p from '@clack/prompts';
 import type { Autonomy, Mission, MissionState, WorkflowStep } from '../types.js';
 import { str, type Flags } from '../core/args.js';
 import {
-  Refusal, archiveMission, closeMission, createMission, currentBranch, currentCheckout, ensureClaimIgnored,
+  Refusal, archiveMission, closeMission, createMission, currentBranch, currentCheckout, ensureIgnored,
   git, listArchived, listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub,
   pointAtInserted, promoteMission, readClaim, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
 } from '../core/mission.js';
-import { ROLE_MODEL, dumpWorkflow, loadWorkflow, stepRole } from '../core/workflow.js';
+import { dumpWorkflow, loadWorkflow, runnerLabel, stepRole } from '../core/workflow.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { existingProjects } from '../core/projects.js';
 import { field, headerRow, missionRow, rule } from '../ui/format.js';
@@ -83,7 +83,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
 
   // A stub has no branch to commit on: `mission open` promotes it and takes care of the ignore then.
   const workdir = created.state.worktree ?? (await currentCheckout(cwd));
-  const ignored = created.state.branch ? await ensureClaimIgnored(workdir) : null;
+  const ignored = created.state.branch ? await ensureIgnored(workdir) : null;
 
   console.log('');
   headerRow(`${colors.cyan}●${colors.reset} ${colors.bold}${created.state.name}${colors.reset}`, `${colors.dim}${created.state.workflow} · ${created.state.autonomy}${colors.reset}`);
@@ -92,7 +92,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   field('branch', created.state.branch ?? `${colors.dim}stub — open it to branch${colors.reset}`);
   if (created.state.worktree) field('worktree', created.state.worktree);
   field('step', created.state.step);
-  if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
+  if (ignored) field('ignored', `the Factory's own files added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log('');
 
   if (!stub && flags['no-open'] !== true) await open(created.state.name, flags, cwd);
@@ -109,7 +109,7 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   let ignored: 'added' | 'committed' | null = null;
   if (stub && !dry) {
     await promoteMission(cwd, m);
-    ignored = await ensureClaimIgnored(await currentCheckout(cwd));
+    ignored = await ensureIgnored(await currentCheckout(cwd));
   }
   const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
   const spawn = await openSession(cwd, m, preset, dry);
@@ -127,7 +127,7 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
   field('config', dry ? `would write ${spawn.configPath}` : spawn.configPath);
   field('uri', spawn.uri);
   if (dry && stub) field('promote', `would branch mission/${m.state.name} and claim the checkout`);
-  if (ignored) field('ignored', `.factory/claim added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
+  if (ignored) field('ignored', `the Factory's own files added to .gitignore${ignored === 'committed' ? ' and committed' : ''}`);
   console.log(`${I}${colors.dim}command${colors.reset}`);
   console.log(`${I}${spawn.command}`);
   console.log('');
@@ -246,7 +246,7 @@ function stepLine(state: MissionState, definition: WorkflowStep, depth: number):
   const time = step?.startedAt ? duration(step.startedAt, step.endedAt) : '';
   const gate = state.gates[name];
 
-  const left = `${rowColor(row)}${rowSymbol(row)}${colors.reset} ${indent}${name.padEnd(14 - indent.length)}${colors.dim}${role} · ${ROLE_MODEL[role] ?? '—'}${colors.reset}`;
+  const left = `${rowColor(row)}${rowSymbol(row)}${colors.reset} ${indent}${name.padEnd(14 - indent.length)}${colors.dim}${runnerLabel(role)}${colors.reset}`;
   const notes = [
     step?.status === 'skipped' ? `${colors.dim}skipped: ${step.reason ?? ''}${colors.reset}` : '',
     gate?.status === 'open' ? `${colors.yellow}⊘ gate open${colors.reset}` : '',

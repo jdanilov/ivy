@@ -93,9 +93,15 @@ export async function warpInstalled(): Promise<boolean> {
 
 /**
  * The session id is written to state.json before the tab exists, so the hook events the
- * new session emits always find a mission already bound to them.
+ * new session emits always find a mission already bound to them. A mission already carrying one
+ * is never rebound here: the old session keeps sending events at a mission that has moved on, and
+ * every one of them goes nowhere. `mission adopt` is the deliberate rebind, and it says so.
  */
 export async function openSession(cwd: string, mission: Mission, preset: Preset, dryRun: boolean): Promise<Spawn> {
+  const bound = mission.state.session;
+  const mine = mission.state.name;
+  if (bound) throw new Refusal(`mission ${mine} is bound to session ${bound} — factory mission adopt ${mine} --session <id> to rebind`);
+
   const session = crypto.randomUUID();
   const checkout = mission.state.worktree ?? (await mainCheckout(cwd));
   const name = `factory-${mission.state.name}`;

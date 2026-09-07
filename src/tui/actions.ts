@@ -33,6 +33,8 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
 /** The preset `mission open` uses with no flag: a mission's session is the Orchestrator's. */
 const PRESET = 'orchestrator';
 
+/** A mission already bound to a session is never reopened: `openSession` refuses, and the toast
+ *  is that refusal — one rule for the key and for `factory mission open`. */
 export async function openTab(project: string, name: string): Promise<string> {
   const mission = await resolveMission(project, name);
   if (await sessionLive(mission.state.session)) return `factory-${name} is already open — switch to that tab`;
@@ -132,7 +134,7 @@ export async function setAutonomy(project: string, name: string, autonomy: Auton
   return `${name} autonomy ${autonomy}`;
 }
 
-/** `git mv` between `.factory/missions/` and `.factory/archive/`; the closed-only rule is the core's. */
+/** A rename between `.factory/missions/` and `.factory/archive/`; the closed-only rule is the core's. */
 export async function archive(project: string, name: string, back: boolean): Promise<string> {
   const log = await archiveMission(project, name, back);
   return log.length > 0 ? log.join(' · ') : `${name} is already ${back ? 'in missions' : 'archived'}`;

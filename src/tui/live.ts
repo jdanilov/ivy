@@ -233,10 +233,13 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
 
   const decisions = await readDecisions(m.dir);
 
-  logRows(ctx, tail, ev, state.session ?? '');
-  ctx.inbox.push(...(await waitItems(project, m, decisions)));
-  const asks = asking(ev, tail);
-  if (asks) ctx.inbox.push(question(project, state.name, `factory-${state.name}`, asks, ev!.at));
+  // A closed mission's session is history: what it asks now is its own row's, or the next mission's.
+  if (state.status !== 'closed') {
+    logRows(ctx, tail, ev, state.session ?? '');
+    ctx.inbox.push(...(await waitItems(project, m, decisions)));
+    const asks = asking(ev, tail);
+    if (asks) ctx.inbox.push(question(project, state.name, `factory-${state.name}`, asks, ev!.at));
+  }
 
   // A worktree mission's diff is counted where that mission's commits are.
   const diff = state.status === 'open' && state.branch ? diffCount(state.worktree || dir, state.branch) : undefined;
@@ -327,8 +330,10 @@ export async function buildSnapshot(): Promise<Snapshot> {
     found.set(dir, [...live.map((m): [CoreMission, boolean] => [m, false]), ...archived.map((m): [CoreMission, boolean] => [m, true])]);
   }
 
-  // A session bound to any mission is that mission's row, never an unbound one of its own.
-  const bound = new Set([...found.values()].flatMap((ms) => ms.map(([m]) => m.state.session).filter((s) => s !== null)));
+  // A session bound to an open mission is that mission's row, never an unbound one of its own.
+  // A closed mission keeps its session id as a record; the session, if it lives on, is free.
+  const bound = new Set([...found.values()].flatMap((ms) =>
+    ms.filter(([m]) => m.state.status !== 'closed').map(([m]) => m.state.session).filter((s) => s !== null)));
   const ctx: Ctx = { activity: [], inbox: [], logged: new Set() };
   const projects: Project[] = [];
 
@@ -336,7 +341,8 @@ export async function buildSnapshot(): Promise<Snapshot> {
     const name = path.basename(dir);
     const missions: Mission[] = [];
     for (const [m, archived] of found.get(dir) ?? []) {
-      missions.push(await missionRow(ctx, name, real, m, m.state.session ? events.get(m.state.session) : undefined, archived));
+      const ev = m.state.session && m.state.status !== 'closed' ? events.get(m.state.session) : undefined;
+      missions.push(await missionRow(ctx, name, real, m, ev, archived));
     }
     const sessions: Session[] = [];
     for (const ev of events.values()) {

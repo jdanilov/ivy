@@ -63,17 +63,41 @@ row 2        ──────────────────────�
 row 3        status: mission bar or project summary, or the toast that replaces it
 row 4        ───────────────────────────────────────────────────────────────────────
              PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | PARTS (60%)
-             inbox, projects,        │  a list above a detail block; the detail of
-             missions, sessions      │  a gate ends in the answer row
+             inbox, ~ global,        │  a list above a detail block; a gate and a
+             projects, missions,     │  decision each end in the command that
+             sessions                │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             ACTIVITY  <subject>     one third of the body, all of it on F
+             DECISIONS | ACTIVITY  <subject>   one third of the body, all of it on F
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Open  O Tab  X Kill  C Caffeinate  Z Closed  F Activity  ? Help  Q Quit
+             ↑↓ Select  ↵ Open  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  A Activity  F Full  ? Help  Q Quit
 ```
 
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
   Two cells of padding on the left pane keep its right-aligned tokens off the divider.
-- Activity keeps a third of the body, never fewer than 5 rows; `F` gives it all of it.
+- `~ global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
+  every project. Archived missions are off the list until `Z` asks for them.
+- The foot keeps a third of the body, never fewer than 5 rows; `F` gives it all of it. It draws
+  DECISIONS by default and ACTIVITY on `A`, and `↑↓` scroll whichever one is full.
+
+### The foot: DECISIONS
+
+One row per decision of whatever the left column has selected — a mission, a project, or every
+project on the Inbox row — newest last, the mission column present only when more than one is in
+scope. A decision is a fork an agent took; the screen never answers one.
+
+```
+D3   implement   worker        LOW     Do not implement auth here, KISS and YAGNI     ⊘ waiting
+D2   implement   worker        MEDIUM  Reuse readJson for the manifest              ✓ accepted
+D4   review      orchestrator  MEDIUM  Triage r2: fix F1 and F3    ✗ overruled: fix F2 too
+D1   spec        orchestrator  HIGH    Four workers, serial                                auto
+```
+
+| Status      | Glyph | Colour        | Row                                   |
+|-------------|-------|---------------|----------------------------------------|
+| `waiting`   | `⊘`   | warning amber | bright, it is holding the mission up   |
+| `accepted`  | `✓`   | success olive | bright                                 |
+| `overruled` | `✗`   | error red     | bright, the note follows the word      |
+| `auto`      | none  | dim label     | dim: a record, not a question          |
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.
 - The key bar sits on the last row and lists the focused pane's keys; `?` is the first pair
@@ -81,40 +105,47 @@ last row     ──────────────────────�
 - No box carries a background: every cell the screen does not colour keeps the terminal's own.
   The one exception is the inverted selected row; the help panel paints nothing either.
 
-### Step colours by meaning
+### Step colours by role
 
 A step's name is coloured by what kind of work it is, its glyph by where it is in its life, so one
-row carries both without a legend. Kind comes from the workflow: role `worker` or `investigator`
-is agent work, `verify`, `validate` and `accept` are gatekeeping, `grill` and `intent` are the
-human's, everything left is technical.
+row carries both without a legend. The kind comes from `stepRole` in `src/core/workflow.ts` — the
+one place a runner is named — so the graph, `mission status` and a spawn can never disagree. A
+parallel group takes its members' kind; a gate the human answers is the human's own; the three
+step names a closed mission's workflow copy still carries keep the colours they had.
 
-| Kind        | Colour    | Steps                                   |
-|-------------|-----------|------------------------------------------|
-| human       | `#a8a968` | grill, intent — the gates the human owns |
-| gatekeeper  | `#d7af5f` | accept, verify, validate                 |
-| agent       | `#6b8fd9` | implement, research, any worker step     |
-| technical   | `#6e6e6e` | spec, condense, merge                    |
+| Kind        | Colour    | Role                       | Steps                            |
+|-------------|-----------|----------------------------|-----------------------------------|
+| human       | `#a8a968` | `gate: human`              | intent, merge — and old `grill`   |
+| gatekeeper  | `#d7af5f` | verifier, validator        | verify, validate, review — `accept` |
+| agent       | `#6b8fd9` | worker, investigator       | implement, research               |
+| technical   | `#6e6e6e` | orchestrator               | spec, an ungated merge — `condense` |
 
-Agent prompt colours follow the same reading: Worker blue, Investigator cyan, Verifier and
-Validator yellow, Summarizer magenta because Claude Code has no grey.
+Each graph row names its runner beside the step, and its model where the runner is not this
+session: `worker · opus`, `verifier · sonnet`, a bare `orchestrator`. Agent prompt colours follow
+the same reading: Worker blue, Investigator cyan, Verifier and Validator yellow, Summarizer
+magenta because Claude Code has no grey.
 
 ### Keys
 
-| Key      | Pane            | Does                                                         |
+| Key      | Pane             | Does                                                          |
 |----------|------------------|---------------------------------------------------------------|
 | `↑↓`     | any              | move the selection                                            |
-| `→` `↵`  | left             | enter the right pane; in Messages `←→` pick the answer         |
-| `←` `esc`| right            | back to the left pane                                         |
-| `↵`      | Messages         | record the answer; amend and reject take a one-line note first |
-| `Space` `↵` `Y` | Parts     | toggle a part, apply the set, confirm                          |
+| `→` `↵`  | left             | enter the right pane                                          |
+| `←` `esc`| right            | back to the left pane; in Parts `esc` first discards a toggle |
+| `Space` `↵` `Y` `N` `R` | Parts | toggle a part, apply the set, confirm, cancel, reset     |
 | `O`      | mission row      | open the mission's Warp tab, or name the tab that is live      |
 | `X`      | mission, session | SIGTERM the session's process, SIGKILL on a second press       |
 | `T`      | mission row      | autonomy full → partial → none                                 |
+| `H`      | mission row      | archive a closed mission, or bring an archived one back        |
+| `Z`      | left             | show the archived missions                                     |
 | `C`      | any              | caffeinate auto → on → off                                     |
-| `Z`      | left             | hide closed missions                                           |
-| `F`      | any              | Activity at full height; header and status bar hidden          |
-| `↑↓`     | full activity    | scroll the log; `↵`, `F` or `esc` restore the columns          |
+| `D` `A`  | any              | the foot draws DECISIONS, or ACTIVITY                          |
+| `F`      | any              | the foot at full height; header and status bar hidden          |
+| `↑↓`     | full foot        | scroll it; `↵`, `F` or `esc` restore the columns               |
 | `?` `Q`  | any              | help panel, quit                                               |
+
+Messages answers nothing: a gate row and a decision row each carry the command that answers them
+in the session that raised them, and `←`, `→` and `↵` on one write nothing.
 
 ## Glyphs
 

@@ -64,9 +64,10 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `decision list [--waiting]`                    | The mission's decisions, or only the ones waiting on the human             |
 | `handoff save <step>`                          | Write the handoff on stdin into the mission folder                         |
 
-Mission Control keys: `↑↓` select, `↵` open or answer, `O` tab, `X` kill, `T` autonomy, `C`
-caffeinate, `Z` hide closed, `F` activity, `?` help, `Q` quit. Space toggles a part and `Y`
-applies the set.
+Mission Control keys: `↑↓` select, `↵` open, `O` tab, `X` kill, `T` autonomy, `H` archive, `Z`
+show archived, `C` caffeinate, `D` decisions, `A` activity, `F` full height, `?` help, `Q` quit.
+Space toggles a part and `Y` applies the set. Gates and decisions are answered in the session
+that raised them; the screen shows the command and records nothing itself.
 
 ## Parts
 

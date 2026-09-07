@@ -1,5 +1,7 @@
+import { stepRole } from '../core/workflow.js';
+import type { WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
-import type { Activity, InboxItem, Mission, PartRow, Project, Snapshot, StepRow } from './model.js';
+import type { Activity, Decision, InboxItem, Mission, PartRow, Project, Snapshot, StepRow } from './model.js';
 
 /** Fake data for the look-and-feel prototype. Ages are relative, so the screen reads right whenever it runs. */
 
@@ -8,19 +10,24 @@ const H = 60 * M;
 const D = 24 * H;
 const now = Date.now();
 
-/** The kind is never spelled out here: the fixture reads its colours through the same mapping the
- *  live snapshot does, so a look review is a review of what the screen will draw. */
-function steps(spec: [name: string, status: StepRow['status'], wall?: number, role?: string][]): StepRow[] {
-  return spec.map(([name, status, wall, role]) => ({
-    name, status, wall, kind: stepKind({ name, ...(role ? { role } : {}) }), ...(role ? { role } : {}),
-  }));
+/** The kind and the runner are never spelled out here: the fixture reads both through the
+ *  mappings the live snapshot uses, so a look review is a review of what ships. */
+function steps(spec: [name: string, status: StepRow['status'], wall?: number, of?: Omit<WorkflowStep, 'name'>,
+  tokens?: StepRow['tokens'], runs?: number][]): StepRow[] {
+  return spec.map(([name, status, wall, of, tokens, runs]) => {
+    const step: WorkflowStep = { name, ...of };
+    return { name, status, wall, tokens, runs, kind: stepKind(step), role: stepRole(step) };
+  });
 }
 
+// The two finished steps carry their spend, so the graph's tokens column is on screen in a look review.
 const refitSteps = steps([
-  ['grill', 'done', 3 * M], ['intent', 'done', 12 * M], ['research', 'skipped', undefined, 'investigator'],
-  ['spec', 'done', 8 * M], ['implement', 'running', 6 * M, 'worker'], ['accept', 'pending'],
-  ['verify', 'pending'], ['validate', 'pending'], ['condense', 'pending'],
-  ['merge', 'pending'],
+  ['intent', 'done', 12 * M, { gate: 'human' }, { input: 24_000, cached: 260_000, output: 4_800 }],
+  ['research', 'skipped', undefined, { role: 'investigator' }],
+  ['spec', 'done', 8 * M, undefined, { input: 41_500, cached: 620_000, output: 9_300 }],
+  ['implement', 'running', 6 * M, { role: 'worker' }, undefined, 2],
+  ['review', 'pending', undefined, { parallel: ['verify', 'validate'] }],
+  ['verify', 'pending'], ['validate', 'pending'], ['merge', 'pending', undefined, { gate: 'human' }],
 ]);
 
 /** `minutes back|verb|text`, oldest first — the shape wiring will read out of the transcript. */
@@ -34,34 +41,26 @@ function log(session: string, spec: string): Activity[] {
 const refitLog = log('75cb46e1', `
 30.0|Text|Round 2 opens. Three findings from the Verifier, all in the render path.
 29.5|Read|.factory/missions/2026-09-06-refit/findings.md
-29.1|Read|src/tui/screen.ts
 28.6|Bash|rg -n "destroyRecursively" src
 28.0|Text|Triage: fix F1 and F2, skip F3 — the divider is cosmetic and out of the contract.
 27.4|Agent|Worker implement round 2
-26.9|Read|src/tui/screen.ts
 26.3|Read|src/ui/format.ts
 25.7|Edit|src/tui/screen.ts destroy the old row tree instead of removing it
-25.0|Bash|bun x tsc --noEmit
 24.4|Edit|src/tui/format.ts spread() pads to the pane width
-23.8|Bash|bun x tsc --noEmit
 23.1|Bash|bun scripts/test.ts
 22.4|Text|Two cases fail: the status bar no longer fits its metrics at 100 columns.
-21.8|Read|src/tui/format.ts
 21.1|Edit|src/tui/screen.ts cap the progress bar at a third of the line
 20.3|Bash|bun scripts/test.ts
-19.6|Bash|bun x tsc --noEmit
 18.9|Stop|Worker handed off: 4 files, 2 fixes, F3 skipped with a reason
 18.1|Text|Handoff reads clean. Verify before the accept gate.
 17.4|Agent|Verifier round 2
 16.8|Read|.factory/missions/2026-09-06-refit/acceptance.md
-16.1|Bash|git diff --stat main...mission/refit
 15.3|Read|src/tui/screen.ts
 14.6|Text|A2 pass, A5 pass, A9 unchecked — nothing drives the 100-column case.
 13.8|Stop|Verifier findings written
 13.0|Agent|Worker implement round 2
 12.3|Edit|scripts/test.ts a 100x24 render case
 11.6|Bash|bun scripts/test.ts
-10.8|Bash|bun x tsc --noEmit
 10.0|Stop|Worker handed off: A9 now checked
 9.2|Text|All nine assertions pass, so the accept gate is the next thing.
 8.4|Ask|Accept round 2 and move on to validate?
@@ -95,38 +94,67 @@ const quickLog = log('b3f21c07', `
 12|Ask|Which recall strategy for v1, embeddings or a grep index?`);
 
 const authSteps = steps([
-  ['grill', 'done', 4 * M], ['implement', 'done', 71 * M, 'worker'],
-  ['verify', 'done', 22 * M], ['merge', 'blocked'],
+  ['intent', 'done', 4 * M, { gate: 'human' }], ['implement', 'done', 71 * M, { role: 'worker' }],
+  ['verify', 'done', 22 * M], ['merge', 'blocked', undefined, { gate: 'human' }],
 ]);
 authSteps[3]!.gateOpen = true;
 
-const ivyParts: PartRow[] = (
-  [
-    ['archify', 'skill', ['.claude/skills/archify/skill.md', '.claude/skills/archify/template.html']],
-    ['browse', 'tool', ['.claude/skills/browse/skill.md', '.claude/skills/browse/agent-browser.md']],
-    ['code-format', 'fixture', ['.claude/code-format.md']],
-    ['codegraph', 'mcp', ['.claude/scripts/codegraph-gate.sh', '.mcp.json']],
-    ['commit', 'skill', ['.claude/skills/commit/skill.md']],
-    ['docs-format', 'fixture', ['.claude/docs-format.md']],
-    ['explain', 'skill', ['.claude/skills/explain/skill.md']],
-    ['hook-factory', 'fixture', ['.claude/scripts/hook-factory.ts']],
-    ['hook-safe-bash', 'fixture', ['.claude/scripts/safe-bash.sh']],
-    ['mission', 'skill', ['.claude/skills/mission/skill.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md']],
-    ['permissions', 'fixture', ['.claude/settings.json']],
-    ['research', 'tool', ['.claude/skills/research/skill.md']],
-    ['retro', 'skill', ['.claude/skills/retro/skill.md']],
-    ['roadmap', 'fixture', ['docs/roadmap.md']],
-    ['terminology', 'fixture', ['docs/terminology.md']],
-    ['validate', 'skill', ['.claude/skills/validate/skill.md', '.claude/agents/Validator.md']],
-    ['verify', 'skill', ['.claude/skills/verify/skill.md', '.claude/agents/Verifier.md']],
-  ] as const
-).map(([name, type, files]) => ({ name, type, files: [...files], status: name === 'archify' || name === 'codegraph' ? 'not-installed' : 'installed' }));
+/** `id step by confidence summary status note`, the columns of the mission's own decisions.md. */
+function decisions(spec: [string, string, string, Decision['confidence'], string, Decision['status'], string?][]): Decision[] {
+  return spec.map(([id, step, by, confidence, summary, status, note]) => ({ id, step, by, confidence, summary, status, note: note ?? '' }));
+}
+
+const refitDecisions = decisions([
+  ['D1', 'spec', 'orchestrator', 'HIGH', 'Four workers, serial — one context per ground', 'auto'],
+  ['D2', 'implement', 'worker', 'MEDIUM', 'Reuse readJson for the manifest rather than a second parser', 'accepted'],
+  // Long on purpose: a summary the human has to read whole is what the foot pane wraps for.
+  ['D3', 'implement', 'worker', 'LOW', 'Do not implement auth here: the contract names one endpoint and the session store already carries the flag, so a second path would be two ways of saying one thing — KISS and YAGNI', 'waiting'],
+  ['D4', 'review', 'orchestrator', 'MEDIUM', 'Triage r2: fix F1 and F3, skip F2 as cosmetic', 'overruled', 'fix F2 too, it is on the contract'],
+]);
+
+const authDecisions = decisions([
+  ['D1', 'implement', 'worker', 'HIGH', 'Rotate the refresh token on every reuse', 'accepted'],
+  ['D2', 'verify', 'verifier', 'LOW', 'Device-list paging is out of the contract, left alone', 'waiting'],
+]);
+
+const partFiles: Record<string, string[]> = {
+  archify: ['.claude/skills/archify/skill.md', '.claude/skills/archify/template.html'],
+  mission: ['.claude/skills/mission/skill.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md'],
+};
+
+const part = (name: string, type: string, description: string, status: PartRow['status'] = 'installed'): PartRow =>
+  ({ name, type, description, status, files: partFiles[name] ?? [`.claude/skills/${name}/skill.md`] });
+
+const ivyParts: PartRow[] = [
+  part('archify', 'skill', 'architecture diagrams from a typed spec, html and svg', 'not-installed'),
+  part('browse', 'tool', 'drive a real or headless browser through agent-browser'),
+  part('code-format', 'fixture', 'how code is written'),
+  part('codegraph', 'mcp', 'code graph MCP plus prompt hook, per project index', 'not-installed'),
+  part('docs-format', 'fixture', 'how agent-facing docs are written'),
+  part('hook-factory', 'fixture', 'report session events, file decisions, ring when the session waits'),
+  part('mission', 'skill', 'run a mission through its workflow, gates and triage'),
+  part('retro', 'skill', 'sweep closed missions\' retro.md into one table the human answers'),
+  part('roadmap', 'fixture', 'template docs/roadmap.md, the project\'s plain checklist'),
+  part('terminology', 'fixture', 'template docs/terminology.md for the project domain'),
+  part('validate', 'skill', 'validator gatekeeper driving the running system'),
+  part('verify', 'skill', 'verifier gatekeeper over the diff and the contract'),
+];
+
+/** The user's own parts, linked into `~/.claude/` and shared by every project. */
+const globalParts: PartRow[] = [
+  part('commit', 'skill', 'structured git commits'),
+  part('explain', 'skill', 'visual code explanations and flow diagrams'),
+  part('hook-safe-bash', 'fixture', 'block destructive commands'),
+  part('permissions', 'fixture', 'baseline tool allow list in .claude/settings.json'),
+  part('research', 'tool', 'web research via Grok', 'not-installed'),
+];
 
 /** Everything a mission needs but a fixture rarely varies. */
 function mission(m: Partial<Mission> & Pick<Mission, 'name' | 'workflow'>): Mission {
   return {
-    status: 'open', state: 'pending', attention: 'full', step: null, round: 0, session: null, branch: null, worktree: null,
-    caffeinate: false, wall: 0, tokens: { input: 0, cached: 0, output: 0 }, steps: [], deviations: 0,
+    status: 'open', state: 'pending', autonomy: 'full', archived: false, step: null, round: 0,
+    session: null, preset: null, branch: null, worktree: null, wall: 0,
+    tokens: { input: 0, cached: 0, output: 0 }, steps: [], decisions: [], deviations: [],
     ...m,
   };
 }
@@ -140,11 +168,15 @@ const projects: Project[] = [
     missions: [
       mission({
         name: 'refit', workflow: 'story', state: 'running', step: 'implement', round: 2, session: '75cb46e1',
-        branch: 'mission/refit', worktree: '../ivy-refit', caffeinate: true, wall: 14 * M, deviations: 1,
-        attention: 'light', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
-        diff: { added: 412, removed: 96 },
+        preset: 'orchestrator', branch: 'mission/refit', worktree: '../ivy-refit', wall: 14 * M,
+        deviations: [
+          'skipped research: the recovery design was already in the intent',
+          'added step polish after implement: the wrap rule landed after the spec was written',
+        ],
+        autonomy: 'partial', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
+        decisions: refitDecisions, diff: { added: 412, removed: 96 },
       }),
-      mission({ name: 'memory', workflow: 'story', status: 'stub' }),
+      mission({ name: 'memory', workflow: 'intent', status: 'stub' }),
     ],
   },
   {
@@ -161,8 +193,9 @@ const projects: Project[] = [
     missions: [
       mission({
         name: 'auth', workflow: 'fix', state: 'blocked', step: 'merge', round: 2, session: '8a9e6b42',
-        branch: 'mission/auth', wall: 2 * H + 4 * M, tokens: { input: 96_400, cached: 1_100_000, output: 22_800 },
-        diff: { added: 120, removed: 34 }, steps: authSteps,
+        preset: 'orchestrator', branch: 'mission/auth', wall: 2 * H + 4 * M, autonomy: 'partial',
+        tokens: { input: 96_400, cached: 1_100_000, output: 22_800 },
+        diff: { added: 120, removed: 34 }, steps: authSteps, decisions: authDecisions,
       }),
     ],
   },
@@ -173,8 +206,12 @@ const projects: Project[] = [
     sessions: [],
     missions: [
       mission({
-        name: 'intro', workflow: 'chore', status: 'closed', state: 'done', attention: 'light', wall: 41 * M,
+        name: 'intro', workflow: 'chore', status: 'closed', state: 'done', autonomy: 'partial', wall: 41 * M,
         tokens: { input: 44_000, cached: 820_000, output: 9_100 }, closedAt: now - 2 * D,
+      }),
+      mission({
+        name: 'seed', workflow: 'chore', status: 'closed', state: 'done', archived: true, wall: 18 * M,
+        tokens: { input: 21_000, cached: 300_000, output: 4_200 }, closedAt: now - 9 * D,
       }),
     ],
   },
@@ -199,14 +236,14 @@ Two rounds of verify on a copy change is one round too many, the second found no
 /** Oldest first: the Inbox reads like a queue, the newest arrival lands at the foot. */
 const inbox: InboxItem[] = [
   {
-    kind: 'triage', project: 'igs', origin: 'auth', label: 'triage r2', at: now - 1 * H,
-    plan: [
-      { action: 'fix', text: 'A3 session cookie survives logout — Worker, one round' },
-      { action: 'fix', text: 'A7 refresh token not rotated on reuse' },
-      { action: 'fix', text: 'A9 rate limit counts by IP, not by account' },
-      { action: 'skip', text: 'A4 password rules read oddly — copy, not behaviour' },
-      { action: 'skip', text: 'A11 device list paging — out of the contract' },
-    ],
+    kind: 'decision', project: 'ivy', origin: 'refit', label: 'decision D3', at: now - 1 * H,
+    answer: 'factory decision answer D3 accept|overrule',
+    text: 'implement · worker · LOW\nDo not implement auth here, KISS and YAGNI',
+  },
+  {
+    kind: 'decision', project: 'igs', origin: 'auth', label: 'decision D2', at: now - 22 * M,
+    answer: 'factory decision answer D2 accept|overrule',
+    text: 'verify · verifier · LOW\nDevice-list paging is out of the contract, left alone',
   },
   {
     kind: 'question', project: 'igs', origin: 'quick', label: 'asks', at: now - 8 * M,
@@ -215,8 +252,11 @@ const inbox: InboxItem[] = [
   },
   {
     kind: 'gate', project: 'igs', origin: 'auth', label: 'gate merge', at: now - 3 * M,
+    answer: 'factory gate answer merge accept|amend|reject',
     file: 'retro.md', lines: 41, body: retroBody,
   },
 ];
 
-export const snapshot: Snapshot = { projects, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto' };
+export const snapshot: Snapshot = {
+  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto',
+};

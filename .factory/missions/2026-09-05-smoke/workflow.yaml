@@ -1,5 +1,0 @@
-name: chore
-steps:
-  - grill
-  - implement: { role: worker }
-  - merge

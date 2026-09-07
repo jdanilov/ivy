@@ -9,3 +9,7 @@ recipes:
       - bun src/cli.ts status .
     run:
       - bash scripts/e2e.sh
+      # The two surfaces the CLI walk never reaches: the screen under keys, and the hook's
+      # decision paths fired the way Claude Code fires them. Both check themselves.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
+      - bun scripts/hook-inject.ts

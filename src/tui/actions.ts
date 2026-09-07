@@ -1,20 +1,20 @@
 import path from 'node:path';
 import { readdir, readFile, unlink } from 'node:fs/promises';
-import { gate } from '../commands/gate.js';
 import { install } from '../commands/install.js';
 import { removeParts } from '../core/parts.js';
-import { deviate, resolveMission, sessionLive, writeState } from '../core/mission.js';
+import { archiveMission, resolveMission, sessionLive, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { writeCaffeinate, type Caffeinate } from '../core/config.js';
-import { FACTORY_HOME } from '../core/projects.js';
+import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import type { Attention, InboxItem } from './model.js';
+import type { Autonomy } from './model.js';
 
 /**
- * What a key actually does. Every action goes through the same functions the CLI runs — `gate`,
- * `install`, `removeParts`, `openSession`, `writeState` — so the screen can never write a mission
- * a command would have written differently. Each returns the line the toast shows; a refusal
- * throws, and the caller toasts that instead.
+ * What a key actually does. Every action goes through the same functions the CLI runs —
+ * `install`, `removeParts`, `openSession`, `archiveMission` — so the screen can never write a
+ * mission a command would have written differently. Each returns the line the toast shows; a
+ * refusal throws, and the caller toasts that instead. Gates and decisions are answered in the
+ * session, never here: one answer path, and the CLI records it.
  */
 
 /** The commands talk to a human on stdout, and stdout is the screen. */
@@ -28,22 +28,12 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-// ── gates ────────────────────────────────────────────────────────────────────
-
-/** `factory gate answer <step> <verdict>` with the project as its cwd. First answer wins there. */
-export async function answerGate(project: string, item: InboxItem, verdict: string, note: string): Promise<string> {
-  const step = item.step;
-  if (!step) throw new Error(`${item.label} is not a gate`);
-  const flags = { mission: item.origin, ...(note === '' ? {} : { note }) };
-  await quiet(() => gate('answer', [step, verdict], flags, project));
-  return `${item.origin} ${step} ${verdict}${note === '' ? '' : ` — ${note}`}`;
-}
-
 // ── sessions ─────────────────────────────────────────────────────────────────
 
 /** The preset `mission open` uses with no flag: a mission's session is the Orchestrator's. */
 const PRESET = 'orchestrator';
 
+/** A mission whose tab is still live is not reopened; one whose session died gets a new tab. */
 export async function openTab(project: string, name: string): Promise<string> {
   const mission = await resolveMission(project, name);
   if (await sessionLive(mission.state.session)) return `factory-${name} is already open — switch to that tab`;
@@ -95,9 +85,9 @@ export async function applyParts(project: string, add: string[], drop: string[])
 
 // ── caffeinate ───────────────────────────────────────────────────────────────
 
-const PIDS = path.join(FACTORY_HOME, 'caffeinate');
+const PIDS = (): string => path.join(factoryHome(), 'caffeinate');
 /** Mission Control's own hold, next to the hook's one file per session. */
-const CONTROL = path.join(PIDS, 'control.pid');
+const CONTROL = (): string => path.join(PIDS(), 'control.pid');
 
 async function stop(file: string): Promise<void> {
   const pid = Number(await readFile(file, 'utf-8').catch(() => ''));
@@ -110,7 +100,7 @@ async function stop(file: string): Promise<void> {
 }
 
 async function start(): Promise<void> {
-  const pid = Number(await readFile(CONTROL, 'utf-8').catch(() => ''));
+  const pid = Number(await readFile(CONTROL(), 'utf-8').catch(() => ''));
   try {
     if (pid > 0 && process.kill(pid, 0)) return;
   } catch {
@@ -120,7 +110,7 @@ async function start(): Promise<void> {
   const proc = Bun.spawn(['/bin/sh', '-c', 'nohup caffeinate -i >/dev/null 2>&1 & printf %s "$!"'], { stdout: 'pipe', stderr: 'ignore' });
   const spawned = (await new Response(proc.stdout).text()).trim();
   await proc.exited;
-  if (spawned !== '') await Bun.write(CONTROL, spawned);
+  if (spawned !== '') await Bun.write(CONTROL(), spawned);
 }
 
 /**
@@ -131,17 +121,20 @@ async function start(): Promise<void> {
 export async function setCaffeinate(mode: Caffeinate): Promise<string> {
   await writeCaffeinate(mode);
   if (mode === 'on') await start();
-  else if (mode === 'auto') await stop(CONTROL);
-  else for (const name of await readdir(PIDS).catch(() => [])) await stop(path.join(PIDS, name));
+  else if (mode === 'auto') await stop(CONTROL());
+  else for (const name of await readdir(PIDS()).catch(() => [])) await stop(path.join(PIDS(), name));
   return `caffeinate ${mode.toUpperCase()}`;
 }
 
-// ── attention ────────────────────────────────────────────────────────────────
+// ── missions ─────────────────────────────────────────────────────────────────
 
-export async function setAttention(project: string, name: string, attention: Attention): Promise<string> {
-  const mission = await resolveMission(project, name);
-  mission.state.attention = attention;
-  deviate(mission.state, `attention set to ${attention}`, 'set from Mission Control');
-  await writeState(mission.dir, mission.state);
-  return `${name} attention ${attention}`;
+export async function setAutonomy(project: string, name: string, autonomy: Autonomy): Promise<string> {
+  await writeAutonomy(project, name, autonomy, 'set from Mission Control');
+  return `${name} autonomy ${autonomy}`;
+}
+
+/** A rename between `.factory/missions/` and `.factory/archive/`; the closed-only rule is the core's. */
+export async function archive(project: string, name: string, back: boolean): Promise<string> {
+  const log = await archiveMission(project, name, back);
+  return log.length > 0 ? log.join(' · ') : `${name} is already ${back ? 'in missions' : 'archived'}`;
 }

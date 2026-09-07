@@ -20,6 +20,7 @@ to both surfaces so they read as one product. Terse-visual vocabulary: `● enti
 | error           | `#cc5555` | 167      | failed, conflict, extrapolated (absent in shots)  |
 | selected row bg | `#b8b8b8` | 251      | inverted row background on focus                  |
 | selected row fg | `#141414` | 233      | text on an inverted row                           |
+| agent blue      | `#6b8fd9` | 68       | agent work: a step a sub-agent runs                |
 
 Sampled from solid fills (progress bar, orange dot) where anti-aliasing is negligible; small text
 undershoots these values on screen but the hierarchy holds.
@@ -60,20 +61,81 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 row 0        blank
 row 1        ⌬ FACTORY  <project or path>                        caffeinate AUTO [ON]
 row 2        ───────────────────────────────────────────────────────────────────────
-row 3        status: mission bar or project summary, or the toast that replaces it
+row 3        status: mission bar or project bar, or the toast that replaces it
 row 4        ───────────────────────────────────────────────────────────────────────
              PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | PARTS (60%)
-             inbox, projects,        │  a list above a detail block; the detail of
-             missions, sessions      │  a gate ends in the answer row
+             inbox, Global,          │  a list above a detail block; a gate and a
+             projects, missions,     │  decision each end in the command that
+             sessions                │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             ACTIVITY  <subject>     one third of the body, all of it on F
+             DECISIONS  ACTIVITY     one third of the body, all of it on F
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Open  O Tab  X Kill  C Caffeinate  Z Closed  F Activity  ? Help  Q Quit
+             ↑↓ Select  ↵ Open  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  A Activity  F Full  ? Help  Q Quit
 ```
 
+- Two blank columns down the left of every row, none on the right and none under the key bar: the
+  screen breathes on the side the eye starts from and fills the rest.
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
   Two cells of padding on the left pane keep its right-aligned tokens off the divider.
-- Activity keeps a third of the body, never fewer than 5 rows; `F` gives it all of it.
+- `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
+  every project. Archived missions are off the list until `Z` asks for them.
+- The foot keeps a third of the body, never fewer than 5 rows; `F` gives it all of it. Its header
+  is the two tabs, the drawn one bright: DECISIONS by default, ACTIVITY on `A`, `D` back.
+
+### The status bar
+
+A mission is its state, a fixed eight-column word so the bar behind it never moves, then a
+progress bar of its done steps, the fraction, and the metrics right. `PENDING` takes a warning
+circle: a mission nobody has started is waiting on the human, where a pending *step* is only next
+in line.
+
+A project — or the Inbox, over every project — is one bar over its missions instead of the words
+alone: closed green, open amber, stub grey, one segment each. The counts stay behind it as the
+dim legend that names the colours.
+
+### The Inbox
+
+Every open gate, waiting decision and waiting question across all projects, keyed
+`project/origin/label`. Each names the session command that answers it; a question names the tab
+that owns it. A key the last snapshot did not have rings the terminal bell and Warp's own
+`777;notify`. Messages, the right pane over it, shows the selected item's body and that command.
+
+### The foot: DECISIONS
+
+One row per decision of whatever the left column has selected — a mission, a project, or every
+project on the Inbox row — newest last, the mission column present only when more than one is in
+scope. A decision is a fork an agent took; the screen never answers one.
+
+ACTIVITY is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`,
+`Tool` — plus the hook's `Stop`, newest last.
+
+A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
+filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict
+already says whether anyone was asked. Nothing is cut: a summary too long for the line wraps under
+its own column, so a row copies whole into the session that answers it.
+
+```
+✓ D2   Reuse readJson for the manifest rather than a second parser
+? D3   Do not implement auth here: the contract names one endpoint and the session store already
+       carries the flag — KISS and YAGNI
+✗ D4   Triage r2: fix F1 and F3, skip F2 as cosmetic — fix F2 too, it is on the contract
+✓ D1   Four workers, serial — one context per ground
+```
+
+| Status      | Glyph | Colour        | Row                                        |
+|-------------|-------|---------------|---------------------------------------------|
+| `waiting`   | `?`   | error red     | bright: the only one still asking something |
+| `accepted`  | `✓`   | success olive | bright                                      |
+| `overruled` | `✗`   | error red     | bright, the note follows the summary        |
+| `auto`      | `✓`   | dim label     | dim: settled by the dial, not by a human    |
+
+PARTS wraps its descriptions the same way, under the description column. A graph row in MISSION
+ends in two right-aligned columns, tokens then wall time, so the numbers read down the pane, and a
+step the mission looped back to carries a dim `×N` after its name. Under the facts, a DEVIATIONS
+sub-panel gives each entry its own wrapped line, and is absent at zero. A session under a project
+is named `session · <preset>`, never by its preset alone, and the `no missions` hint is absent
+while a session is standing there.
+
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.
 - The key bar sits on the last row and lists the focused pane's keys; `?` is the first pair
@@ -81,40 +143,65 @@ last row     ──────────────────────�
 - No box carries a background: every cell the screen does not colour keeps the terminal's own.
   The one exception is the inverted selected row; the help panel paints nothing either.
 
-### Step colours by meaning
+### Step colours by role
 
 A step's name is coloured by what kind of work it is, its glyph by where it is in its life, so one
-row carries both without a legend. Kind comes from the workflow: role `worker` or `investigator`
-is agent work, `verify`, `validate` and `accept` are gatekeeping, `grill` and `intent` are the
-human's, everything left is technical.
+row carries both without a legend. The kind comes from `stepRole` in `src/core/workflow.ts` — the
+one place a runner is named — so the graph, `mission status` and a spawn can never disagree. A
+parallel group takes its members' kind; a gate the human answers is the human's own; the three
+step names a closed mission's workflow copy still carries keep the colours they had.
 
-| Kind        | Colour    | Steps                                   |
-|-------------|-----------|------------------------------------------|
-| human       | `#a8a968` | grill, intent — the gates the human owns |
-| gatekeeper  | `#d7af5f` | accept, verify, validate                 |
-| agent       | `#6b8fd9` | implement, research, any worker step     |
-| technical   | `#6e6e6e` | spec, condense, merge                    |
+| Kind        | Colour    | Role                       | Steps                            |
+|-------------|-----------|----------------------------|-----------------------------------|
+| human       | `#a8a968` | `gate: human`              | intent, merge — and old `grill`   |
+| gatekeeper  | `#d7af5f` | verifier, validator        | verify, validate, review — `accept` |
+| agent       | `#6b8fd9` | worker, investigator       | implement, research               |
+| technical   | `#6e6e6e` | orchestrator               | spec, an ungated merge — `condense` |
 
-Agent prompt colours follow the same reading: Worker blue, Investigator cyan, Verifier and
-Validator yellow, Summarizer magenta because Claude Code has no grey.
+Each graph row names its runner beside the step, and its model where the runner is not this
+session: `worker · opus`, `verifier · opus`, a bare `orchestrator`. Agent prompt colours follow
+the same reading: Worker blue, Investigator cyan, Verifier and Validator yellow, Summarizer
+magenta because Claude Code has no grey.
 
 ### Keys
 
-| Key      | Pane            | Does                                                         |
-|----------|------------------|---------------------------------------------------------------|
-| `↑↓`     | any              | move the selection                                            |
-| `→` `↵`  | left             | enter the right pane; in Messages `←→` pick the answer         |
-| `←` `esc`| right            | back to the left pane                                         |
-| `↵`      | Messages         | record the answer; amend and reject take a one-line note first |
-| `Space` `↵` `Y` | Parts     | toggle a part, apply the set, confirm                          |
-| `O`      | mission row      | open the mission's Warp tab, or name the tab that is live      |
-| `X`      | mission, session | SIGTERM the session's process, SIGKILL on a second press       |
-| `T`      | mission row      | attention full → light → unattended                            |
-| `C`      | any              | caffeinate auto → on → off                                     |
-| `Z`      | left             | hide closed missions                                           |
-| `F`      | any              | Activity at full height; header and status bar hidden          |
-| `↑↓`     | full activity    | scroll the log; `↵`, `F` or `esc` restore the columns          |
-| `?` `Q`  | any              | help panel, quit                                               |
+One key to a line, in the panel and here: a line listing three keys is read as one thing three
+keys do, and none of these three do the same thing.
+
+| Key     | Pane             | Does                                                            |
+|---------|------------------|------------------------------------------------------------------|
+| `↑↓`    | any              | move the selection; scroll the foot while it is full             |
+| `→`     | left             | enter the right pane                                             |
+| `→`     | MISSION          | turn the autonomy dial, the pane's one focusable value           |
+| `↵`     | any              | open the selection, or apply what Parts has pending              |
+| `←`     | right            | back to the left pane                                            |
+| `esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
+| `Space` | Parts            | toggle a part                                                    |
+| `Y`     | Parts            | confirm the apply                                                |
+| `N`     | Parts            | cancel it                                                        |
+| `R`     | Parts            | reset the toggles                                                |
+| `O`     | mission row      | open the mission's Warp tab; a bound mission is refused          |
+| `X`     | mission, session | SIGTERM the session's process, SIGKILL on a second press         |
+| `T`     | mission, MISSION | autonomy full → partial → none                                   |
+| `H`     | mission row      | archive a closed mission, or bring an archived one back          |
+| `Z`     | left             | show the archived missions                                       |
+| `C`     | any              | caffeinate auto → on → off                                       |
+| `D`     | any              | the foot draws DECISIONS                                         |
+| `A`     | any              | the foot draws ACTIVITY                                          |
+| `F`     | any              | the foot at full height; header and status bar hidden            |
+| `?`     | any              | the KEYS panel                                                   |
+| `Q`     | any              | quit                                                             |
+
+The key bar is built from the kind of row selected, so it never offers a key whose whole reply
+would be a toast: a mission row answers `O X T H`, a session row `X`, a project, the Inbox and
+`Global` none of them.
+
+The panel is KEYS, then TERMS — one row per step kind in its own colour, then the words the screen
+uses — then HOW FACTORY WORKS. The primer is what a short terminal loses: all of it or none, never
+a sentence cut in half.
+
+Messages answers nothing: a gate row and a decision row each carry the command that answers them
+in the session that raised them, and `←`, `→` and `↵` on one write nothing.
 
 ## Glyphs
 
@@ -142,7 +229,6 @@ Validator yellow, Summarizer magenta because Claude Code has no grey.
 | pending          | `○`   | dim label     | `pending`            |
 | running          | `●`   | accent orange | `RUNNING`, `running`  |
 | done             | `✓`   | success olive | `done`, `Success`     |
-| failed           | `✗`   | error red     | `failed`              |
 | blocked          | `⊘`   | warning amber | `blocked`, `no session` |
 | selected (focus) | none, inverted background | selected row bg/fg | (whole row inverts) |
 | waiting-on-human | `⊘`   | warning amber | `gate open`           |
@@ -170,7 +256,7 @@ Validator yellow, Summarizer magenta because Claude Code has no grey.
 ## CLI rules
 
 - `factory status`: unchanged 3-space `I` indent and `statusSymbol`/`statusColor` from `theme.ts`.
-  Add a Missions block using the same row-state glyphs: `●` running, `○` pending, `✓` done, `✗` failed,
+  Add a Missions block using the same row-state glyphs: `●` running, `○` pending, `✓` done,
   `⊘` blocked. A mission with no live session prints `no session` in dim label color.
 - `factory mission status`: header row is the brand glyph, mission name, and workflow name left,
   wall time, step, and round right, thin rule below. Steps print as a vertical list, not two panes,
@@ -196,4 +282,4 @@ Validator yellow, Summarizer magenta because Claude Code has no grey.
 | Progress Log    | Events                  | `~/.factory/events/<session>.jsonl`, rendered as a log pane   |
 | Features pane   | Steps pane              | the right-hand checklist of the workflow                      |
 | Workers pane    | Sessions                | the roster of sub-agent runs for the mission                  |
-| RUNNING/Success/Failed | running/done/failed | row-state words, see Row states                              |
+| RUNNING/Success/Failed | running/done/blocked | row-state words, see Row states; the Factory has no failed state |

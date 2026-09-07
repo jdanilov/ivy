@@ -4,8 +4,9 @@
  *
  * Appends one line to ~/.factory/events/<session>.jsonl, binds an unclaimed mission to the session
  * that shows up, keeps the Mac awake as ~/.factory/config.yaml says to, rings when the
- * session is waiting on the human, injects mission focus before a compaction, and saves a
- * sub-agent's final message as the step handoff.
+ * session is waiting on the human, injects mission focus before a compaction, saves a sub-agent's
+ * final message as the step handoff, files the decisions that message carries, and tells the
+ * Orchestrator which of them wait on the human.
  *
  * It never fails a hook: every step is guarded and the process always exits 0.
  */
@@ -40,6 +41,7 @@ interface Bound {
   step: string;
   session: string | null;
   round: number;
+  autonomy: string;
   gates: Record<string, { status?: string; file?: string }>;
 }
 
@@ -54,7 +56,10 @@ async function readMission(dir: string): Promise<Bound | null> {
   const state = await Bun.file(path.join(dir, 'state.json')).json().catch(() => null);
   if (!state) return null;
   const name = state.name ?? path.basename(dir).replace(/^\d{4}-\d{2}-\d{2}-/, '');
-  return { dir, name, title: state.title ?? name, step: state.step ?? '', session: state.session ?? null, round: state.round ?? 0, gates: state.gates ?? {} };
+  return {
+    dir, name, title: state.title ?? name, step: state.step ?? '', session: state.session ?? null,
+    round: state.round ?? 0, autonomy: state.autonomy ?? 'partial', gates: state.gates ?? {},
+  };
 }
 
 /** Walk up from the session's cwd looking for the checkout that holds `.factory/`. */
@@ -223,12 +228,18 @@ async function freeName(dir: string, base: string): Promise<string> {
   }
 }
 
-async function saveHandoff(mission: Bound, input: HookInput): Promise<string | null> {
-  if (!input.agent_transcript_path) return null;
+/** The sub-agent's last word, from the hook when it carries one, else from its transcript. */
+async function finalText(input: HookInput): Promise<string> {
   const final = (input.last_assistant_message ?? '').trim();
-  const text = final !== '' ? final : (await lastAssistantText(input.agent_transcript_path)).trim();
+  if (final !== '') return final;
+  if (!input.agent_transcript_path) return '';
+  return (await lastAssistantText(input.agent_transcript_path)).trim();
+}
+
+async function saveHandoff(mission: Bound, input: HookInput, text: string): Promise<void> {
+  if (!input.agent_transcript_path) return;
   // A sign-off is not a handoff: the template alone runs longer than this.
-  if (mission.step === '' || text.split('\n').length < 5) return null;
+  if (mission.step === '' || text.split('\n').length < 5) return;
 
   // Every agent gets its own file, so a Worker and a gatekeeper in one step never collide.
   const agent = (input.agent_type ?? '').trim().replace(/[^A-Za-z0-9_-]+/g, '-');
@@ -237,7 +248,89 @@ async function saveHandoff(mission: Bound, input: HookInput): Promise<string | n
   await mkdir(dir, { recursive: true });
   const file = await freeName(dir, `${mission.step}${agent === '' ? '' : `-${agent}`}${round}`);
   await writeFile(file, `${text}\n`);
-  return file;
+}
+
+// ── decisions ────────────────────────────────────────────────────────────────
+
+/**
+ * `decisions.md` is written here rather than through `factory`: a hook never fails, and a binary
+ * missing from PATH would lose a decision silently. The format is the one `src/core/decision.ts`
+ * reads back, so both writers append to the same table.
+ */
+const DECISIONS_HEADER = [
+  '# Decisions',
+  '',
+  '| id | step | by | confidence | summary | status | note |',
+  '|----|------|----|------------|---------|--------|------|',
+].join('\n');
+
+const CONFIDENCE = /^-\s*(HIGH|MEDIUM|LOW)\s*:\s*(.+)$/;
+
+/** Rows are the lines whose first cell starts with `D`; everything else in the file is furniture. */
+function decisionRows(text: string): string[][] {
+  const rows: string[][] = [];
+  for (const line of text.split('\n')) {
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length >= 6 && cells[0]!.startsWith('D')) rows.push(cells);
+  }
+  return rows;
+}
+
+/** The dial: `full` decides everything itself, `partial` hands over LOW, `none` hands over all. */
+const waits = (autonomy: string, confidence: string): boolean =>
+  autonomy === 'full' ? false : autonomy === 'none' ? true : confidence === 'LOW';
+
+/** The handoff's `Decisions:` block: its lines until a blank one or the next `Word:` header. */
+function parseDecisions(text: string): Array<{ confidence: string; summary: string }> {
+  const found: Array<{ confidence: string; summary: string }> = [];
+  let inside = false;
+
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!inside) {
+      inside = /^Decisions:/.test(line);
+      continue;
+    }
+    if (line === '') break;
+    const hit = CONFIDENCE.exec(line);
+    if (hit) found.push({ confidence: hit[1]!, summary: hit[2]! });
+    else if (/^[A-Za-z][A-Za-z ]*:/.test(line)) break;
+  }
+  return found;
+}
+
+/** Appends verbatim: rows already on disk are never reparsed into a rewrite. */
+async function fileDecisions(mission: Bound, input: HookInput, text: string): Promise<void> {
+  const found = parseDecisions(text);
+  if (found.length === 0 || mission.step === '') return;
+
+  const target = path.join(mission.dir, 'decisions.md');
+  const existing = await readFile(target, 'utf-8').catch(() => '');
+  const rows = decisionRows(existing);
+  let number = rows.reduce((max, cells) => Math.max(max, Number(cells[0]!.slice(1)) || 0), 0) + 1;
+  const by = ((input.agent_type ?? '').trim().toLowerCase() || 'agent').replace(/\s+/g, '-');
+
+  const lines = found.map(({ confidence, summary }) => {
+    const status = waits(mission.autonomy, confidence) ? 'waiting' : 'auto';
+    const one = summary.replaceAll('|', '/').replace(/\s+/g, ' ').trim();
+    return `| D${number++} | ${mission.step} | ${by} | ${confidence} | ${one} | ${status} |  |`;
+  });
+
+  const body = [DECISIONS_HEADER, ...rows.map((cells) => `| ${cells.join(' | ')} |`), ...lines].join('\n');
+  const temp = path.join(mission.dir, `.decisions.md.${process.pid}`);
+  await writeFile(temp, `${body}\n`);
+  await rename(temp, target);
+}
+
+/** What the Orchestrator is told the moment a decision needs the human, or '' when none does. */
+async function waitingText(mission: Bound): Promise<string> {
+  const text = await readFile(path.join(mission.dir, 'decisions.md'), 'utf-8').catch(() => '');
+  const waiting = decisionRows(text).filter((cells) => cells[5] === 'waiting');
+  if (waiting.length === 0) return '';
+
+  const list = waiting.map((cells) => `${cells[0]} ${cells[3]} ${cells[4]}`).join('; ');
+  return `Decisions waiting on the human (autonomy ${mission.autonomy}): ${list}. Surface each in the chat, `
+    + 'record with factory decision answer <id> accept|overrule --note N, then continue.';
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -282,17 +375,20 @@ async function main(): Promise<void> {
   const cwd = input.cwd ?? process.cwd();
   const mission = await bind(cwd, session).catch(() => null);
 
-  await mkdir(EVENTS, { recursive: true });
-  const line = {
-    at: new Date().toISOString(),
-    event,
-    session,
-    cwd,
-    mission: mission?.name ?? null,
-    step: mission?.step ?? null,
-    detail: detailOf(event, input),
-  };
-  await appendFile(path.join(EVENTS, `${session}.jsonl`), `${JSON.stringify(line)}\n`);
+  // PostToolUse fires on every Agent result: logging it would drown the bus for one line of context.
+  if (event !== 'PostToolUse') {
+    await mkdir(EVENTS, { recursive: true });
+    const line = {
+      at: new Date().toISOString(),
+      event,
+      session,
+      cwd,
+      mission: mission?.name ?? null,
+      step: mission?.step ?? null,
+      detail: detailOf(event, input),
+    };
+    await appendFile(path.join(EVENTS, `${session}.jsonl`), `${JSON.stringify(line)}\n`);
+  }
 
   // Sound is about the human at the keyboard, not about a mission: every session rings.
   await ring(event, input, session).catch(() => {});
@@ -301,12 +397,26 @@ async function main(): Promise<void> {
 
   if (event === 'SessionStart' || event === 'UserPromptSubmit') await adoptSession(mission, session);
   if (event === 'PreCompact') console.log(focus(mission));
-  if (event === 'SubagentStop') await saveHandoff(mission, input);
+  if (event === 'SubagentStop') {
+    const text = await finalText(input);
+    await saveHandoff(mission, input, text);
+    await fileDecisions(mission, input, text);
+  }
+  if (event === 'PostToolUse' || event === 'UserPromptSubmit') await inject(event, mission);
 
   const mode = await caffeinateMode();
   if (mode === 'off') return;
   if (event === (mode === 'on' ? 'SessionStart' : 'UserPromptSubmit')) await caffeinateStart(session);
   if (event === 'Stop' && mode === 'auto') await caffeinateStop(session);
+}
+
+/** UserPromptSubmit takes stdout as context; a tool hook has to name the field it fills. */
+async function inject(event: string, mission: Bound): Promise<void> {
+  const text = await waitingText(mission);
+  if (text === '') return;
+  console.log(event === 'UserPromptSubmit'
+    ? text
+    : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: text } }));
 }
 
 await main().catch(() => {});

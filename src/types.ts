@@ -58,12 +58,17 @@ export interface Recipes {
 
 export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 
+/** Where a part installs: into a project's `.claude/`, or into the user's own `~/.claude/`. */
+export type Scope = 'project' | 'global';
+
 /** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
 export type Settings = Record<string, unknown>;
 
 export interface Part {
   name: string;
   type: PartType;
+  /** `global` parts belong to the user, not a project: no snippet, no recipes, no project root. */
+  scope: Scope;
   description: string;
   default: boolean;        // enabled by default in install menu
   files: PartFile[];
@@ -126,7 +131,7 @@ export interface WorkflowStep {
   role?: string;
   gate?: 'human' | 'orchestrator';
   parallel?: string[];
-  loop?: { back: string; max: number; human_from: number };
+  loop?: { back: string; max: number };
 }
 
 export interface Workflow {
@@ -134,7 +139,8 @@ export interface Workflow {
   steps: WorkflowStep[];
 }
 
-export type Attention = 'full' | 'light' | 'unattended';
+/** How much of what the mission decides waits on the human. Per mission, set at shape time. */
+export type Autonomy = 'full' | 'partial' | 'none';
 export type StepStatus = 'pending' | 'running' | 'done' | 'skipped';
 export type GateAnswer = 'accept' | 'amend' | 'reject';
 
@@ -148,6 +154,8 @@ export interface GateState {
 
 export interface StepState {
   status: StepStatus;
+  /** Times `step start` has run it. A loop resets the status and keeps the count. */
+  runs?: number;
   startedAt?: string;
   endedAt?: string;
   reason?: string;
@@ -163,7 +171,7 @@ export interface MissionState {
   name: string;
   title: string;
   workflow: string;
-  attention: Attention;
+  autonomy: Autonomy;
   /** A stub has intent and no branch: `mission open` promotes it. */
   status: 'stub' | 'open' | 'closed';
   step: string;

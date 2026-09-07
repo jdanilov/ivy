@@ -61,15 +61,14 @@ export function statusSymbol(status: string): string {
   }
 }
 
-// Row states from docs/design.md: pending ○, running ●, done ✓, failed ✗, blocked ⊘.
+// Row states from docs/design.md: pending ○, running ●, done ✓, blocked ⊘. A step never fails —
+// it is done, skipped or waiting on someone — so there is no ✗ row for a caller to reach.
 export function rowSymbol(state: string): string {
   switch (state) {
     case 'running':
       return symbols.installed;
     case 'done':
       return symbols.check;
-    case 'failed':
-      return symbols.cross;
     case 'blocked':
       return '⊘';
     default:
@@ -83,8 +82,6 @@ export function rowColor(state: string): string {
       return colors.cyan;
     case 'done':
       return colors.green;
-    case 'failed':
-      return colors.red;
     case 'blocked':
       return colors.yellow;
     default:

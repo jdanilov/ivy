@@ -1,7 +1,7 @@
 ---
 name: commit
 model: sonnet
-description: ♻ Structured git commits with sea-themed emojis
+description: ⌬ Structured git commits with sea-themed emojis
 ---
 
 # Commit changes via Sub-Agent

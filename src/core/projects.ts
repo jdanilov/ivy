@@ -1,32 +1,42 @@
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { lstat, mkdir, unlink } from 'node:fs/promises';
+import type { Scope } from '../types.js';
 import { FACTORY_ROOT } from './registry.js';
 import { I, colors } from '../ui/theme.js';
 
-export const FACTORY_HOME = path.join(homedir(), '.factory');
+/**
+ * HOME read at call time, never at import: Bun fixes `os.homedir()` when the process starts, so a
+ * scratch HOME set by a test or a spawned run would otherwise reach the real one anyway.
+ */
+export const home = (): string => process.env.HOME ?? homedir();
 
-const PROJECTS_FILE = path.join(FACTORY_HOME, 'projects');
+export const factoryHome = (): string => path.join(home(), '.factory');
+
+/** The home dir is the global scope, every other target is a project. One rule, read everywhere. */
+export const scopeOf = (targetDir: string): Scope => (path.resolve(targetDir) === home() ? 'global' : 'project');
+
+const projectsFile = (): string => path.join(factoryHome(), 'projects');
 const SEED_FILE = path.join(FACTORY_ROOT, '.projects');
 const DROID_FILES = ['auth.v2.key', 'droids'];
 
 let ready: Promise<boolean> | null = null;
 
 /** Create ~/.factory unless Droid still owns it. Seeds the projects file from the repo once. */
-function home(): Promise<boolean> {
+function ownHome(): Promise<boolean> {
   ready ??= (async () => {
     for (const name of DROID_FILES) {
-      if (await lstat(path.join(FACTORY_HOME, name)).catch(() => null)) {
-        console.log(`${I}${colors.yellow}${FACTORY_HOME}/${name} belongs to Droid — move it aside, the Factory owns ${FACTORY_HOME} now.${colors.reset}`);
+      if (await lstat(path.join(factoryHome(), name)).catch(() => null)) {
+        console.log(`${I}${colors.yellow}${factoryHome()}/${name} belongs to Droid — move it aside, the Factory owns ${factoryHome()} now.${colors.reset}`);
         return false;
       }
     }
 
-    await mkdir(FACTORY_HOME, { recursive: true });
+    await mkdir(factoryHome(), { recursive: true });
 
     const seed = Bun.file(SEED_FILE);
-    if (!(await Bun.file(PROJECTS_FILE).exists()) && (await seed.exists())) {
-      await Bun.write(PROJECTS_FILE, await seed.text());
+    if (!(await Bun.file(projectsFile()).exists()) && (await seed.exists())) {
+      await Bun.write(projectsFile(), await seed.text());
     }
     await unlink(SEED_FILE).catch(() => {});
 
@@ -36,8 +46,8 @@ function home(): Promise<boolean> {
 }
 
 export async function loadProjects(): Promise<string[]> {
-  if (!(await home())) return [];
-  const file = Bun.file(PROJECTS_FILE);
+  if (!(await ownHome())) return [];
+  const file = Bun.file(projectsFile());
   if (!(await file.exists())) return [];
   const text = await file.text();
   return text.split('\n').filter((l) => l.trim() !== '');
@@ -53,11 +63,11 @@ export async function existingProjects(): Promise<string[]> {
 }
 
 export async function saveProject(projectPath: string): Promise<void> {
-  if (!(await home())) return;
+  if (!(await ownHome())) return;
   const projects = await loadProjects();
   const abs = path.resolve(projectPath);
   const idx = projects.indexOf(abs);
   if (idx !== -1) projects.splice(idx, 1);
   projects.unshift(abs);
-  await Bun.write(PROJECTS_FILE, projects.join('\n') + '\n');
+  await Bun.write(projectsFile(), projects.join('\n') + '\n');
 }

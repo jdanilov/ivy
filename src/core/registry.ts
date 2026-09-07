@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { readdir } from 'node:fs/promises';
-import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType, Recipes, Snippet } from '../types.js';
+import { readdir, stat } from 'node:fs/promises';
+import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType, Recipes, Scope, Snippet } from '../types.js';
 import { HOOK_EVENTS } from '../types.js';
 
 // Resolve FACTORY_ROOT from this file's location: src/core/ -> project root
@@ -21,7 +21,7 @@ export async function loadParts(): Promise<Part[]> {
   for (const entry of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
     const file = Bun.file(path.join(dir, entry.name, 'part.yaml'));
     if (!(await file.exists())) continue;
-    parts.push(parsePart(entry.name, Bun.YAML.parse(await file.text())));
+    parts.push(await parsePart(entry.name, Bun.YAML.parse(await file.text())));
   }
 
   for (const part of parts) {
@@ -51,7 +51,19 @@ export function dependants(parts: Part[], name: string, leaving: string[]): stri
   return parts.filter((p) => !leaving.includes(p.name) && (p.requires ?? []).includes(name)).map((p) => p.name);
 }
 
-function parsePart(name: string, raw: unknown): Part {
+/** Every file under a directory source, in name order, paths relative to it. */
+async function walk(dir: string, prefix = ''): Promise<string[]> {
+  const found: string[] = [];
+  const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    const rel = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) found.push(...(await walk(path.join(dir, entry.name), rel)));
+    else found.push(rel);
+  }
+  return found;
+}
+
+async function parsePart(name: string, raw: unknown): Promise<Part> {
   const fail: (msg: string) => never = (msg) => {
     throw new Error(`parts/${name}/part.yaml: ${msg}`);
   };
@@ -64,18 +76,31 @@ function parsePart(name: string, raw: unknown): Part {
   if (typeof raw.default !== 'boolean') fail('default must be a boolean');
   if (!Array.isArray(raw.files)) fail('files must be a list');
 
-  const files = (raw.files as unknown[]).map((f): PartFile => {
-    if (!isRecord(f) || typeof f.source !== 'string') return fail('every files entry needs a source');
+  const scope = (raw.scope ?? 'project') as Scope;
+  if (scope !== 'project' && scope !== 'global') fail('scope must be project or global');
+  // Nothing global has a project root: no agent file to write a line in, no directory to run in.
+  if (scope === 'global' && (raw.snippet !== undefined || raw.recipes !== undefined)) fail('a global part can have neither a snippet nor recipes');
+
+  const files: PartFile[] = [];
+  for (const f of raw.files as unknown[]) {
+    if (!isRecord(f) || typeof f.source !== 'string') fail('every files entry needs a source');
     if (f.target !== undefined && typeof f.target !== 'string') fail(`files entry "${f.source}" has a non-string target`);
     if (f.skipIfExists !== undefined && typeof f.skipIfExists !== 'boolean') fail(`files entry "${f.source}" has a non-boolean skipIfExists`);
-    return {
-      source: path.join('parts', name, f.source),
-      target: (f.target as string | undefined) ?? defaultTarget(name, type, f.source) ?? fail(`files entry "${f.source}" needs a target`),
-      ...(f.skipIfExists === true ? { skipIfExists: true } : {}),
-    };
-  });
 
-  const part: Part = { name, type, description: raw.description, default: raw.default, files };
+    const source = f.source.replace(/\/$/, '');
+    const target = (f.target as string | undefined) ?? defaultTarget(name, type, source) ?? fail(`files entry "${f.source}" needs a target`);
+    const extra = f.skipIfExists === true ? { skipIfExists: true as const } : {};
+    const dir = path.join(FACTORY_ROOT, 'parts', name, source);
+
+    // A directory source is a shorthand for every file under it, kept expanded from here on.
+    if (await stat(dir).then((st) => st.isDirectory(), () => false)) {
+      for (const rel of await walk(dir)) files.push({ source: path.join('parts', name, source, rel), target: path.join(target, rel), ...extra });
+      continue;
+    }
+    files.push({ source: path.join('parts', name, source), target, ...extra });
+  }
+
+  const part: Part = { name, type, scope, description: raw.description, default: raw.default, files };
 
   if (raw.hooks !== undefined) {
     if (!Array.isArray(raw.hooks)) fail('hooks must be a list');

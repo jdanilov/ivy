@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { homedir } from 'node:os';
 import { stat } from 'node:fs/promises';
 import type { Activity } from './model.js';
+import { home } from '../core/projects.js';
 
 /**
  * Claude Code's live transcript, one JSON object per line. The screen reads the tail only: a byte
@@ -11,7 +11,7 @@ import type { Activity } from './model.js';
 
 /** `~/.claude/projects/<cwd with every / turned into ->/<session>.jsonl`. */
 export function transcriptPath(cwd: string, session: string): string {
-  return path.join(homedir(), '.claude', 'projects', cwd.replaceAll('/', '-'), `${session}.jsonl`);
+  return path.join(home(), '.claude', 'projects', cwd.replaceAll('/', '-'), `${session}.jsonl`);
 }
 
 export interface Usage { at: number; input: number; cached: number; output: number }
@@ -19,7 +19,9 @@ export interface Usage { at: number; input: number; cached: number; output: numb
 export interface Tail {
   activity: Activity[];
   usage: Usage[];
-  /** Last assistant text block: what the session is waiting on the human with. */
+  /** The last text block of an **assistant** record, never a user one: a skill preamble is
+   *  injected as user text and would otherwise read as the session's last word. It is the last
+   *  text seen, not the last of one turn — the fallback for a Stop that recorded no message. */
   text: string;
   offset: number;
   /** Message ids already counted: one API response is written as one line per content block. */

@@ -8,3 +8,5 @@ dist
 .factory/claim
 .factory/inbox/
 .codegraph/
+.factory/missions/
+.factory/archive/

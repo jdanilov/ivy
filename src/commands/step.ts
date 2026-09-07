@@ -1,8 +1,9 @@
 import path from 'node:path';
-import type { MissionState, Workflow } from '../types.js';
+import type { MissionState, StepState, Workflow } from '../types.js';
 import { str, type Flags } from '../core/args.js';
-import { Refusal, deviate, missionWorkflow, notStub, now, resolveMission, writeState } from '../core/mission.js';
+import { Refusal, deviate, missionWorkflow, notStub, now, pointAtInserted, resolveMission, writeState } from '../core/mission.js';
 import { allStepNames, dumpWorkflow, findStep, nextStep, ownerStep, validate } from '../core/workflow.js';
+import { waitingDecisions } from '../core/decision.js';
 import { field } from '../ui/format.js';
 import { I, colors, duration, rowColor, rowSymbol } from '../ui/theme.js';
 
@@ -17,6 +18,7 @@ export async function step(sub: string, args: string[], flags: Flags, cwd: strin
 
   switch (sub) {
     case 'start':
+      await noneWaiting(mission.dir);
       start(state, workflow, name);
       break;
     case 'done':
@@ -37,6 +39,14 @@ export async function step(sub: string, args: string[], flags: Flags, cwd: strin
 
   await writeState(mission.dir, state);
   print(state, name);
+}
+
+/** Half the enforcement of the dial: no step runs while the human still owes an answer. */
+async function noneWaiting(dir: string): Promise<void> {
+  const ids = (await waitingDecisions(dir)).map((d) => d.id);
+  if (ids.length === 0) return;
+  const verb = ids.length === 1 ? 'decision waits' : 'decisions wait';
+  throw new Refusal(`${ids.length} ${verb} on the human: ${ids.join(', ')} — answer them with: factory decision answer ${ids[0]} accept|overrule`);
 }
 
 function known(workflow: Workflow, name: string): void {
@@ -62,7 +72,7 @@ function start(state: MissionState, workflow: Workflow, name: string): void {
     throw new Refusal(`step ${name} is not the current step — the mission is at ${state.step}, start that with: factory step start ${state.step}`);
   }
 
-  state.steps[name] = { status: 'running', startedAt: now() };
+  state.steps[name] = { status: 'running', runs: (current?.runs ?? 0) + 1, startedAt: now() };
 }
 
 function done(state: MissionState, workflow: Workflow, name: string): void {
@@ -123,6 +133,7 @@ async function add(dir: string, state: MissionState, workflow: Workflow, name: s
   await Bun.write(path.join(dir, 'workflow.yaml'), dumpWorkflow(workflow));
 
   state.steps[name] = { status: 'pending' };
+  pointAtInserted(state, workflow, name);
   deviate(state, `added step ${name} after ${after}`, reason);
 }
 
@@ -136,10 +147,14 @@ function loop(state: MissionState, workflow: Workflow, name: string, flags: Flag
     throw new Refusal(`round ${round} is past loop max ${definition.loop.max} on ${name} — open a human gate instead of looping again`);
   }
 
+  // Pending again, but not for the first time: the run count is what the graph shows as `×2`.
+  const again = (step: string, extra: Partial<StepState> = {}): StepState =>
+    ({ status: 'pending', runs: state.steps[step]?.runs, ...extra });
+
   state.round = round;
-  state.steps[name] = { status: 'pending', reason: str(flags, 'reason') };
-  for (const member of definition.parallel ?? []) state.steps[member] = { status: 'pending' };
-  state.steps[definition.loop.back] = { status: 'pending' };
+  state.steps[name] = again(name, { reason: str(flags, 'reason') });
+  for (const member of definition.parallel ?? []) state.steps[member] = again(member);
+  state.steps[definition.loop.back] = again(definition.loop.back);
   state.step = definition.loop.back;
 }
 

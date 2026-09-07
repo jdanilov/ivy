@@ -28,11 +28,11 @@ Feedback from the agents to the human. Not a status report, the Mission folder a
 
 | Section     | Content                                                              |
 |-------------|----------------------------------------------------------------------|
-| Worked      | What cut attention or wall clock, worth keeping                      |
+| Worked      | What cut human time or wall clock, worth keeping                     |
 | Cost        | Where tokens or rounds went and what they bought                     |
 | Tools       | Missing, broken or noisy tooling, one line each, from the handoffs   |
 | Context     | Prompts, memories or docs that were wrong, stale or bloated          |
-| Workflow    | Step, gate and attention defaults this Mission argues for changing   |
+| Workflow    | Step, gate and autonomy defaults this Mission argues for changing    |
 | Memories    | Proposed notes: title, the reason, and where it applies              |
 
 Every `Faster` line from a handoff lands in `Worked` or `Tools`. None is dropped silently.
@@ -52,5 +52,6 @@ Done: <one line per item>
 Acceptance: <id pass|fail|unchecked>, one per owned id
 ```
 
-Add `Undone`, `Commands`, `Issues`, `Deviations`, `Faster` only when they have content. `Commands`
-lists a command only when it failed or decided something, with its exit code. Never write `none`.
+Add `Decisions`, `Undone`, `Commands`, `Issues`, `Deviations`, `Faster` only when they have content,
+never `none`. `Decisions`: one line each, `- HIGH|MEDIUM|LOW: what you chose and why`, only forks a
+reviewer might have taken differently. `Commands`: what failed or decided something, with its code.

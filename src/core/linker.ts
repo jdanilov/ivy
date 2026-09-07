@@ -2,6 +2,13 @@ import path from 'node:path';
 import { mkdir, symlink, unlink, readdir, readlink, realpath, rmdir, readFile, lstat } from 'node:fs/promises';
 import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet, SnippetRecord } from '../types.js';
 import { hashFile } from './scanner.js';
+import { scopeOf } from './projects.js';
+
+/** Hooks are the project's local business; at user level there is only `~/.claude/settings.json`. */
+export const hooksFileName = (targetDir: string): string =>
+  path.join('.claude', scopeOf(targetDir) === 'global' ? 'settings.json' : 'settings.local.json');
+
+const hooksFile = (targetDir: string): string => path.join(targetDir, hooksFileName(targetDir));
 
 async function readJson<T>(filePath: string, fallback: T): Promise<T> {
   try {
@@ -247,7 +254,7 @@ export async function unlinkPart(
 type HookEntry = { matcher?: string; hooks: Array<{ type: string; command: string }> };
 
 export async function injectHooks(hooks: HookConfig[], targetDir: string): Promise<void> {
-  const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
+  const settingsPath = hooksFile(targetDir);
   const settings = await readJson<Record<string, any>>(settingsPath, {});
 
   if (!settings.hooks) {
@@ -282,7 +289,7 @@ export async function injectHooks(hooks: HookConfig[], targetDir: string): Promi
 
 /** Returns how many hook entries were actually removed, so a caller reports only real changes. */
 export async function removeHooks(hooks: HookConfig[], targetDir: string): Promise<number> {
-  const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
+  const settingsPath = hooksFile(targetDir);
   let settings: Record<string, any>;
 
   try {
@@ -433,8 +440,10 @@ export async function dropCreated(files: string[], targetDir: string): Promise<s
     gone.push(rel);
   }
 
-  // rmdir refuses a directory with anything in it, so this only fires once the last part is gone.
-  if (await rmdir(path.join(targetDir, '.claude')).then(() => true, () => false)) gone.push('.claude/');
+  // rmdir refuses a directory with anything in it, so these only fire once the last part is gone.
+  for (const dir of ['.claude', 'docs']) {
+    if (await rmdir(path.join(targetDir, dir)).then(() => true, () => false)) gone.push(`${dir}/`);
+  }
 
   return gone;
 }

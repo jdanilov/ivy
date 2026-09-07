@@ -1,5 +1,5 @@
 name: chore
 steps:
-  - grill
+  - intent: { gate: human }
   - implement: { role: worker }
   - merge

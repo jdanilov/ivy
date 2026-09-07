@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 
 import { pickCommand, pickProject, CancelError } from './ui/prompts.js';
-import { loadProjects, saveProject } from './core/projects.js';
+import { home, loadProjects, saveProject } from './core/projects.js';
 import { loadParts } from './core/registry.js';
 import { parseArgs, str, type Flags } from './core/args.js';
 import { Refusal } from './core/mission.js';
 import { I, colors, setNameCol } from './ui/theme.js';
 
 // Mission work happens in the checkout you are standing in; only the part commands pick a project.
-const MISSION_COMMANDS = ['mission', 'step', 'gate', 'handoff'];
+const MISSION_COMMANDS = ['mission', 'step', 'gate', 'decision', 'handoff'];
 
 async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(argv);
@@ -27,6 +27,10 @@ async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
     case 'gate': {
       const { gate } = await import('./commands/gate.js');
       return gate(sub!, rest, flags, cwd);
+    }
+    case 'decision': {
+      const { decision } = await import('./commands/decision.js');
+      return decision(sub!, rest, flags, cwd);
     }
     default: {
       const { handoff } = await import('./commands/handoff.js');
@@ -56,7 +60,7 @@ async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<v
       return update(targetDir, skip ? skip.split(',') : []);
     }
     default:
-      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, handoff, control`);
+      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, decision, handoff, control`);
   }
 }
 
@@ -80,8 +84,10 @@ async function main() {
   setNameCol(await loadParts());
 
   const cmd = first === 'menu' ? await pickCommand() : first;
-  const targetDir = positionals[1] ?? await pickProject(await loadProjects());
-  await saveProject(targetDir);
+  // `--global` stands where the project path would: the home dir, and never in the projects list.
+  const global = flags.global === true;
+  const targetDir = global ? home() : (positionals[1] ?? await pickProject(await loadProjects()));
+  if (!global) await saveProject(targetDir);
 
   await dispatch(cmd, targetDir, flags);
 }

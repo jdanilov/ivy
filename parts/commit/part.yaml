@@ -1,5 +1,6 @@
 type: skill
 description: structured git commits (sonnet)
+scope: global
 default: true
 files:
   - source: skill.md

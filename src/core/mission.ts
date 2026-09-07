@@ -1,7 +1,7 @@
 import path from 'node:path';
-import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
-import type { Attention, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
-import { FACTORY_HOME, saveProject } from './projects.js';
+import { mkdir, readdir, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
+import type { Autonomy, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
+import { factoryHome, loadProjects, saveProject } from './projects.js';
 import { dumpWorkflow, loadWorkflow, readWorkflowFile } from './workflow.js';
 
 /** A refusal is an expected "no" from the CLI: one line, exit 1, no stack. */
@@ -18,7 +18,7 @@ export function notStub(state: MissionState): asserts state is MissionState & { 
 }
 
 const LIVE_WINDOW_MS = 10 * 60 * 1000;
-const EVENTS_DIR = path.join(FACTORY_HOME, 'events');
+const eventsDir = (): string => path.join(factoryHome(), 'events');
 
 // ── git ──────────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ export async function readState(dir: string): Promise<MissionState> {
     name,
     title: raw.title ?? name,
     workflow: raw.workflow ?? 'story',
-    attention: raw.attention ?? 'light',
+    autonomy: raw.autonomy ?? 'partial',
     status,
     step: raw.step ?? '',
     round: raw.round ?? 0,
@@ -116,6 +116,29 @@ export function deviate(state: MissionState, what: string, reason: string): void
   state.deviations.push(entry);
 }
 
+/** The dial that decides which decisions wait. Moving it mid-mission is a deviation, with its source. */
+export async function setAutonomy(cwd: string, name: string | undefined, autonomy: Autonomy, from: string): Promise<Mission> {
+  const mission = await resolveMission(cwd, name);
+  mission.state.autonomy = autonomy;
+  deviate(mission.state, `autonomy set to ${autonomy}`, from);
+  await writeState(mission.dir, mission.state);
+  return mission;
+}
+
+/**
+ * The pointer follows work that was inserted into the graph, whether by `step add` or by `mission
+ * shape`: with the step before it finished, standing on that step or on the one the insert displaced
+ * means the new step is what runs next. Anywhere else the pointer is where the human put it.
+ */
+export function pointAtInserted(state: MissionState, workflow: Workflow, name: string): void {
+  const at = workflow.steps.findIndex((s) => s.name === name);
+  const before = workflow.steps[at - 1]?.name;
+  const displaced = workflow.steps[at + 1]?.name;
+  const status = before ? state.steps[before]?.status : undefined;
+  if (status !== 'done' && status !== 'skipped') return;
+  if (state.step === before || (displaced !== undefined && state.step === displaced)) state.step = name;
+}
+
 // ── claim ────────────────────────────────────────────────────────────────────
 
 export const claimPath = (main: string): string => path.join(main, '.factory', 'claim');
@@ -133,22 +156,29 @@ export async function clearClaim(main: string): Promise<void> {
   await unlink(claimPath(main)).catch(() => {});
 }
 
+/** What the Factory writes into a project and the project never tracks: the claim it holds the
+ *  checkout with, and every mission folder — live and archived — which belong to the machine
+ *  that ran them, not to the history of the code. */
+const IGNORED = ['.factory/claim', '.factory/missions/', '.factory/archive/'];
+
 /**
- * The Factory writes the claim, so the project must ignore it: a tracked claim reads as dirty and
- * blocks every close. The line is committed on the spot when `.gitignore` is otherwise clean, since
+ * A tracked claim or mission folder reads as dirty and blocks every close, so the project ignores
+ * all three. Missing lines are committed on the spot when `.gitignore` is otherwise clean, since
  * the edit would itself be the dirt that blocks the close. Returns what happened, for one printed line.
  */
-export async function ensureClaimIgnored(checkout: string): Promise<'added' | 'committed' | null> {
-  if (await gitOk(checkout, 'check-ignore', '-q', '.factory/claim')) return null;
+export async function ensureIgnored(checkout: string): Promise<'added' | 'committed' | null> {
+  const missing: string[] = [];
+  for (const line of IGNORED) if (!(await gitOk(checkout, 'check-ignore', '-q', line))) missing.push(line);
+  if (missing.length === 0) return null;
 
   const clean = (await git(checkout, 'status', '--porcelain', '--', '.gitignore')) === '';
   const file = path.join(checkout, '.gitignore');
   const current = await Bun.file(file).text().catch(() => '');
-  await Bun.write(file, `${current}${current === '' || current.endsWith('\n') ? '' : '\n'}.factory/claim\n`);
+  await Bun.write(file, `${current}${current === '' || current.endsWith('\n') ? '' : '\n'}${missing.join('\n')}\n`);
   if (!clean) return 'added';
 
   const done = await gitOk(checkout, 'add', '--', '.gitignore')
-    && await gitOk(checkout, 'commit', '-m', '🧹 chore: ignore .factory/claim', '--', '.gitignore');
+    && await gitOk(checkout, 'commit', '-m', '🧹 chore: ignore the Factory\'s own files', '--', '.gitignore');
   return done ? 'committed' : 'added';
 }
 
@@ -157,16 +187,30 @@ export async function ensureClaimIgnored(checkout: string): Promise<'added' | 'c
 /** Live means the session's events file was touched inside the last ten minutes. */
 export async function sessionLive(session: string | null): Promise<boolean> {
   if (!session) return false;
-  const info = await stat(path.join(EVENTS_DIR, `${session}.jsonl`)).catch(() => null);
+  const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
   return info !== null && Date.now() - info.mtimeMs < LIVE_WINDOW_MS;
 }
 
 // ── finding missions ─────────────────────────────────────────────────────────
 
 export const missionsDir = (main: string): string => path.join(main, '.factory', 'missions');
+export const archiveDir = (main: string): string => path.join(main, '.factory', 'archive');
 
-export async function listMissions(cwd: string): Promise<Mission[]> {
-  const dir = missionsDir(await mainCheckout(cwd));
+/**
+ * Mission work only happens in a checkout `~/.factory/projects` knows: the projects list lives
+ * under HOME, so this is what makes a scratch HOME a sandbox instead of a suggestion.
+ */
+export async function registered(main: string): Promise<void> {
+  const real = await realpath(main).catch(() => main);
+  for (const project of await loadProjects()) {
+    if (project === main || project === real) return;
+    if ((await realpath(project).catch(() => null)) === real) return;
+  }
+  throw new Refusal(`${main} is not a registered project — run: factory install ${main}`);
+}
+
+/** The missions in a folder, newest name last. Missing folder reads as none. */
+async function readMissions(dir: string): Promise<Mission[]> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const missions: Mission[] = [];
   for (const entry of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -175,6 +219,19 @@ export async function listMissions(cwd: string): Promise<Mission[]> {
     if (state) missions.push({ dir: folder, state });
   }
   return missions;
+}
+
+export async function listMissions(cwd: string): Promise<Mission[]> {
+  const main = await mainCheckout(cwd);
+  await registered(main);
+  return readMissions(missionsDir(main));
+}
+
+/** Archived missions: closed work moved aside, read by `mission list --all` and nothing else. */
+export async function listArchived(cwd: string): Promise<Mission[]> {
+  const main = await mainCheckout(cwd);
+  await registered(main);
+  return readMissions(archiveDir(main));
 }
 
 /**
@@ -241,7 +298,7 @@ export interface NewMission {
   name: string;
   title?: string;
   workflow: string;
-  attention: Attention;
+  autonomy: Autonomy;
   worktree: boolean;
   stub: boolean;
 }
@@ -254,6 +311,7 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   if (!/^[a-z0-9][a-z0-9-]*$/.test(opts.name)) throw new Refusal(`mission name must be lowercase letters, digits and dashes, got "${opts.name}"`);
 
   const main = await mainCheckout(cwd);
+  await registered(main);
   const checkout = await currentCheckout(cwd);
   const workflow = await loadWorkflow(opts.workflow, main);
   const title = opts.title ?? opts.name;
@@ -290,7 +348,7 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
     name: opts.name,
     title,
     workflow: workflow.name,
-    attention: opts.attention,
+    autonomy: opts.autonomy,
     status: opts.stub ? 'stub' : 'open',
     step: workflow.steps[0]!.name,
     round: 0,
@@ -346,12 +404,9 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
   const trunk = await trunkBranch(main);
   const log: string[] = [];
 
-  const rel = path.relative(main, mission.dir);
-  let merged = (await git(main, 'branch', '--merged', trunk, '--format=%(refname:short)')).split('\n').includes(state.branch);
-  const committed = await gitOk(main, 'cat-file', '-e', `${trunk}:${rel}/state.json`);
-
-  // A branch with no commits of its own reads as merged, so the folder commit is the real postcondition.
-  if (!(merged && committed)) {
+  // The mission folder is ignored, never committed and never checked out: `status: closed` in its
+  // own state.json is what says this mission is finished, and a rerun after a crash reads it back.
+  if (state.status !== 'closed') {
     const open = Object.entries(state.gates).filter(([, g]) => g.status === 'open').map(([s]) => s);
     if (open.length > 0) throw new Refusal(`gate open on ${open.join(', ')} — answer it with: factory gate answer <step> accept`);
 
@@ -360,25 +415,18 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
     const lastState = state.steps[last]?.status;
     if (lastState !== 'done' && lastState !== 'skipped') throw new Refusal(`step "${last}" is ${lastState ?? 'pending'} — the final step must be done or skipped before close`);
 
-    // The mission folder rides along on the branch. Anything else dirty would not survive the checkout.
+    // Work the branch is carrying would not survive the checkout back to the trunk.
     const dirty = [
       ...(await git(main, 'diff', '--name-only', 'HEAD')).split('\n'),
       ...(await git(main, 'ls-files', '--others', '--exclude-standard')).split('\n'),
     ].filter((f) => f !== '');
-    // Everything under `.factory/` is the Factory's own: the claim this close clears, this mission's
-    // folder, and a sibling's folder that belongs to whoever is running it in another worktree.
+    // Everything under `.factory/` is the Factory's own: the claim this close clears, this
+    // mission's folder, and a sibling's that belongs to whoever is running it in another worktree.
     const outside = dirty.filter((f) => !f.startsWith('.factory/'));
     if (outside.length > 0) throw new Refusal(`dirty outside the mission folder, commit or stash first: ${outside.join(', ')}`);
-
-    const own = dirty.filter((f) => f === rel || f.startsWith(`${rel}/`));
-    if (own.length > 0 && (await currentBranch(main)) === state.branch) {
-      await git(main, 'add', '--', rel);
-      await git(main, 'commit', '-m', `📦 chore: close mission ${state.name}`, '--', rel);
-      log.push(`committed ${rel} on ${state.branch}`);
-      merged = false;
-    }
   }
 
+  const merged = (await git(main, 'branch', '--merged', trunk, '--format=%(refname:short)')).split('\n').includes(state.branch);
   const was = await currentBranch(main);
   if (was !== trunk) await git(main, 'checkout', trunk);
 
@@ -391,12 +439,7 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
     if (state.status !== 'closed') {
       state.status = 'closed';
       await writeState(mission.dir, state);
-    }
-
-    await git(main, 'add', '--', rel);
-    if ((await git(main, 'status', '--porcelain', '--', rel)) !== '') {
-      await git(main, 'commit', '-m', `🏗️ chore: close mission ${state.name}`, '--', rel);
-      log.push(`committed ${rel} on ${trunk}`);
+      log.push(`closed ${path.relative(main, mission.dir)}`);
     }
   } finally {
     // Never leave the main checkout on a branch another mission is not using.
@@ -425,6 +468,33 @@ export async function closeMission(cwd: string, mission: Mission, keepBranch = f
   }
 
   return log;
+}
+
+// ── archive ──────────────────────────────────────────────────────────────────
+
+/**
+ * A closed mission steps out of the way: one rename between `.factory/missions/` and
+ * `.factory/archive/`. Both are ignored, so git has nothing to say about it — the folder is the
+ * machine's record of a run, not part of the history of the code.
+ */
+export async function archiveMission(cwd: string, name: string, back = false): Promise<string[]> {
+  const main = await mainCheckout(cwd);
+  await registered(main);
+  const from = back ? archiveDir(main) : missionsDir(main);
+  const to = back ? missionsDir(main) : archiveDir(main);
+  const named = (m: Mission): boolean => m.state.name === name || path.basename(m.dir) === name;
+
+  const mission = (await readMissions(from)).find(named);
+  if (!mission) {
+    if ((await readMissions(to)).find(named)) return [];
+    throw new Refusal(`no mission "${name}" in ${from}`);
+  }
+  if (mission.state.status !== 'closed') throw new Refusal(`mission ${name} is ${mission.state.status} — close it first`);
+
+  const target = path.join(to, path.basename(mission.dir));
+  await mkdir(to, { recursive: true });
+  await rename(mission.dir, target);
+  return [`${back ? 'unarchived' : 'archived'} ${path.relative(main, target)}`];
 }
 
 /** Local calendar date, so a folder matches the day the human started the mission. */

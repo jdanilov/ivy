@@ -49,7 +49,7 @@ Always start commit message with one of these emojis:
 
 - ✨ feat: New feature or functionality
 - 🐛 fix: Bug fix or error correction
-- ♻️ refactor: Code restructuring without changing functionality
+- ⌬️ refactor: Code restructuring without changing functionality
 - 🧪 test: Adding or updating tests
 - 💬 text: Changing user-facing text, wording, content
 - 🎨 style: UI/CSS changes, formatting, missing semicolons

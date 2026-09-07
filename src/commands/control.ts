@@ -1,4 +1,5 @@
 import { str, type Flags } from '../core/args.js';
+import { Refusal } from '../core/mission.js';
 import type { InboxItem, Snapshot } from '../tui/model.js';
 
 /**
@@ -7,6 +8,9 @@ import type { InboxItem, Snapshot } from '../tui/model.js';
  * live screen as text and exits, which is how it is checked without a terminal.
  */
 export async function control(flags: Flags): Promise<void> {
+  // A bare `--frames` is a typo, and the interactive screen it would fall through to hangs a run
+  // that has no terminal: the whole point of the flag is not needing one.
+  if (flags.frames === true) throw new Refusal('factory --frames <dir> [--fixture]');
   const fixture = flags.fixture === true;
   const live = fixture ? null : await import('../tui/live.js');
   let snapshot = live ? await live.buildSnapshot() : (await import('../tui/fixture.js')).snapshot;

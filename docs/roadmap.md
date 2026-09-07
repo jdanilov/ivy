@@ -3,15 +3,12 @@
 A plain checklist of work the Factory has decided to do and not started. `/retro` appends to it,
 a human prunes it, nothing else reads it.
 
-- [ ] `mission open --dry-run` promotes a stub before it prints: rename the flag or split the promote out (2026-09-05-refit)
 - [ ] Memory: the `mem` MCP, per project and global notes, recall on prompt (2026-09-05-refit)
-- [ ] Global parts: a part that installs into `~/.claude` instead of a project (2026-09-05-refit)
 - [ ] Codex harness support: a second harness reading the same parts (2026-09-05-refit)
-- [ ] `status` counts `skipIfExists` templates as installed when there is no manifest (2026-09-05-refit)
-- [ ] `mission new` on a claimed checkout with no tty exits 0 having done nothing, it should refuse (2026-09-05-refit)
-- [ ] `uninstall` leaves behind a `docs/` it created (2026-09-05-refit)
-- [ ] Directory `source` in a part's `files[]`, for vendors too large to list file by file (2026-09-05-refit)
-- [ ] `step add --after X` when X is done and the pointer sits on the next pending step: the pointer should move to the new step (2026-09-06-control)
-- [ ] `scripts/test.ts` in-process cases write scratch paths into the real `~/.factory/projects`: Bun fixes `os.homedir()` at start, so `FACTORY_HOME` must read `HOME` lazily or the cases must run as children (2026-09-06-control)
-- [ ] `failed` step state: nothing sets it; add `factory step fail <step> --reason` or drop it from `RunState` (2026-09-06-control)
-- [ ] `gate|step|mission` resolve from cwd, so a scratch HOME does not sandbox them; refuse when the resolved project is not in `$HOME/.factory/projects` (2026-09-06-control)
+- [ ] Overrule rate per agent in `retro.md`, written by the Summarizer, so decision confidence is measured before any prompt tuning or caps (2026-09-07-decisions)
+- [ ] Detached sessions: `mission open --detached` starts `tmux new -d -s factory-<mission> 'claude …'` and the tab config attaches; needs `allow-passthrough on` and extended keys in tmux for Warp's agent badge and our OSC 777 notify; costs Warp's block scrollback and input editor in that tab (2026-09-07-decisions)
+- [ ] OhMyPi harness: `omp` reads an existing `.claude/` tree, so parts need no second format; its per-project SQLite memory backend is the Memory candidate; the human runs the five-step scratch test first, then decide against the `mem` MCP line (2026-09-07-decisions)
+- [ ] Install scope chosen per part by the user, `off | global | project`, instead of fixed in `part.yaml` (2026-09-07-decisions)
+- [ ] Fresh-system install path: the `factory` command shipped or documented instead of a hand `bun link`, README rewritten why-first for a human reader (2026-09-07-decisions)
+- [ ] Graph editing from the screen: toggle a mission's steps on and off in the MISSION pane, `validate` first (2026-09-07-decisions)
+- [ ] Workflows: keep `story`, `research` and `quick`; drop `fix`; `chore` takes `--verify`, which adds the verifier loop after implement. `intent` stays the start of every shaped mission (2026-09-07-decisions)

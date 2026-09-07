@@ -1,7 +1,7 @@
 ---
 name: verify
-model: sonnet
-description: ♻ Run the Verifier over the diff against the mission contract
+model: opus
+description: ⌬ Run the Verifier over the diff against the mission contract
 ---
 
 # Verify

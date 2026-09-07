@@ -2,7 +2,7 @@
 // Plain-text frames of the fixture, so the look can be reviewed without a tty.
 // Live data has its own frames: `factory --frames <dir>`.
 import { snapshot } from '../src/tui/fixture.js';
-import { leftItems } from '../src/tui/screen.js';
+import { leftItems } from '../src/tui/panes/pane.js';
 import { writeFrames, type Frame } from '../src/tui/frames.js';
 
 const out = process.argv[2] ?? '.factory/missions/2026-09-06-control/prototype';
@@ -25,7 +25,9 @@ const frames: Frame[] = [
       ui.part = 3;
     },
   },
-  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
+  { name: 'decisions-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
+  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },
+  { name: 'global', left: at((i) => i.kind === 'global'), focus: 'right' },
   { name: 'help', left: at((i) => i.kind === 'inbox'), focus: 'right', set: (ui) => { ui.help = true; } },
   {
     name: 'parts-confirm',

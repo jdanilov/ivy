@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
-import { itemKey, leftItems, newUi, render, type Ui } from './screen.js';
+import { render } from './screen.js';
+import { itemKey, leftItems, newUi, type Ui } from './panes/pane.js';
 import type { Snapshot } from './model.js';
 
 /**
@@ -10,15 +11,22 @@ import type { Snapshot } from './model.js';
 
 export interface Frame { name: string; left: number; focus: Ui['focus']; set?: (ui: Ui) => void }
 
-/** Live: every left row with the right pane it opens, plus Activity at full height. */
+/** Live: every left row with the right pane it opens, then each foot pane and the panel. */
 export function liveFrames(snap: Snapshot): Frame[] {
   const rows = leftItems(snap).map((item, left): Frame => ({
     name: `${String(left).padStart(2, '0')}-${itemKey(item).replace(/[^a-z0-9]+/gi, '-')}`,
     left, focus: 'right',
   }));
+  // The key bar is built from the selected row's kind, so one left-focus frame of each kind shows it.
+  const kinds = new Map<string, number>();
+  leftItems(snap).forEach((item, left) => { if (!kinds.has(item.kind)) kinds.set(item.kind, left); });
+
   return [
     ...rows,
-    { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; } },
+    ...[...kinds].map(([kind, left]): Frame => ({ name: `keys-${kind}`, left, focus: 'left' })),
+    { name: 'archived', left: 0, focus: 'left', set: (ui) => { ui.showArchived = true; } },
+    { name: 'decisions-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; } },
+    { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },
     { name: 'help', left: 0, focus: 'right', set: (ui) => { ui.help = true; } },
   ];
 }

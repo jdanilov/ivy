@@ -1,12 +1,10 @@
 name: story
 steps:
-  - grill
   - intent:    { gate: human }
   - research:  { role: investigator }      # recovery or research pass, gates the spec
   - spec                                   # spec.md, acceptance.md
   - implement: { role: worker }
-  - accept:
+  - review:
       parallel: [verify, validate]
-      loop: { back: implement, max: 3, human_from: 2 }
-  - condense:  { role: summarizer }
-  - merge:     { gate: human }
+      loop: { back: implement, max: 3 }
+  - merge:     { gate: human }             # the Summarizer runs first, then the gate opens

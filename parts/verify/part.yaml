@@ -1,5 +1,5 @@
 type: skill
-description: verifier gatekeeper over the diff and the contract (sonnet)
+description: verifier gatekeeper over the diff and the contract (opus)
 default: true
 files:
   - source: skill.md

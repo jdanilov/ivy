@@ -20,13 +20,12 @@ export const C = {
 };
 
 export const GLYPH: Record<RunState, string> = {
-  pending: '○', running: '●', done: '✓', failed: '✗', blocked: '⊘', skipped: '·',
+  pending: '○', running: '●', done: '✓', blocked: '⊘', skipped: '·',
 };
 
 export function stateColor(state: RunState): string {
   if (state === 'running') return C.accent;
   if (state === 'done') return C.success;
-  if (state === 'failed') return C.error;
   if (state === 'blocked') return C.warning;
   return C.dim;
 }

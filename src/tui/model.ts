@@ -43,17 +43,11 @@ export interface StepRow {
   gateOpen?: boolean;
 }
 
-export interface EventRow {
-  at: number;
-  verb: string;
-  detail: string;
-}
-
 /** One line of a session's progress log. Wiring reads these from Claude Code's transcript jsonl. */
 export interface Activity {
   at: number;
   session: string;
-  verb: 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Tool' | 'Stop';
+  verb: 'You' | 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Tool' | 'Stop';
   text: string;
 }
 
@@ -103,8 +97,8 @@ export interface Session {
   cwd: string;
   /** When its last turn ended. Meaningless while busy. */
   idleSince: number;
-  last?: EventRow;
-  question?: string;
+  /** The final message of its last turn, a statement or a question alike. */
+  said?: string;
 }
 
 export interface PartRow {

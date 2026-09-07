@@ -75,10 +75,11 @@ function detail(block: Block, cwd: string): string {
   const input = block.input ?? {};
   const file = text(input.file_path);
   switch (block.name) {
-    case 'Bash': return text(input.command).split('\n')[0] ?? '';
+    // The description is what the model said it was doing; the command is what it typed.
+    case 'Bash': return text(input.description) || (text(input.command).split('\n')[0] ?? '');
     case 'Edit': case 'Write': return file.startsWith(cwd) ? path.relative(cwd, file) : file;
     case 'Read': case 'Glob': case 'Grep': return file || text(input.pattern);
-    case 'Agent': return `${text(input.subagent_type)} ${text(input.description)}`.trim();
+    case 'Agent': return [text(input.subagent_type), text(input.description)].filter((s) => s !== '').join(' · ');
     case 'AskUserQuestion': {
       const first = Array.isArray(input.questions) ? (input.questions[0] as { question?: string }) : undefined;
       return sentence(text(first?.question));

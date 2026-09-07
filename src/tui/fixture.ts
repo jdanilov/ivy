@@ -40,6 +40,7 @@ function log(session: string, spec: string): Activity[] {
 }
 
 const refitLog = log('75cb46e1', `
+30.2|You|Round 2: fix the three Verifier findings, skip nothing without a reason.
 30.0|Text|Round 2 opens. Three findings from the Verifier, all in the render path.
 29.5|Read|.factory/missions/2026-09-06-refit/findings.md
 28.6|Bash|rg -n "destroyRecursively" src
@@ -193,8 +194,7 @@ const projects: Project[] = [
     sessions: [
       {
         id: 'b3f21c07', name: 'recall', busy: false, preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
-        last: { at: now - 12 * M, verb: 'Notification', detail: 'waiting on the human' },
-        question: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
+        said: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
       },
     ],
     missions: [

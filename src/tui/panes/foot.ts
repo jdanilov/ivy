@@ -6,9 +6,15 @@ import type { Activity, Decision, Mission, Project, Snapshot } from '../model.js
 /** The pane along the foot: the decisions of whatever is selected, or its sessions' activity. */
 
 const VERB: Record<Activity['verb'], string> = {
-  Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
+  You: C.accent, Bash: C.bright, Edit: C.success, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
   Tool: C.dim, Stop: C.success,
 };
+
+/** What of a row is the human's or the model's own words, drawn bright; the rest is tooling, dim. */
+const SAID = new Set<Activity['verb']>(['You', 'Text', 'Ask']);
+
+/** A row wraps under its text column to this many lines; a longer command is a paragraph nobody reads here. */
+const ACTIVITY_ROWS = 2;
 
 /** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch. */
 const tabs = (ui: Ui): Cell[] => [
@@ -107,13 +113,19 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
 
   p.row(spread(tabs(ui), [[`${rows.length}`, C.dim]], p.width));
   p.rule();
-  const shown = visible(rows, room, ui);
-  for (const a of shown) {
-    p.row([
+  // The scroll walks lines, not rows: a wrapped row is two of them.
+  const lines = rows.flatMap((a): Cell[][] => {
+    const head: Cell[] = [
       [`${clock(a.at)}  `, C.dim], ...(merged ? ([[(owners.get(a.session) ?? '').padEnd(9), C.dim]] as Cell[]) : []),
-      [a.verb.padEnd(7), VERB[a.verb]], [a.text, a.verb === 'Text' || a.verb === 'Ask' ? C.bright : C.dim],
-    ]);
-  }
+      [a.verb.padEnd(7), VERB[a.verb]],
+    ];
+    const indent = len(head);
+    const color = SAID.has(a.verb) ? C.bright : C.dim;
+    return wrap(a.text, Math.max(20, p.width - indent), ACTIVITY_ROWS)
+      .map((text, i): Cell[] => (i === 0 ? [...head, [text, color]] : [[' '.repeat(indent), C.dim], [text, color]]));
+  });
+  const shown = visible(lines, room, ui);
+  for (const line of shown) p.row(line);
   pad(p, shown.length, room);
 }
 

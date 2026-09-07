@@ -1,0 +1,43 @@
+import { C } from '../theme.js';
+import { ago, spread, wrap, type Cell } from '../format.js';
+import { marker, type Pane, type Ui } from './pane.js';
+import type { InboxItem, Snapshot } from '../model.js';
+
+/** MESSAGES: everything waiting on the human across every project, and how each one is answered. */
+
+export function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {
+  const items = snap.inbox;
+  p.row([['MESSAGES', C.bright], [` (${items.length})`, C.dim]]);
+  p.rule();
+
+  items.forEach((item, i) => {
+    const selected = i === ui.msg;
+    const cells: Cell[] = [
+      marker(selected, ui.focus === 'right'), ['⊘ ', C.warning],
+      [`${item.project}/${item.origin}`, C.bright], ['  ', C.dim], [item.label, C.dim],
+    ];
+    p.row(spread(cells, [[ago(item.at), C.dim]], p.width), selected && ui.focus === 'right');
+  });
+
+  p.rule();
+  const item = items[ui.msg];
+  if (item) messageDetail(p, item, h - 3 - items.length);
+}
+
+/** Read-only, on purpose: one answer path, the session that raised it, and the CLI records it. */
+function messageDetail(p: Pane, item: InboxItem, h: number): void {
+  const room = Math.max(1, h - 3);
+
+  if (item.kind === 'gate') {
+    p.row([[item.file ?? '', C.bright], [` (${item.lines} lines)`, C.dim]]);
+    const body = (item.body ?? []).flatMap((l) => (l ? wrap(l, p.width, 4) : ['']));
+    for (const l of body.slice(0, room - 1)) p.row([[l, C.dim]]);
+  } else {
+    for (const text of (item.text ?? '').split('\n')) for (const l of wrap(text, p.width, room)) p.row([[l, C.bright]]);
+  }
+
+  p.row([]);
+  // Warp cannot focus a tab from outside; the name is what the human types into its tab switcher.
+  if (item.kind === 'question') return p.row([['answer in tab ', C.dim], [item.tab ?? '—', C.bright]]);
+  p.row([['answer in the session: ', C.dim], [item.answer ?? '', C.bright]]);
+}

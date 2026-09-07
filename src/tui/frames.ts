@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
-import { itemKey, leftItems, newUi, render, type Ui } from './screen.js';
+import { render } from './screen.js';
+import { itemKey, leftItems, newUi, type Ui } from './panes/pane.js';
 import type { Snapshot } from './model.js';
 
 /**

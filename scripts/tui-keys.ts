@@ -18,7 +18,9 @@
  *   keys: up down left right return escape space a d f h z t c o x y n r ? q  |  sleep:ms  |  reload
  */
 import type { KeyEvent } from '@opentui/core';
-import { itemKey, leftItems, newUi, onKey, render, type App, type Ui } from '../src/tui/screen.js';
+import { render, type App } from '../src/tui/screen.js';
+import { onKey } from '../src/tui/keys.js';
+import { itemKey, leftItems, newUi, type Ui } from '../src/tui/panes/pane.js';
 import type { Snapshot } from '../src/tui/model.js';
 
 const argv = process.argv.slice(2);

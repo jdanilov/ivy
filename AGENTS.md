@@ -28,8 +28,10 @@ src/           CLI source (entry: src/cli.ts)
 │              spawn (preset, Warp tab config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
-│              activity, tokens), watch (fs.watch + poll), screen (render + keys), actions (what
-│              a key writes, through the CLI's own functions), notify, frames, format, theme
+│              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys
+│              (what a keypress does), panes/ (pane scaffolding plus left, messages, mission,
+│              parts, foot, help — one file each, none over 400 lines), actions (what a key
+│              writes, through the CLI's own functions), notify, frames, format, theme
 ├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control
 └── types.ts   Shared type definitions
 

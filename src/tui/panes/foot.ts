@@ -29,11 +29,16 @@ const pad = (p: Pane, shown: number, room: number): void => {
   for (let i = shown; i < room; i++) p.row([]);
 };
 
-/** Which missions the selection covers: a mission is one, a project its own, the Inbox every one. */
+/**
+ * Which missions the selection covers: a mission is one, a project its open ones, the Inbox every
+ * open one. A closed mission's decisions are its record, read by selecting it; over a project they
+ * would bury the live rows under every run that came before.
+ */
 function missionsOf(snap: Snapshot, here: LeftItem): Mission[] {
-  return here.kind === 'inbox' ? snap.projects.flatMap((project) => project.missions)
+  const open = (missions: Mission[]): Mission[] => missions.filter((m) => m.status === 'open');
+  return here.kind === 'inbox' ? open(snap.projects.flatMap((project) => project.missions))
     : here.kind === 'mission' ? [here.mission]
-    : here.kind === 'project' ? here.project.missions : [];
+    : here.kind === 'project' ? open(here.project.missions) : [];
 }
 
 /** Where a decision stands, left of its id. A question the human still owes an answer to is the

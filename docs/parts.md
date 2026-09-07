@@ -45,12 +45,28 @@ sit outside `.claude`. A `source` naming a directory, with or without a trailing
 registry load to every file under it, each targeted `<target>/<relative>`; the manifest holds the
 expanded list, so nothing downstream knows the shorthand existed.
 
+## Copies
+
+Every file lands as a copy, so a project stands on its own: `.claude/` can be committed and read on
+a machine that never heard of the Factory, and the manifest is the only link back. What that costs
+is a refresh step — a Factory edit reaches a project when `update` runs there, never by itself, and
+`update --all` walks every registered project and then the home dir in one run. That one command is
+also the whole migration from an older install; a home dir that never had `install --global` still
+needs it once, and the run says so.
+
+Ownership is decided per file, from the manifest: a file whose hash is the one the manifest recorded
+or the one the source holds now is ours to overwrite or remove, and so is a link into the Factory
+left by an older install, because reading it gives the source's bytes. Anything else the project
+wrote itself: `update` rewrites it and prints `restored <file>`, `uninstall` leaves it and names it.
+`status` reads the same hashes, so an edited copy is `modified` and a file at a target of a part no
+manifest lists is a `conflict`.
+
 ## Scope
 
-A part's `scope` decides the target dir and nothing else: `project` links into the project's
+A part's `scope` decides the target dir and nothing else: `project` copies into the project's
 `.claude/`, `global` into `~/.claude/`, where hooks and settings share one `settings.json` because
 there is no `settings.local.json` at user level. A project command never lists a global part and
-`--global` never lists a project one, so a part that changes scope is unlinked by the next `update`
+`--global` never lists a project one, so a part that changes scope is removed by the next `update`
 the same way a retired one is. A global part with a `snippet` or `recipes` is a registry error:
 nothing global has a project root to write a line in or run a command in.
 
@@ -67,18 +83,19 @@ override is hook-factory's `sound` (`off` silences it, a bare name is a macOS sy
 
 ## Manifest, snippets, recipes
 
-The manifest records where each file came from under the Factory root, so uninstall knows a link is
-ours without reading it; a manifest written before that falls back to `readlink`. It also records each
-part's `snippet: { file, section, line }` and, after `recipes.init` succeeded, `initAt`. A section that
-already carries a line naming the same path gets that line rewritten in place instead of a second one
-appended, and the original is kept as `snippet.replaced`. Uninstall works from those records, not from
-a fresh resolution: it puts a replaced line back, otherwise removes the recorded line from the recorded
-file and drops the section when only blank lines are left. A settings or mcp file the uninstall emptied
-is deleted, and so are `.claude/` and `docs/` once nothing is left in either. With no manifest at all,
-`status` reads a `skipIfExists` file that exists as installed: a project seeded with the templates by
-hand owns them already. `init` runs when `initAt` is absent and refuses on a non-zero exit with the
-part left linked, so a fix plus `update` retries. `uninit` runs on uninstall and when `update` drops a
-part the registry no longer has; a failure prints `◈` and the unlink continues.
+The manifest records where each file came from under the Factory root, which is how ownership holds
+even after the source has changed; a manifest written before that has the recorded hash alone. It
+also records each part's `snippet: { file, section, line }` and, after `recipes.init` succeeded,
+`initAt`. A section that already carries a line naming the same path gets that line rewritten in
+place instead of a second one appended, and the original is kept as `snippet.replaced`. Uninstall
+works from those records, not from a fresh resolution: it puts a replaced line back, otherwise
+removes the recorded line from the recorded file and drops the section when only blank lines are
+left. A settings or mcp file the uninstall emptied is deleted, and so are `.claude/` and `docs/`
+once nothing is left in either. With no manifest at all, `status` reads a `skipIfExists` file that
+exists as installed: a project seeded with the templates by hand owns them already. `init` runs when
+`initAt` is absent and refuses on a non-zero exit with the part left in place, so a fix plus
+`update` retries. `uninit` runs on uninstall and when `update` drops a part the registry no longer
+has; a failure prints `◈` and the removal continues.
 
 ## Commands
 
@@ -88,10 +105,13 @@ filtered to `scope: global`, and nothing written to `~/.factory/projects`. `inst
 take `--yes`: the defaults plus what is already installed, no menu, no confirm. `install` also takes
 `--parts a,b`: exactly those parts plus their `requires`, no menu, no confirm, an unknown name is a
 refusal and a name the other scope owns names the command that does install it. `update` alone takes
-`--skip a,b`, which records the part in the manifest, so the project keeps its own copy for good.
+`--skip a,b`, which records the part in the manifest, so the project keeps its own copy for good, and
+`--all`, which names its own targets: every registered project in list order, then the home dir, one
+header each, the first failure ending the run.
 
-`update` is the non-interactive install: relink, add parts the registry marks `default`, drop parts
-and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever removes a
-symlink pointing into the Factory. `install --global` refuses while any registered project's manifest
-still lists a part it is about to link, naming the projects: the same skill loaded twice is worse than
-an unfinished migration, and `update` on each project is what finishes it.
+`update` is the non-interactive install: rewrite the copies, add parts the registry marks `default`,
+drop parts and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever
+removes a file the manifest or the source can still claim. `install --global` refuses while any
+registered project's manifest still lists a part it is about to install, naming the projects: the same
+skill loaded twice is worse than an unfinished migration, and `update` on each project is what
+finishes it.

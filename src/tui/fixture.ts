@@ -153,7 +153,7 @@ const globalParts: PartRow[] = [
 /** Everything a mission needs but a fixture rarely varies. */
 function mission(m: Partial<Mission> & Pick<Mission, 'name' | 'workflow'>): Mission {
   return {
-    status: 'open', state: 'pending', autonomy: 'full', archived: false, step: null, round: 0,
+    title: m.name, status: 'open', state: 'pending', autonomy: 'full', archived: false, step: null, round: 0,
     session: null, preset: null, branch: null, worktree: null, wall: 0,
     tokens: { input: 0, cached: 0, output: 0 }, steps: [], decisions: [], deviations: [],
     ...m,
@@ -177,7 +177,10 @@ const projects: Project[] = [
         autonomy: 'partial', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
         decisions: refitDecisions, diff: { added: 412, removed: 96 },
       }),
-      mission({ name: 'memory', workflow: 'intent', status: 'stub' }),
+      mission({
+        name: 'memory', title: 'Memory: the mem MCP', workflow: 'intent', status: 'stub',
+        why: 'Every mission relearns the project from scratch. A per-project note store the hook recalls on prompt would let a session start where the last one stopped.',
+      }),
     ],
   },
   {

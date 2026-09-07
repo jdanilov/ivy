@@ -215,6 +215,14 @@ function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: strin
   for (const at of ev?.stops ?? []) ctx.activity.push({ at, session, verb: 'Stop', text: '' });
 }
 
+/** A stub's own words: the first paragraph under `## Why`, joined onto one line. */
+async function intentWhy(dir: string): Promise<string | undefined> {
+  const text = await readFile(path.join(dir, 'intent.md'), 'utf-8').catch(() => '');
+  const body = text.split(/^## Why\s*$/m)[1]?.split(/^## /m)[0] ?? '';
+  const paragraph = body.split(/\n\s*\n/).map((s) => s.replace(/\s+/g, ' ').trim()).find((s) => s !== '');
+  return paragraph;
+}
+
 async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission, ev: Ev | undefined, archived: boolean): Promise<Mission> {
   const state = m.state;
   // A worktree mission runs in its own checkout, so that is where its transcript was written.
@@ -233,8 +241,12 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
   // A worktree mission's diff is counted where that mission's commits are.
   const diff = state.status === 'open' && state.branch ? diffCount(state.worktree || dir, state.branch) : undefined;
 
+  const why = state.status === 'stub' ? await intentWhy(m.dir) : undefined;
+
   return {
     name: state.name,
+    title: state.title,
+    ...(why ? { why } : {}),
     workflow: state.workflow,
     status: state.status,
     state: missionRowState(state) as RunState,

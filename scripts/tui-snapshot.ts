@@ -16,6 +16,7 @@ const frames: Frame[] = [
   { name: 'parts', left: at((i) => i.kind === 'project' && i.project.name === 'ivy'), focus: 'right' },
   { name: 'mission', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left' },
   { name: 'session', left: at((i) => i.kind === 'session'), focus: 'right' },
+  { name: 'stub', left: at((i) => i.kind === 'mission' && i.mission.status === 'stub'), focus: 'left' },
   {
     name: 'parts-pending',
     left: at((i) => i.kind === 'project' && i.project.name === 'ivy'),

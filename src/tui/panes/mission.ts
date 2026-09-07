@@ -27,6 +27,13 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
   p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
+  // A stub has no graph, so the pane says what it is for: the title, then the intent's own why.
+  if (!m.steps.length) {
+    p.row([[' ', C.dim], [m.title, C.bright]]);
+    for (const l of wrap(m.why ?? 'no intent yet', p.width - 1, 6)) p.row([[' ', C.dim], [l, C.dim]]);
+    p.rule();
+    return;
+  }
 
   for (const s of m.steps) {
     // A step the mission looped back to says so: one run is the norm and carries no mark.
@@ -45,8 +52,6 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
     const took = timed && s.wall ? dur(s.wall) : s.status;
     p.row(spread(cells, [[spent.padStart(SPEND_COL), C.dim], [took.padStart(TIME_COL), C.dim]], p.width));
   }
-  if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
-
   p.rule();
   // The dial is the one thing this pane changes, so it is the one thing `→` can land on.
   fact(p, 'step', [[m.step ?? '—', C.bright], DOT, [runner(m.steps.find((s) => s.name === m.step)), C.dim],

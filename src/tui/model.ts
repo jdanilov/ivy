@@ -62,6 +62,10 @@ export type Autonomy = 'full' | 'partial' | 'none';
 
 export interface Mission {
   name: string;
+  /** The line `mission new --title` gave it, or the name again. */
+  title: string;
+  /** The first paragraph under `## Why` in `intent.md`, read for a stub: the one row that has no steps to say what it is. */
+  why?: string;
   workflow: string;
   status: 'open' | 'stub' | 'closed';
   state: RunState;

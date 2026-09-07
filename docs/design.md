@@ -93,6 +93,12 @@ A project — or the Inbox, over every project — is one bar over its missions 
 alone: closed green, open amber, stub grey, one segment each. The counts stay behind it as the
 dim legend that names the colours.
 
+A session has no steps to bar and no project to count: `IDLE`, its id, preset and cwd, and how
+long since its last event on the right.
+
+A stub has no graph, so the MISSION pane gives its title and the first paragraph under `## Why`
+in its `intent.md` where the steps would be: two stubs differ by what they are for, not by name.
+
 ### The Inbox
 
 Every open gate, waiting decision and waiting question across all projects, keyed

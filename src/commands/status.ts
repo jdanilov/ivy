@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { ignoredScopes } from '../core/registry.js';
 import { scanProject } from '../core/scanner.js';
 import { missionsBlock } from './mission.js';
 import { I, nameCol, colors, statusColor, statusSymbol, statusLabel, displayName, typeLabel } from '../ui/theme.js';
@@ -56,6 +57,13 @@ export async function status(targetDir: string): Promise<void> {
   console.log('');
   const counts = `${installed} installed, ${modified} modified, ${available} available`;
   console.log(`${I}${counts}${skipped > 0 ? `, ${skipped} skipped` : ''}`);
+
+  // A choice the registry could not honour is worth one line: the list above otherwise reads as
+  // if the config had never been written.
+  const ignored = await ignoredScopes();
+  if (ignored.length > 0) {
+    console.log(`${I}${colors.dim}global in ~/.factory/config.yaml is ignored for ${ignored.join(', ')} — a part with a snippet or recipes has no home dir to live in.${colors.reset}`);
+  }
 
   await missionsBlock(resolvedDir);
   console.log('');

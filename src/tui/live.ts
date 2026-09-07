@@ -6,7 +6,7 @@ import { readDecisions, type Decision } from '../core/decision.js';
 import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
-import { allParts, loadParts } from '../core/registry.js';
+import { allParts, loadParts, projectOnly } from '../core/registry.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
 import { id } from './format.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
@@ -311,6 +311,7 @@ async function globalParts(): Promise<PartRow[]> {
     status: scanned.get(part.name)?.status ?? 'not-installed',
     scope: inPlay.get(part.name)?.scope ?? 'off',
     recommended: part.recommended,
+    ...(projectOnly(part) ? { projectOnly: true } : {}),
     files: part.files.map((f) => f.target),
   }));
 }

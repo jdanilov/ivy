@@ -24,8 +24,13 @@ export function partScope(part: PartRow, ui: Ui): ScopeChoice {
   return typeof choice === 'string' ? choice : part.scope;
 }
 
-export const nextScope = (part: PartRow, ui: Ui): ScopeChoice =>
-  CHOICES[(CHOICES.indexOf(partScope(part, ui)) + 1) % CHOICES.length]!;
+/** What the part can be: `global` is not on offer for one that needs a project root to live in. */
+const offered = (part: PartRow): ScopeChoice[] => CHOICES.filter((c) => c !== 'global' || !part.projectOnly);
+
+export const nextScope = (part: PartRow, ui: Ui): ScopeChoice => {
+  const choices = offered(part);
+  return choices[(choices.indexOf(partScope(part, ui)) + 1) % choices.length]!;
+};
 
 /** The parts `↵` would install and the ones it would remove: the toggles the manifest disagrees with. */
 export function changes(project: Project, ui: Ui): { add: string[]; drop: string[] } {
@@ -50,13 +55,18 @@ export function pending(project: Project, ui: Ui, global: boolean): string[] {
 }
 
 /** The three choices, the chosen one filled and bright, the recommended one in accent until it is
- *  the chosen: what the author advises is only worth saying while the human has left it. */
+ *  the chosen: what the author advises is only worth saying while the human has left it. One the
+ *  part cannot take keeps its column but loses its glyph, so the row reads as three and offers two. */
 function choices(part: PartRow, ui: Ui): Cell[] {
   const chosen = partScope(part, ui);
-  return CHOICES.map((choice): Cell => [
-    `${choice === chosen ? '●' : '○'} ${choice.padEnd(9)}`,
-    choice === chosen ? C.bright : choice === part.recommended ? C.accent : C.dim,
-  ]);
+  const can = offered(part);
+  return CHOICES.map((choice): Cell => {
+    if (!can.includes(choice)) return [`  ${choice.padEnd(9)}`, C.rule];
+    return [
+      `${choice === chosen ? '●' : '○'} ${choice.padEnd(9)}`,
+      choice === chosen ? C.bright : choice === part.recommended ? C.accent : C.dim,
+    ];
+  });
 }
 
 export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean): void {

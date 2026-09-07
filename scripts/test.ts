@@ -25,6 +25,7 @@ await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
 await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
 
 const { install } = await import('../src/commands/install.js');
+const { status } = await import('../src/commands/status.js');
 const { hashFile, scanProject } = await import('../src/core/scanner.js');
 const { update, updateAll } = await import('../src/commands/update.js');
 const { uninstall } = await import('../src/commands/uninstall.js');
@@ -36,7 +37,7 @@ const { mission } = await import('../src/commands/mission.js');
 const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission, writeState } = await import('../src/core/mission.js');
 const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
-const { dependants, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
+const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { loadConfig, resetConfig, writePartScope } = await import('../src/core/config.js');
 
@@ -806,6 +807,26 @@ await check('an override wins over part.yaml, and off is in no scope at all', as
     ok(!inProject.includes('research') && !inHome.includes('research'), 'an off part is in a scan');
   });
   ok((await loadParts()).find((p) => p.name === 'commit')?.scope === 'global', 'the override outlived its config');
+});
+
+await check('a snippet or recipes keeps a part out of global, whatever the config says', async () => {
+  await withConfig(`${BASE_CONFIG}parts:\n  code-format: "global"\n  codegraph: "global"\n`, async () => {
+    const parts = await loadParts();
+    const snippet = parts.find((p) => p.name === 'code-format');
+    ok(snippet?.scope === 'project' && snippet.recommended === 'project', `code-format resolved ${snippet?.scope}`);
+    ok(parts.find((p) => p.name === 'codegraph')?.scope === 'project', 'a part with recipes took the override');
+
+    const ignored = await ignoredScopes();
+    ok(ignored.includes('code-format') && ignored.includes('codegraph'), `ignoredScopes read ${ignored.join(', ')}`);
+    const said = await printed(() => status(main));
+    ok(said.includes('ignored for code-format, codegraph'), `status never named the ignored override:\n${said}`);
+
+    const { newUi } = await import('../src/tui/panes/pane.js');
+    const { nextScope } = await import('../src/tui/panes/parts.js');
+    const row = { name: 'code-format', type: 'fixture', description: '', status: 'not-installed' as const,
+      scope: 'project' as const, recommended: 'project' as const, projectOnly: true, files: [] };
+    ok(nextScope(row, newUi()) === 'off', 'Space offered global to a part that cannot take it');
+  });
 });
 
 await check('update drops a part the config turned off', async () => {

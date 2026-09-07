@@ -83,8 +83,12 @@ Resolution is the override, else `part.yaml`, else `project`, and it happens onc
 `install`, `update`, `status` and the PARTS pane all read a part that already knows where it lives.
 `off` drops the part from the registry, so every reader sees what it sees for a part the Factory
 retired — `update` removes it, `status` stops listing it, and `install --parts` on it refuses by
-naming the file that turned it off. Only the `~ global` PARTS pane draws the choice, because the
-choice is the machine's: it lists every part, `Space` cycles `project → global → off` and `↵` applies.
+naming the file that turned it off. The override is a choice between the scopes a part can take,
+not a way around the invariant: `global` on a part with a `snippet` or `recipes` falls back to the
+recommendation, `status` names the ignored line, and the pane never offers the choice.
+
+Only the `~ global` PARTS pane draws the choice, because the choice is the machine's: it lists
+every part, `Space` cycles `project → global → off` and `↵` applies.
 
 Moving a part is the collision rule played out in order, and the pane's `↵` runs exactly what a
 human would: the choice is written, then `update` on every project whose manifest still lists the

@@ -48,8 +48,22 @@ export async function loadParts(): Promise<Part[]> {
   return (await allParts()).flatMap((part) => {
     const choice = choices[part.name];
     if (choice === 'off') return [];
-    return [choice === undefined || choice === part.scope ? part : { ...part, scope: choice }];
+    // `global` on a part that needs a project root is not a choice the machine gets to make: the
+    // recommendation stands, the same invariant `part.yaml` is refused for.
+    const scope = choice === 'global' && projectOnly(part) ? part.recommended : choice;
+    return [scope === undefined || scope === part.scope ? part : { ...part, scope }];
   });
+}
+
+/** A snippet needs an `AGENTS.md` and a recipe a directory to run in: the home dir has neither. */
+export function projectOnly(part: Part): boolean {
+  return part.snippet !== undefined || part.recipes !== undefined;
+}
+
+/** Parts whose config `global` `loadParts` could not honour, for a reader that says so out loud. */
+export async function ignoredScopes(): Promise<string[]> {
+  const choices = (await loadConfig()).parts ?? {};
+  return (await allParts()).filter((p) => choices[p.name] === 'global' && projectOnly(p)).map((p) => p.name);
 }
 
 /**
@@ -96,8 +110,6 @@ async function parsePart(name: string, raw: unknown): Promise<Part> {
 
   const scope = (raw.scope ?? 'project') as Scope;
   if (scope !== 'project' && scope !== 'global') fail('scope must be project or global');
-  // Nothing global has a project root: no agent file to write a line in, no directory to run in.
-  if (scope === 'global' && (raw.snippet !== undefined || raw.recipes !== undefined)) fail('a global part can have neither a snippet nor recipes');
 
   const files: PartFile[] = [];
   for (const f of raw.files as unknown[]) {
@@ -194,6 +206,9 @@ async function parsePart(name: string, raw: unknown): Promise<Part> {
       return { name: v.name, description: v.description, url: v.url };
     });
   }
+
+  // Nothing global has a project root: no agent file to write a line in, no directory to run in.
+  if (part.scope === 'global' && projectOnly(part)) fail('a global part can have neither a snippet nor recipes');
 
   return part;
 }

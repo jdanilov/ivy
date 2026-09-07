@@ -12,6 +12,7 @@ recipes:
       # The two surfaces the CLI walk never reaches: the screen under keys, and the hook's
       # decision paths fired the way Claude Code fires them. Both check themselves.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row global right space return escape escape
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

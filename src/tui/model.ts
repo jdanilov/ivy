@@ -108,6 +108,8 @@ export interface PartRow {
   /** Where the machine has it: the config's choice, else what the part recommends. */
   scope: ScopeChoice;
   recommended: Scope;
+  /** Global row only: a part with a snippet or recipes has no global choice to cycle to. */
+  projectOnly?: boolean;
   files: string[];
 }
 

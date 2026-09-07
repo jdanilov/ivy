@@ -50,8 +50,8 @@ factory decision add "<summary>" --confidence HIGH|MEDIUM|LOW [--step S] [--by R
 
 - `step done` refuses on an unanswered gate and on an unfinished `parallel` member. `step loop`
   counts a round and returns to `loop.back`; past `max` it refuses, so open a human gate instead.
-- `mission close` refuses with an open gate or a non-final step, then merges `--no-ff`, commits the
-  Mission folder on the trunk, clears the claim and drops the worktree. It is the only merge path.
+- `mission close` refuses with an open gate or a non-final step, then merges `--no-ff` — the only
+  merge path — marks it closed, clears the claim, drops the worktree. Its folder is never committed.
 
 ## Sub-agents
 

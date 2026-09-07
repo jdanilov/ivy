@@ -159,7 +159,7 @@ export async function clearClaim(main: string): Promise<void> {
 /** What the Factory writes into a project and the project never tracks: the claim it holds the
  *  checkout with, and every mission folder — live and archived — which belong to the machine
  *  that ran them, not to the history of the code. */
-export const IGNORED = ['.factory/claim', '.factory/missions/', '.factory/archive/'];
+const IGNORED = ['.factory/claim', '.factory/missions/', '.factory/archive/'];
 
 /**
  * A tracked claim or mission folder reads as dirty and blocks every close, so the project ignores

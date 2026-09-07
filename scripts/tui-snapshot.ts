@@ -25,7 +25,9 @@ const frames: Frame[] = [
       ui.part = 3;
     },
   },
-  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
+  { name: 'decisions-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
+  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },
+  { name: 'global', left: at((i) => i.kind === 'global'), focus: 'right' },
   { name: 'help', left: at((i) => i.kind === 'inbox'), focus: 'right', set: (ui) => { ui.help = true; } },
   {
     name: 'parts-confirm',

@@ -336,7 +336,7 @@ await check('a new inbox key is news, the first snapshot and an ageing item are 
   const { arrivals, inboxKey } = await import('../src/tui/notify.js');
   const item = (origin: string, at: number) => ({ kind: 'gate' as const, project: 'p', origin, label: 'gate g', at });
   const first = [item('a', 1)];
-  ok(inboxKey(item('a', 1)) === 'p/a/gate', `key is project/origin/kind, got ${inboxKey(item('a', 1))}`);
+  ok(inboxKey(item('a', 1)) === 'p/a/gate g', `key is project/origin/label, got ${inboxKey(item('a', 1))}`);
   ok(arrivals(null, first).length === 0, 'the first snapshot announced its own backlog');
   ok(arrivals(first, [item('a', 9)]).length === 0, 'an item that only aged read as new');
   ok(arrivals(first, [item('a', 9), item('b', 9)]).map((i) => i.origin).join() === 'b', 'the new item was missed');
@@ -346,13 +346,15 @@ await check('a step is coloured by what kind of work it is', async () => {
   const { stepKind } = await import('../src/tui/model.js');
   const { loadWorkflow } = await import('../src/core/workflow.js');
   const story = await loadWorkflow('story', TMP);
-  // The story workflow names all four kinds; `early` is what the live mapping computes per step.
-  const work = story.steps.findIndex((step) => step.role === 'worker');
-  const kinds = story.steps.map((step, i) => `${step.name}:${stepKind(step, i < work)}`);
-  const want = 'intent:human,research:agent,spec:technical,implement:agent,review:gatekeeper,merge:technical';
+  // The story workflow names all four kinds; the runner decides, the human's gates are their own.
+  const kinds = story.steps.map((step) => `${step.name}:${stepKind(step)}`);
+  const want = 'intent:human,research:agent,spec:technical,implement:agent,review:gatekeeper,merge:human';
   ok(kinds.join() === want, `story reads ${kinds.join()}`);
   ok(stepKind({ name: 'verify' }) === 'gatekeeper' && stepKind({ name: 'validate' }) === 'gatekeeper',
     'a parallel gatekeeper row is not gatekeeping');
+  // A closed mission's workflow copy still names the folded steps; they keep the colours they had.
+  ok(stepKind({ name: 'grill' }) === 'human' && stepKind({ name: 'accept' }) === 'gatekeeper'
+    && stepKind({ name: 'condense' }) === 'technical', 'an old step name lost its colour');
 });
 
 await check('the transcript tail parses each line once', async () => {

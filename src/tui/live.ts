@@ -1,15 +1,17 @@
 import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { existingProjects, factoryHome } from '../core/projects.js';
+import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { readCaffeinate } from '../core/config.js';
-import { git, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
+import { readDecisions, type Decision } from '../core/decision.js';
+import { ROLE_MODEL, stepRole } from '../core/workflow.js';
+import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
 import { id } from './format.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
 import type {
-  Activity, InboxItem, Mission, PartRow, Project, RunState, Session, Snapshot, StepRow, TriageLine,
+  Activity, InboxItem, Mission, PartRow, Project, RunState, Session, Snapshot, StepRow,
 } from './model.js';
 
 /**
@@ -25,7 +27,6 @@ const DAY = 24 * 60 * 60 * 1000;
 const BODY_LINES = 200;
 
 const events = (): string => path.join(factoryHome(), 'events');
-const pids = (): string => path.join(factoryHome(), 'caffeinate');
 
 // ── events ───────────────────────────────────────────────────────────────────
 
@@ -90,28 +91,26 @@ const waiting = (ev: Ev | undefined): boolean => ev?.event === 'Stop' || ev?.eve
 
 // ── steps ────────────────────────────────────────────────────────────────────
 
-/** A parallel group draws as its own rows; only the top-level ones can be the human's own gates,
- *  and only the ones before the first worker step, which is where `early` comes from. */
-function flatten(steps: WorkflowStep[]): [step: WorkflowStep, early: boolean][] {
-  const work = steps.findIndex((s) => s.role === 'worker');
-  return steps.flatMap((step, i): [WorkflowStep, boolean][] =>
-    [[step, work < 0 || i < work], ...(step.parallel ?? []).map((name): [WorkflowStep, boolean] => [{ name }, false])]);
-}
+/** A parallel group draws as its own rows: the group, then each member under it. */
+const flatten = (steps: WorkflowStep[]): WorkflowStep[] =>
+  steps.flatMap((step) => [step, ...(step.parallel ?? []).map((name): WorkflowStep => ({ name }))]);
 
 function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): StepRow[] {
   return flatten(steps)
-    .map(([step, early]): StepRow => {
+    .map((step): StepRow => {
       const state = m.state.steps[step.name];
       const gateOpen = m.state.gates[step.name]?.status === 'open';
       const start = Date.parse(state?.startedAt ?? '');
       const end = Date.parse(state?.endedAt ?? '');
       const from = Number.isNaN(start) ? null : start;
       const to = Number.isNaN(end) ? Date.now() : end;
+      const role = stepRole(step);
       return {
         name: step.name,
-        kind: stepKind(step, early),
+        kind: stepKind(step),
         status: (gateOpen ? 'blocked' : state?.status ?? 'pending') as RunState,
-        ...(step.role ? { role: step.role } : {}),
+        role,
+        ...(ROLE_MODEL[role] ? { model: ROLE_MODEL[role] } : {}),
         ...(from ? { wall: to - from } : {}),
         ...(from && tail ? { tokens: sumUsage(tail.usage, from, to) } : {}),
         ...(gateOpen ? { gateOpen } : {}),
@@ -121,37 +120,31 @@ function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): Ste
 
 // ── inbox ────────────────────────────────────────────────────────────────────
 
-/** The triage the orchestrator wrote: `fix` or `skip` in a findings.md table row. */
-function triagePlan(body: string[]): TriageLine[] {
-  const plan: TriageLine[] = [];
-  for (const line of body) {
-    const cells = line.split('|').map((c) => c.trim()).filter((c) => c !== '');
-    const action = cells.find((c) => c === 'fix' || c === 'skip') as TriageLine['action'] | undefined;
-    if (!action || cells.length < 2) continue;
-    plan.push({ action, text: cells.filter((c) => c !== action).sort((a, b) => b.length - a.length)[0] ?? '' });
-  }
-  return plan;
-}
-
 async function bodyOf(dir: string, file: string): Promise<string[]> {
   const text = await readFile(path.join(dir, file), 'utf-8').catch(() => '');
   return text === '' ? [] : text.replace(/\n$/, '').split('\n').slice(0, BODY_LINES);
 }
 
-/** An open gate is one Inbox item; on the accept step it is the round's triage. */
-async function gateItems(project: string, m: CoreMission): Promise<InboxItem[]> {
+/** Everything of one mission that waits on the human: each open gate, each waiting decision. */
+async function waitItems(project: string, m: CoreMission, decisions: Decision[]): Promise<InboxItem[]> {
   const items: InboxItem[] = [];
   for (const [step, gate] of Object.entries(m.state.gates)) {
     if (gate.status !== 'open') continue;
-    const at = Date.parse(gate.at) || Date.now();
-    const base = { project, origin: m.state.name, at };
-    if (step === 'accept') {
-      const body = await bodyOf(m.dir, 'findings.md');
-      items.push({ ...base, kind: 'triage', step, label: `triage r${m.state.round}`, plan: triagePlan(body) });
-      continue;
-    }
     const body = gate.file ? await bodyOf(m.dir, gate.file) : [];
-    items.push({ ...base, kind: 'gate', step, label: `gate ${step}`, file: gate.file ?? '', lines: body.length, body });
+    items.push({
+      kind: 'gate', project, origin: m.state.name, at: Date.parse(gate.at) || Date.now(),
+      label: `gate ${step}`, answer: `factory gate answer ${step} accept|amend|reject`,
+      file: gate.file ?? '', lines: body.length, body,
+    });
+  }
+  // decisions.md carries no clock, so a waiting row is as old as the last thing the mission wrote.
+  const at = Date.parse(m.state.updated) || Date.now();
+  for (const d of decisions.filter((row) => row.status === 'waiting')) {
+    items.push({
+      kind: 'decision', project, origin: m.state.name, at, label: `decision ${d.id}`,
+      answer: `factory decision answer ${d.id} accept|overrule`,
+      text: `${d.step} · ${d.by} · ${d.confidence}\n${d.summary}`,
+    });
   }
   return items;
 }
@@ -199,17 +192,6 @@ export async function settle(): Promise<void> {
 
 // ── missions and sessions ────────────────────────────────────────────────────
 
-/** The hook records one pid per session; a stale file outlives the process that made it. */
-async function caffeinated(session: string | null): Promise<boolean> {
-  if (!session) return false;
-  const pid = Number(await readFile(path.join(pids(), `${session}.pid`), 'utf-8').catch(() => ''));
-  try {
-    return pid > 0 && process.kill(pid, 0);
-  } catch {
-    return false;
-  }
-}
-
 /** `logged` is per session: two missions can name one — a closed one and its successor. */
 interface Ctx { activity: Activity[]; inbox: InboxItem[]; logged: Set<string> }
 
@@ -221,7 +203,7 @@ function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: strin
   for (const at of ev?.stops ?? []) ctx.activity.push({ at, session, verb: 'Stop', text: '' });
 }
 
-async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission, ev: Ev | undefined): Promise<Mission> {
+async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission, ev: Ev | undefined, archived: boolean): Promise<Mission> {
   const state = m.state;
   // A worktree mission runs in its own checkout, so that is where its transcript was written.
   const cwd = ev?.cwd || state.worktree || dir;
@@ -229,8 +211,10 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
   const workflow = await missionWorkflow(m).catch(() => null);
   const steps = stepRows(m, workflow?.steps ?? [], tail);
 
+  const decisions = await readDecisions(m.dir);
+
   logRows(ctx, tail, ev, state.session ?? '');
-  ctx.inbox.push(...(await gateItems(project, m)));
+  ctx.inbox.push(...(await waitItems(project, m, decisions)));
   if (waiting(ev) && tail?.text) {
     ctx.inbox.push(question(project, state.name, `factory-${state.name}`, tail.text, ev!.at));
   }
@@ -244,17 +228,19 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
     status: state.status,
     state: missionRowState(state) as RunState,
     autonomy: state.autonomy,
+    archived,
     step: state.step || null,
     round: state.round,
     session: state.session,
+    preset: ev?.preset ?? null,
     branch: state.branch,
     worktree: state.worktree,
-    caffeinate: await caffeinated(state.session),
     wall: steps.reduce((n, s) => n + (s.wall ?? 0), 0),
     tokens: tail ? sumUsage(tail.usage) : { input: 0, cached: 0, output: 0 },
     ...(diff ? { diff } : {}),
     steps,
-    deviations: state.deviations.length,
+    decisions,
+    deviations: state.deviations.map((d) => `${d.what}: ${d.reason}`),
     ...(state.status === 'closed' ? { closedAt: Date.parse(state.updated) || Date.now() } : {}),
   };
 }
@@ -277,9 +263,9 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
 
 // ── snapshot ─────────────────────────────────────────────────────────────────
 
-const parts = (states: Awaited<ReturnType<typeof scanProject>>): PartRow[] =>
-  states.map((s) => ({
-    name: s.part.name, type: s.part.type,
+const parts = async (dir: string): Promise<PartRow[]> =>
+  (await scanProject(dir)).map((s) => ({
+    name: s.part.name, type: s.part.type, description: s.part.description,
     status: s.status === 'installed' || s.status === 'modified' ? s.status : 'not-installed',
     files: s.part.files.map((f) => f.target),
   }));
@@ -311,19 +297,23 @@ function owner(dirs: Dir[], real: string): string | null {
 export async function buildSnapshot(): Promise<Snapshot> {
   const dirs = await projectDirs();
   const events = await readEvents();
-  const found = new Map<string, CoreMission[]>();
-  for (const { dir } of dirs) found.set(dir, await listMissions(dir).catch(() => []));
+  const found = new Map<string, [mission: CoreMission, archived: boolean][]>();
+  for (const { dir } of dirs) {
+    const live = await listMissions(dir).catch(() => []);
+    const archived = await listArchived(dir).catch(() => []);
+    found.set(dir, [...live.map((m): [CoreMission, boolean] => [m, false]), ...archived.map((m): [CoreMission, boolean] => [m, true])]);
+  }
 
   // A session bound to any mission is that mission's row, never an unbound one of its own.
-  const bound = new Set([...found.values()].flatMap((ms) => ms.map((m) => m.state.session).filter((s) => s !== null)));
+  const bound = new Set([...found.values()].flatMap((ms) => ms.map(([m]) => m.state.session).filter((s) => s !== null)));
   const ctx: Ctx = { activity: [], inbox: [], logged: new Set() };
   const projects: Project[] = [];
 
   for (const { dir, real } of dirs) {
     const name = path.basename(dir);
     const missions: Mission[] = [];
-    for (const m of found.get(dir) ?? []) {
-      missions.push(await missionRow(ctx, name, real, m, m.state.session ? events.get(m.state.session) : undefined));
+    for (const [m, archived] of found.get(dir) ?? []) {
+      missions.push(await missionRow(ctx, name, real, m, m.state.session ? events.get(m.state.session) : undefined, archived));
     }
     const sessions: Session[] = [];
     for (const ev of events.values()) {
@@ -332,10 +322,10 @@ export async function buildSnapshot(): Promise<Snapshot> {
       if (!(await sessionLive(ev.session))) continue;
       sessions.push(await sessionRow(ctx, name, ev));
     }
-    projects.push({ name, path: dir, missions, sessions, parts: parts(await scanProject(dir)) });
+    projects.push({ name, path: dir, missions, sessions, parts: await parts(dir) });
   }
 
   ctx.inbox.sort((a, b) => a.at - b.at);
   ctx.activity.sort((a, b) => a.at - b.at);
-  return { projects, inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
+  return { projects, global: await parts(home()), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
 }

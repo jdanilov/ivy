@@ -1,7 +1,8 @@
 import type { InboxItem } from './model.js';
 
-/** Two items are the same message while they name the same origin and kind; only the age moves. */
-export const inboxKey = (item: InboxItem): string => `${item.project}/${item.origin}/${item.kind}`;
+/** Two items are the same message while they name the same origin and label; only the age moves.
+ *  The label carries the gate's step and the decision's id, so a second decision is a new key. */
+export const inboxKey = (item: InboxItem): string => `${item.project}/${item.origin}/${item.label}`;
 
 /** Items the last snapshot did not have. The first snapshot is the backlog, not news. */
 export function arrivals(prev: InboxItem[] | null, next: InboxItem[]): InboxItem[] {

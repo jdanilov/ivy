@@ -1,37 +1,41 @@
 /** What Mission Control draws. `live.ts` fills these from state.json, events and manifests. */
 
 import type { Caffeinate } from '../core/config.js';
+import { stepRole } from '../core/workflow.js';
+import type { Decision } from '../core/decision.js';
+import type { WorkflowStep } from '../types.js';
 
-export type { Caffeinate };
+export type { Caffeinate, Decision };
 
 export type RunState = 'pending' | 'running' | 'done' | 'blocked' | 'skipped';
 
 /** Which colour family a step belongs to, independent of where it is in its life. */
 export type StepKind = 'human' | 'gatekeeper' | 'agent' | 'technical';
 
-/** As much of a workflow step as the kind is read from. */
-export interface KindOf { name: string; role?: string; gate?: string; parallel?: string[] }
-
-const GATEKEEPING = ['verify', 'validate', 'accept'];
+/** Steps a closed mission's workflow copy still carries, from before the graph was folded. */
+const OLD: Record<string, StepKind> = { grill: 'human', accept: 'gatekeeper', condense: 'technical' };
 
 /**
- * What kind of work a step is. The role settles it where the workflow gives one, then the three
- * names every workflow gatekeeps under, then the human's own: a gate before the work starts is a
- * decision, the same gate after it is bookkeeping. `early` is false past the first worker step.
+ * What kind of work a step is. `stepRole` settles who runs it and the runner settles the family;
+ * a parallel group is whatever its members are; a gate the human answers is the human's own.
  * One mapping for the live snapshot and the fixture both, so a review reads the real colours.
  */
-export function stepKind(step: KindOf, early = false): StepKind {
-  if (step.role === 'worker' || step.role === 'investigator') return 'agent';
-  if (GATEKEEPING.includes(step.name) || (step.parallel ?? []).some((n) => GATEKEEPING.includes(n))) return 'gatekeeper';
-  if (step.name === 'grill' || step.name === 'intent' || (step.gate === 'human' && early)) return 'human';
-  return 'technical';
+export function stepKind(step: WorkflowStep): StepKind {
+  const role = stepRole(step);
+  if (role === 'worker' || role === 'investigator') return 'agent';
+  if (role === 'verifier' || role === 'validator') return 'gatekeeper';
+  if ((step.parallel ?? []).some((name) => stepKind({ name }) === 'gatekeeper')) return 'gatekeeper';
+  if (step.gate === 'human') return 'human';
+  return OLD[step.name] ?? 'technical';
 }
 
 export interface StepRow {
   name: string;
   kind: StepKind;
   status: RunState;
-  role?: string;
+  /** Who runs it and with which model: `stepRole` and `ROLE_MODEL`, never guessed here. */
+  role: string;
+  model?: string;
   wall?: number;
   /** Transcript usage inside the step's own window. */
   tokens?: { input: number; cached: number; output: number };
@@ -61,18 +65,23 @@ export interface Mission {
   status: 'open' | 'stub' | 'closed';
   state: RunState;
   autonomy: Autonomy;
+  /** Moved to `.factory/archive/`: off the list until `Z` asks for it. */
+  archived: boolean;
   step: string | null;
   round: number;
   session: string | null;
+  /** The preset the bound session was spawned with, from the hook's own SessionStart line. */
+  preset: string | null;
   branch: string | null;
   worktree: string | null;
-  caffeinate: boolean;
   wall: number;
   tokens: { input: number; cached: number; output: number };
   /** Lines the branch adds and removes against the trunk. Absent until the first `git diff` lands. */
   diff?: { added: number; removed: number };
   steps: StepRow[];
-  deviations: number;
+  /** One `<what>: <reason>` per entry, so the pane shows why and not only how many. */
+  deviations: string[];
+  decisions: Decision[];
   closedAt?: number;
 }
 
@@ -89,6 +98,7 @@ export interface Session {
 export interface PartRow {
   name: string;
   type: string;
+  description: string;
   status: 'installed' | 'not-installed' | 'modified';
   files: string[];
 }
@@ -101,30 +111,25 @@ export interface Project {
   parts: PartRow[];
 }
 
-export interface TriageLine {
-  action: 'fix' | 'skip';
-  text: string;
-}
-
 export interface InboxItem {
-  kind: 'gate' | 'question' | 'triage';
+  kind: 'gate' | 'decision' | 'question';
   project: string;
   origin: string;
-  /** The workflow step an answer is recorded against; absent on a question. */
-  step?: string;
   label: string;
   at: number;
-  answered?: boolean;
+  /** The command that answers it in the session. Mission Control shows it and answers nothing. */
+  answer?: string;
   file?: string;
   lines?: number;
   body?: string[];
   text?: string;
   tab?: string;
-  plan?: TriageLine[];
 }
 
 export interface Snapshot {
   projects: Project[];
+  /** The user's own parts, under `~/.claude/`: the `~ global` row's PARTS. */
+  global: PartRow[];
   inbox: InboxItem[];
   activity: Activity[];
   caffeinate: Caffeinate;

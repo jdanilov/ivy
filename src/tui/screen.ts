@@ -1,16 +1,16 @@
 import {
-  BoxRenderable, InputRenderable, InputRenderableEvents, TextRenderable, createCliRenderer,
-  type CliRenderer, type KeyEvent,
+  BoxRenderable, TextRenderable, createCliRenderer, type CliRenderer, type KeyEvent,
 } from '@opentui/core';
 import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { C, GLYPH, stateColor, stepColor } from './theme.js';
 import { ago, clock, dur, id, len, line, spread, tokens, wrap, type Cell } from './format.js';
-import { answerGate, applyParts, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
-import { factoryHome } from '../core/projects.js';
-import type { Activity, Autonomy, Caffeinate, InboxItem, Mission, Project, Session, Snapshot } from './model.js';
+import { applyParts, archive, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
+import { factoryHome, home } from '../core/projects.js';
+import type {
+  Activity, Autonomy, Caffeinate, Decision, InboxItem, Mission, Project, Session, Snapshot, StepKind,
+} from './model.js';
 
-const ANSWERS = ['accept', 'amend', 'reject'] as const;
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
 const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 
@@ -27,41 +27,45 @@ export interface Ui {
   left: number;
   msg: number;
   part: number;
-  answer: number;
-  answered: Set<number>;
   toggles: Record<string, boolean>;
   confirm: boolean;
   full: boolean;
-  /** Rows the full-height log is scrolled back from its foot. Zero everywhere else. */
+  /** Rows the full-height foot is scrolled back from its own foot. Zero everywhere else. */
   scroll: number;
   help: boolean;
-  hideClosed: boolean;
+  /** Which pane the foot draws. Decisions is what a mission is waiting to be read for. */
+  foot: 'decisions' | 'activity';
+  showArchived: boolean;
   toast: string | null;
-  /** Open while a rejected or amended gate is waiting for its one-line note. */
-  note: { verdict: 'amend' | 'reject'; text: string } | null;
 }
 
 export function newUi(): Ui {
   return {
-    focus: 'left', left: 0, msg: 0, part: 0, answer: 0, answered: new Set(), toggles: {},
-    confirm: false, full: false, scroll: 0, help: false, hideClosed: false, toast: null, note: null,
+    focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
+    scroll: 0, help: false, foot: 'decisions', showArchived: false, toast: null,
   };
 }
 
 /** One selectable row of the left pane. The right pane is whatever this points at. */
 export type LeftItem =
   | { kind: 'inbox' }
+  | { kind: 'global'; project: Project }
   | { kind: 'project'; project: Project }
   | { kind: 'mission'; project: Project; mission: Mission }
   | { kind: 'session'; project: Project; session: Session };
 
-export function leftItems(snap: Snapshot, hideClosed = false): LeftItem[] {
+/** The user's own parts as a project row: one PARTS pane, one apply path, the home dir as its root. */
+const globalRow = (snap: Snapshot): LeftItem =>
+  ({ kind: 'global', project: { name: '~ global', path: home(), missions: [], sessions: [], parts: snap.global } });
+
+export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
   return [
     { kind: 'inbox' },
+    globalRow(snap),
     ...snap.projects.flatMap((project): LeftItem[] => [
       { kind: 'project', project },
       ...project.missions
-        .filter((mission) => !(hideClosed && mission.status === 'closed'))
+        .filter((mission) => showArchived || !mission.archived)
         .map((mission): LeftItem => ({ kind: 'mission', project, mission })),
       ...project.sessions.map((session): LeftItem => ({ kind: 'session', project, session })),
     ]),
@@ -71,17 +75,18 @@ export function leftItems(snap: Snapshot, hideClosed = false): LeftItem[] {
 /** Identity of a row, so the selection survives a list that changed under it. */
 export function itemKey(item: LeftItem): string {
   return item.kind === 'inbox' ? 'inbox'
+    : item.kind === 'global' ? 'global'
     : item.kind === 'project' ? `p ${item.project.name}`
     : item.kind === 'mission' ? `m ${item.project.name}/${item.mission.name}`
     : `s ${item.session.id}`;
 }
 
-/** What the right pane and the activity pane are about. */
+/** What the right pane and the foot pane are about. */
 function subject(here: LeftItem): string {
   return here.kind === 'inbox' ? 'all projects'
-    : here.kind === 'project' ? here.project.name
+    : here.kind === 'session' ? here.session.preset
     : here.kind === 'mission' ? here.mission.name
-    : here.session.preset;
+    : here.project.name;
 }
 
 function clamp(i: number, n: number): number {
@@ -160,6 +165,11 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   if (ui.toast) return p.row([[ui.toast, C.dim]]);
   if (here.kind === 'mission') return missionBar(p, here.mission);
   if (here.kind === 'inbox') return summary(p, snap.projects.flatMap((project) => project.missions));
+  if (here.kind === 'global') {
+    const on = here.project.parts.filter((part) => part.status !== 'not-installed').length;
+    return p.row([[`${on}/${here.project.parts.length} `, C.bright], ['installed in ', C.dim],
+      [path.join(here.project.path, '.claude'), C.bright], ['  ·  the user\'s own parts, in every project', C.dim]]);
+  }
   return summary(p, here.project.missions);
 }
 
@@ -167,19 +177,19 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
  *  terminal is too narrow, because the overlay it opens lists everything anyway. */
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
+  const parts = here.kind === 'project' || here.kind === 'global';
+  const foot: string[][] = ui.foot === 'decisions' ? [['A', 'Activity'], ['F', 'Full']] : [['D', 'Decisions'], ['F', 'Full']];
   const pairs: string[][] =
-    // The panel and the full log each take the screen: their bars list what still answers.
+    // The panel and the full foot each take the screen: their bars list what still answers.
     ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ f esc', 'Back'], ['Q', 'Quit']] :
-    !right ? [['↑↓', 'Select'], ['↵', 'Open'], ['O', 'Tab'], ['X', 'Kill'], ['C', 'Caffeinate'],
-      ['Z', 'Closed'], ['F', 'Activity'], ['?', 'Help'], ['Q', 'Quit']]
-    // ←→ pick the answer in Messages, so only esc leaves that one.
-    : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←→', 'Answer'], ['↵', 'Confirm'], ['esc', 'Back'],
-      ['F', 'Activity'], ['?', 'Help'], ['Q', 'Quit']]
-    : here.kind === 'project' && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
-    : here.kind === 'project' ? [['↑↓', 'Select'], ['Space', 'Toggle'], ['↵', 'Apply'],
-      ...(pending(here.project, ui).length ? [['R', 'Reset']] : []), ['←esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']]
-    : [['←esc', 'Back'], ['C', 'Caffeinate'], ['F', 'Activity'], ['?', 'Help'], ['Q', 'Quit']];
+    !right ? [['↑↓', 'Select'], ['↵', 'Open'], ['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'],
+      ['H', 'Archive'], ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
+    : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
+    : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
+    : parts ? [['↑↓', 'Select'], ['Space', 'Toggle'], ['↵', 'Apply'],
+      ...(pending(here.project, ui).length ? [['R', 'Reset'], ['esc', 'Discard']] : [['←esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
+    : [['←esc', 'Back'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']];
 
   const cells = (list: string[][]): Cell[] =>
     list.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]);
@@ -198,7 +208,8 @@ function diffCells(m: Mission): Cell[] {
 function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): void {
   const quiet = m.status !== 'open';
   const tail: Cell[] =
-    m.status === 'stub' ? [['  stub', C.dim]]
+    m.archived ? [['  archived', C.dim]]
+    : m.status === 'stub' ? [['  stub', C.dim]]
     : m.status === 'closed' ? [[`  closed ${ago(m.closedAt ?? Date.now())}`, C.dim]]
     : [['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright], [m.round ? ` ↻${m.round}` : '', C.dim]];
   const right: Cell[] = m.status === 'open'
@@ -216,9 +227,9 @@ function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): v
 }
 
 function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
-  const hidden = ui.hideClosed
-    ? snap.projects.reduce((n, project) => n + project.missions.filter((m) => m.status === 'closed').length, 0) : 0;
-  p.row([['PROJECTS', C.bright], [hidden ? `  ${hidden} closed hidden` : '', C.dim]]);
+  const hidden = ui.showArchived
+    ? 0 : snap.projects.reduce((n, project) => n + project.missions.filter((m) => m.archived).length, 0);
+  p.row([['PROJECTS', C.bright], [hidden ? `  ${hidden} archived hidden` : '', C.dim]]);
   p.rule();
 
   const focused = ui.focus === 'left';
@@ -226,11 +237,11 @@ function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
     const selected = i === ui.left;
     if (item.kind === 'mission') return missionRow(p, item.mission, selected, focused);
     if (item.kind === 'session') return sessionRow(p, item.session, selected, focused);
-    const open = snap.inbox.length - ui.answered.size;
-    if (i) p.row([]); // a blank line between the Inbox and each project
+    const open = snap.inbox.length;
+    if (i > 1) p.row([]); // a blank line between the Inbox, the global row and each project
     const head: Cell[] = item.kind === 'inbox'
       ? [['Inbox', C.bright], [` (${open})`, open ? C.warning : C.dim]]
-      : [[item.project.name, C.bright]];
+      : [[item.project.name, item.kind === 'global' ? C.dim : C.bright]];
     p.row([marker(selected, focused), ...head], selected && focused);
     // Nothing under a heading reads as a screen that failed to load: the hint names the way out,
     // indented where the row it stands in for would be.
@@ -246,73 +257,56 @@ function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
 
 // ── messages ──────────────────────────────────────────────────────────────────
 
-function messagesPane(r: CliRenderer, p: Pane, snap: Snapshot, ui: Ui, h: number): void {
+function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {
   const items = snap.inbox;
-  p.row([['MESSAGES', C.bright], [` (${items.length - ui.answered.size})`, C.dim]]);
+  p.row([['MESSAGES', C.bright], [` (${items.length})`, C.dim]]);
   p.rule();
 
   items.forEach((item, i) => {
     const selected = i === ui.msg;
-    const answered = ui.answered.has(i);
     const cells: Cell[] = [
-      marker(selected, ui.focus === 'right'),
-      [answered ? '✓ ' : '⊘ ', answered ? C.success : C.warning],
+      marker(selected, ui.focus === 'right'), ['⊘ ', C.warning],
       [`${item.project}/${item.origin}`, C.bright], ['  ', C.dim], [item.label, C.dim],
     ];
-    p.row(spread(cells, [[answered ? 'answered' : ago(item.at), C.dim]], p.width), selected && ui.focus === 'right');
+    p.row(spread(cells, [[ago(item.at), C.dim]], p.width), selected && ui.focus === 'right');
   });
 
   p.rule();
   const item = items[ui.msg];
-  if (item) messageDetail(r, p, item, ui, h - 3 - items.length);
+  if (item) messageDetail(p, item, h - 3 - items.length);
 }
 
-/** Sits at the foot of the pane: `pad` blank rows push it there, one more separates it. */
-function answerRow(r: CliRenderer, p: Pane, ui: Ui, answered: boolean, pad: number): void {
-  for (let i = 0; i <= pad; i++) p.row([]);
-  if (answered) return p.row([['✓ answered', C.success]]);
-  if (ui.note) return notePrompt(r, p, ui.note);
-  p.row(ANSWERS.flatMap((a, i) => [[` ${a} `, C.bright, ui.focus === 'right' && i === ui.answer], ['  ', C.dim]] as Cell[]));
-}
-
-/** An amend or a reject is a sentence, not a verdict: the input takes it where the verdicts were. */
-function notePrompt(r: CliRenderer, p: Pane, note: NonNullable<Ui['note']>): void {
-  p.row([[`${note.verdict} `, C.warning], ['note', C.bright], ['   ↵ record · esc cancel', C.dim]]);
-  const input = new InputRenderable(r, {
-    width: p.width, flexShrink: 0, value: note.text,
-    placeholder: 'one line', textColor: C.bright, placeholderColor: C.dim, cursorColor: C.accent,
-  });
-  // The text lives in the Ui, so a rebuild under the human's hands redraws what they have typed.
-  input.on(InputRenderableEvents.INPUT, (value: string) => { note.text = value; });
-  p.box.add(input);
-  input.focus();
-}
-
-function messageDetail(r: CliRenderer, p: Pane, item: InboxItem, ui: Ui, h: number): void {
-  const answered = ui.answered.has(ui.msg);
-  const room = Math.max(0, h - 3);
+/** Read-only, on purpose: one answer path, the session that raised it, and the CLI records it. */
+function messageDetail(p: Pane, item: InboxItem, h: number): void {
+  const room = Math.max(1, h - 3);
 
   if (item.kind === 'gate') {
     p.row([[item.file ?? '', C.bright], [` (${item.lines} lines)`, C.dim]]);
     const body = (item.body ?? []).flatMap((l) => (l ? wrap(l, p.width, 4) : ['']));
-    for (const l of body.slice(0, room)) p.row([[l, C.dim]]);
-    return answerRow(r, p, ui, answered, room - Math.min(body.length, room));
-  }
-  if (item.kind === 'question') {
-    for (const l of wrap(item.text ?? '', p.width, Math.max(1, h - 2))) p.row([[l, C.bright]]);
-    p.row([]);
-    // Warp cannot focus a tab from outside; the name is what the human types into its tab switcher.
-    return p.row([['tab ', C.dim], [item.tab ?? '', C.dim]]);
+    for (const l of body.slice(0, room - 1)) p.row([[l, C.dim]]);
+  } else {
+    for (const text of (item.text ?? '').split('\n')) for (const l of wrap(text, p.width, room)) p.row([[l, C.bright]]);
   }
 
-  const plan = item.plan ?? [];
-  p.row([['triage ', C.dim], [item.label.replace('triage ', ''), C.bright],
-    [`  ${plan.filter((l) => l.action === 'fix').length} fix · ${plan.filter((l) => l.action === 'skip').length} skip`, C.dim]]);
-  for (const l of plan) p.row([[l.action === 'fix' ? 'fix   ' : 'skip  ', l.action === 'fix' ? C.accent : C.dim], [l.text, C.bright]]);
-  answerRow(r, p, ui, answered, Math.max(0, room - plan.length));
+  p.row([]);
+  // Warp cannot focus a tab from outside; the name is what the human types into its tab switcher.
+  if (item.kind === 'question') return p.row([['answer in tab ', C.dim], [item.tab ?? '—', C.bright]]);
+  p.row([['answer in the session: ', C.dim], [item.answer ?? '', C.bright]]);
 }
 
 // ── mission and session ───────────────────────────────────────────────────────
+
+/** Who runs a step, and with what. The Orchestrator's own steps name no model: it is this session. */
+const runner = (s: { role: string; model?: string } | undefined): string =>
+  s === undefined ? '—' : s.model && s.role !== 'orchestrator' ? `${s.role} · ${s.model}` : s.role;
+
+/** The four facts, label column and value column, so they read as a table without one being drawn. */
+const LABEL = 13;
+const DOT: Cell = [' · ', C.rule];
+
+function fact(p: Pane, label: string, cells: Cell[]): void {
+  p.row([[label.padEnd(LABEL), C.dim], ...cells]);
+}
 
 function missionPane(p: Pane, m: Mission): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
@@ -321,24 +315,24 @@ function missionPane(p: Pane, m: Mission): void {
 
   for (const s of m.steps) {
     const cells: Cell[] = [
-      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind)],
-      ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
+      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name.padEnd(12), stepColor(s.kind)],
+      [runner(s), C.dim], ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
     const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
-    // A duration is only news for a step that is getting somewhere: skipped, failed and blocked
-    // all measure a time nobody wants, and the word is what the row is for.
+    // A duration is only news for a step that is getting somewhere: skipped and blocked both
+    // measure a time nobody wants, and the word is what the row is for.
     const timed = s.status === 'running' || s.status === 'done';
     p.row(spread(cells, [[spend ? `${tokens(spend)}  ` : '', C.dim], [timed && s.wall ? dur(s.wall) : s.status, C.dim]], p.width));
   }
   if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
 
   p.rule();
-  const step = m.steps.find((s) => s.name === m.step);
-  p.row([['step ', C.dim], [m.step ?? '—', C.bright], [' · role ', C.dim], [step?.role ?? '—', C.bright],
-    [' · round ', C.dim], [`${m.round}`, C.bright], [' · autonomy ', C.dim], [m.autonomy, C.bright]]);
-  p.row([['branch ', C.dim], [m.branch ?? '—', C.bright], [' · wt ', C.dim], [m.worktree ?? '—', C.bright]]);
-  p.row([['session ', C.dim], [m.session ? id(m.session) : '—', C.bright], [' · caffeinate ', C.dim], [m.caffeinate ? 'on' : 'off', C.bright]]);
-  p.row([['deviations ', C.dim], [`${m.deviations}`, C.bright]]);
+  fact(p, 'step', [[m.step ?? '—', C.bright], DOT, [runner(m.steps.find((s) => s.name === m.step)), C.dim],
+    DOT, [`round ${m.round}`, C.dim]]);
+  fact(p, 'branch', [[m.branch ?? '—', C.bright], DOT, [`worktree ${m.worktree ?? '—'}`, C.dim]]);
+  fact(p, 'session', [[m.preset ?? (m.session ? id(m.session) : '—'), C.bright], DOT,
+    [`${m.state}${m.wall ? ` ${dur(m.wall)}` : ''}`, C.dim]]);
+  if (m.deviations.length) fact(p, 'deviations', [[`${m.deviations.length}`, C.bright], DOT, [m.deviations.join(' · '), C.dim]]);
 }
 
 function sessionPane(p: Pane, s: Session): void {
@@ -394,24 +388,76 @@ function partsPane(p: Pane, project: Project, ui: Ui): void {
     const cells: Cell[] = [
       marker(selected, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
       [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
-      [part.files[0] ?? '', C.dim],
+      [part.description, C.dim],
     ];
     p.row(spread(cells, [[changed ? '±' : ' ', C.accent]], p.width), selected && ui.focus === 'right');
   });
 
   p.rule();
   if (ui.confirm) {
-    return p.row([['apply: ', C.dim], [changes.join(', '), C.bright], ['   y ', C.accent], ['confirm  ', C.dim], ['n ', C.accent], ['cancel', C.dim]]);
+    return p.row([['apply: ', C.dim], [changes.join(', '), C.bright], ['   Y ', C.accent], ['Confirm  ', C.dim], ['N ', C.accent], ['Cancel', C.dim]]);
   }
+  // The files of the selected part, until something is pending: then the way out is what matters.
+  if (changes.length > 0) return p.row([['↵ ', C.accent], ['Apply', C.dim], DOT, ['Esc ', C.accent], ['Discard', C.dim]]);
   for (const file of parts[ui.part]?.files ?? []) p.row([[file, C.dim]]);
 }
 
-// ── activity ──────────────────────────────────────────────────────────────────
+// ── foot: decisions and activity ──────────────────────────────────────────────
 
 const VERB: Record<Activity['verb'], string> = {
   Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
   Tool: C.dim, Stop: C.success,
 };
+
+/** Newest last, oldest scrolled off: both foot panes read the way they were written, and `↑↓`
+ *  walk back through them while the foot is full. The clamp lives here because only this knows
+ *  the room, and the pad below keeps the rule under the pane on its own row. */
+function visible<T>(rows: T[], room: number, ui: Ui): T[] {
+  ui.scroll = ui.full ? Math.max(0, Math.min(ui.scroll, rows.length - room)) : 0;
+  const end = rows.length - ui.scroll;
+  return rows.slice(Math.max(0, end - room), end);
+}
+
+const pad = (p: Pane, shown: number, room: number): void => {
+  for (let i = shown; i < room; i++) p.row([]);
+};
+
+/** Which missions the selection covers: a mission is one, a project its own, the Inbox every one. */
+function missionsOf(snap: Snapshot, here: LeftItem): Mission[] {
+  return here.kind === 'inbox' ? snap.projects.flatMap((project) => project.missions)
+    : here.kind === 'mission' ? [here.mission]
+    : here.kind === 'project' ? here.project.missions : [];
+}
+
+/** `D3  implement  worker  MEDIUM  summary  ⊘ waiting`. An `auto` row is a record, so it reads dim. */
+function decisionRow(p: Pane, mission: string | null, d: Decision): void {
+  const auto = d.status === 'auto';
+  const [glyph, color] =
+    d.status === 'waiting' ? ['⊘ ', C.warning]
+    : d.status === 'accepted' ? ['✓ ', C.success]
+    : d.status === 'overruled' ? ['✗ ', C.error] : ['  ', C.dim];
+  const said = d.status === 'overruled' && d.note !== '' ? `overruled: ${d.note}` : d.status;
+  p.row(spread([
+    [d.id.padEnd(5), auto ? C.dim : C.bright],
+    ...(mission === null ? [] : ([[mission.padEnd(10), C.dim]] as Cell[])),
+    [d.step.padEnd(12), C.dim], [d.by.padEnd(14), C.dim], [d.confidence.padEnd(8), auto ? C.dim : C.bright],
+    [d.summary, auto ? C.dim : C.bright],
+  ], [['  ', C.dim], [glyph, color], [said, color]], p.width));
+}
+
+function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui): void {
+  const missions = missionsOf(snap, here);
+  const rows = missions.flatMap((m) => m.decisions.map((d): [string, Decision] => [m.name, d]));
+  const waiting = rows.filter(([, d]) => d.status === 'waiting').length;
+
+  p.row(spread([['DECISIONS', C.bright], [`  ${subject(here)}`, C.dim]],
+    [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
+  p.rule();
+  const shown = visible(rows, room, ui);
+  for (const [name, d] of shown) decisionRow(p, missions.length > 1 ? name : null, d);
+  if (rows.length === 0) p.row([['no decisions filed yet', C.dim]]);
+  pad(p, Math.max(shown.length, 1), room);
+}
 
 /** Which sessions the selection covers, and what to call each one in the mission column. */
 function sessionsOf(snap: Snapshot, here: LeftItem): Map<string, string> {
@@ -423,71 +469,100 @@ function sessionsOf(snap: Snapshot, here: LeftItem): Map<string, string> {
   if (here.kind === 'inbox') snap.projects.forEach(add);
   else if (here.kind === 'project') add(here.project);
   else if (here.kind === 'mission') { if (here.mission.session) map.set(here.mission.session, here.mission.name); }
-  else map.set(here.session.id, here.session.preset);
+  else if (here.kind === 'session') map.set(here.session.id, here.session.preset);
   return map;
 }
 
-/** Newest at the bottom, oldest scrolled off: the log reads the way it was written. `↑↓` walk
- *  back through it while it is full, and the clamp lives here because only this knows the room. */
-function activityPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
-  if (sep) p.rule();
+function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui): void {
   const owners = sessionsOf(snap, here);
   const rows = snap.activity.filter((a) => owners.has(a.session)).sort((a, b) => a.at - b.at);
   const merged = owners.size > 1;
 
   p.row(spread([['ACTIVITY', C.bright], [`  ${subject(here)}`, C.dim]], [[`${rows.length}`, C.dim]], p.width));
   p.rule();
-  const room = Math.max(0, h - (sep ? 3 : 2));
-  ui.scroll = ui.full ? Math.max(0, Math.min(ui.scroll, rows.length - room)) : 0;
-  const end = rows.length - ui.scroll;
-  for (const a of rows.slice(Math.max(0, end - room), end)) {
+  const shown = visible(rows, room, ui);
+  for (const a of shown) {
     p.row([
       [`${clock(a.at)}  `, C.dim], ...(merged ? ([[(owners.get(a.session) ?? '').padEnd(9), C.dim]] as Cell[]) : []),
       [a.verb.padEnd(7), VERB[a.verb]], [a.text, a.verb === 'Text' || a.verb === 'Ask' ? C.bright : C.dim],
     ]);
   }
-  for (let i = Math.min(rows.length, room); i < room; i++) p.row([]);
+  pad(p, shown.length, room);
+}
+
+/** The pane along the foot, whichever one `A` and `D` last chose. `F` gives it the whole screen. */
+function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
+  if (sep) p.rule();
+  const room = Math.max(0, h - (sep ? 3 : 2));
+  if (ui.foot === 'activity') return activityPane(p, snap, here, room, ui);
+  decisionsPane(p, snap, here, room, ui);
 }
 
 // ── help ──────────────────────────────────────────────────────────────────────
 
-/** Every key the screen answers, by the pane it belongs to. One row per line of the panel. */
-const HELP: [group: string, keys: [string, string][]][] = [
-  ['Global', [['↑↓', 'Select'], ['↵', 'Open'], ['→', 'Enter pane'], ['←esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']]],
-  ['', [['C', 'Caffeinate']]],
-  ['Projects', [['Z', 'Hide closed'], ['O', 'Open tab'], ['X', 'Kill']]],
-  ['Messages', [['↑↓', 'Select'], ['←→', 'Choose answer'], ['↵', 'Confirm'], ['esc', 'Back']]],
-  ['Parts', [['Space', 'Toggle'], ['↵', 'Apply'], ['R', 'Reset'], ['Y', 'Confirm'], ['N', 'Cancel']]],
-  ['Mission', [['T', 'Autonomy full → partial → none']]],
-  ['Activity', [['F', 'Full height'], ['↑↓', 'Scroll'], ['↵', 'Back to the columns']]],
+/** Every key the screen answers, one per line, under the pane it belongs to. */
+const HELP: [group: string, key: string, does: string][] = [
+  ['Global', '↑↓', 'Move the selection'],
+  ['', '→ ↵', 'Enter the right pane'],
+  ['', '← esc', 'Back to the left column'],
+  ['', 'C', 'Caffeinate auto → on → off'],
+  ['', '? Q', 'This panel, and quit'],
+  ['Projects', 'O', 'Open the mission\'s Warp tab'],
+  ['', 'X', 'Kill its session, again within 5s to SIGKILL'],
+  ['', 'T', 'Autonomy full → partial → none'],
+  ['', 'H', 'Archive a closed mission, or bring it back'],
+  ['', 'Z', 'Show the archived ones'],
+  ['Messages', '↑↓', 'Read what waits — gates and decisions answer in the session'],
+  ['Parts', 'Space', 'Toggle a part'],
+  ['', '↵ Y', 'Apply the set, then confirm'],
+  ['', 'R esc', 'Reset or discard the toggles'],
+  ['Foot', 'D', 'Decisions, the forks this mission took'],
+  ['', 'A', 'Activity, what its session did'],
+  ['', 'F', 'Either at full height, ↑↓ scrolls'],
+];
+
+/** The words the screen uses, in the colours it draws them in. */
+const TERMS: [term: string, color: string, means: string][] = [
+  ['mission', C.bright, 'one unit of work: a branch, a folder, a workflow copied in as its graph'],
+  ['workflow', C.bright, 'the ordered steps; add, skip and loop bend one mission\'s copy'],
+  ['gate', C.warning, 'a step that stops until the human answers it — accept, amend, reject'],
+  ['round', C.bright, 'one pass through a loop: gatekeepers check, the work resumes'],
+  ['decision', C.bright, 'a fork an agent took, filed with a confidence: auto, or waiting on you'],
+  ['autonomy', C.bright, 'which confidences wait: full none, partial LOW, none every one'],
+];
+
+/** The four step families, each in the colour the graph draws it in. */
+const KINDS: [string, StepKind][] = [
+  ['human', 'human'], ['gatekeeper', 'gatekeeper'], ['agent', 'agent'], ['technical', 'technical'],
 ];
 
 const GROUP_W = 10;
+const TERM_W = 11;
 
 /** The screen explains itself once, to the human who opened it before reading any doc. */
 const PRIMER = [
   'A mission is one unit of work: its own branch, its workflow copied in as a graph.',
-  'The Orchestrator session grills you, writes the intent, and runs the steps.',
-  'Gates stop for the human: one waits in MESSAGES until you answer it.',
+  'The Orchestrator session grills you, writes the intent, then runs the steps.',
+  'Gates stop for the human; a decision waits when its confidence is under the dial.',
   'Gatekeepers check work they did not write: the Verifier and the Validator.',
-  '`mission close` merges the branch and files what the mission learned.',
 ];
 
 /** Not an overlay: while `?` is open this is the right pane, at the full height of the body. */
 function helpPane(p: Pane): void {
   p.row([['KEYS', C.bright]]);
   p.rule();
-  for (const [group, keys] of HELP) {
-    p.row([[group.padEnd(GROUP_W), C.bright],
-      ...keys.flatMap(([k, label]) => [[`${k} `, C.accent], [`${label}   `, C.dim]] as Cell[])]);
+  for (const [group, key, does] of HELP) {
+    p.row([[group.padEnd(GROUP_W), C.bright], [key.padEnd(7), C.accent], [does, C.dim]]);
   }
-  p.row([]);
+  p.rule();
+  p.row([['TERMS', C.bright]]);
+  p.row([['steps'.padEnd(TERM_W), C.bright],
+    ...KINDS.flatMap(([word, kind]): Cell[] => [[word, stepColor(kind)], [' · ', C.rule]]),
+    ['coloured by who runs them', C.dim]]);
+  for (const [term, color, means] of TERMS) p.row([[term.padEnd(TERM_W), color], [means, C.dim]]);
   p.rule();
   p.row([['HOW FACTORY WORKS', C.bright]]);
   for (const text of PRIMER) for (const l of wrap(text, p.width, 2)) p.row([[l, C.dim]]);
-  p.row([]);
-  p.row([['Next: ', C.dim], ['factory mission new <name>', C.bright], [' in a project, or ', C.dim],
-    ['/mission', C.bright], [' in a session.', C.dim]]);
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -499,12 +574,12 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   for (const child of [...r.root.getChildren()]) child.destroyRecursively();
 
   const w = r.terminalWidth - 2;
-  const items = leftItems(snap, ui.hideClosed);
+  const items = leftItems(snap, ui.showArchived);
   ui.left = clamp(ui.left, items.length);
   const here = items[ui.left]!;
 
-  // Everything under the status rule and above the key-bar rule. Activity keeps a third of it,
-  // the columns take the rest — and either one takes all of it: `f` gives the log the screen,
+  // Everything under the status rule and above the key-bar rule. The foot keeps a third of it,
+  // the columns take the rest — and either one takes all of it: `f` gives the foot the screen,
   // `?` gives the body to the panel, which needs the height to say anything worth reading.
   const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME));
   const actH = ui.full ? region : ui.help ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
@@ -514,7 +589,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   // does not colour keeps the terminal's own.
   const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 1, paddingRight: 1 });
   root.row([]);
-  // Full activity is the log and nothing else: the header and the status bar are rows it can have.
+  // A full-height foot is that pane and nothing else: the header and the status bar are rows it can have.
   if (!ui.full) {
     header(root, here, snap);
     root.rule();
@@ -531,8 +606,8 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
     leftPane(left, items, snap, ui);
     if (ui.help) helpPane(right);
-    else if (here.kind === 'inbox') messagesPane(r, right, snap, ui, bodyH);
-    else if (here.kind === 'project') partsPane(right, here.project, ui);
+    else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
+    else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui);
     else if (here.kind === 'mission') missionPane(right, here.mission);
     else sessionPane(right, here.session);
     body.add(left.box);
@@ -542,7 +617,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     body.add(right.box);
     root.box.add(body);
   }
-  if (actH > 0) activityPane(root, snap, here, actH, bodyH > 0, ui);
+  if (actH > 0) footPane(root, snap, here, actH, bodyH > 0, ui);
 
   root.rule();
   keyBar(root, here, ui);
@@ -580,37 +655,8 @@ function act(app: App, doing: string, fn: () => Promise<string>): void {
   );
 }
 
-/** Where a message came from: the Inbox names its project, the action needs the checkout. */
-function projectOf(snap: Snapshot, name: string): string {
-  const project = snap.projects.find((p) => p.name === name);
-  if (!project) throw new Error(`no project ${name}`);
-  return project.path;
-}
-
-/** ↵ on a gate: `accept` goes straight through, the other two come back here with the note. */
-function record(app: App, verdict: (typeof ANSWERS)[number], note: string): void {
-  const { snap, ui } = app;
-  const item = snap.inbox[ui.msg];
-  if (!item) return;
-  const row = ui.msg;
-  ui.note = null;
-  // The tick is the record, not the attempt: a refused gate leaves the row open for another try.
-  act(app, `${verdict} ${item.label}…`, async () => {
-    const done = await answerGate(projectOf(snap, item.project), item, verdict, note);
-    ui.answered.add(row);
-    return done;
-  });
-}
-
 export function handleKey(app: App, key: KeyEvent): void {
   const { snap, ui } = app;
-
-  // The input owns the keyboard while a note is open: only these two are the screen's.
-  if (ui.note) {
-    if (key.name === 'escape') { ui.note = null; return draw(app); }
-    if (key.name === 'return') return record(app, ui.note.verdict, ui.note.text.trim());
-    return;
-  }
 
   // The panel holds the right pane until it is asked to leave; nothing else acts behind it.
   if (ui.help) {
@@ -620,21 +666,23 @@ export function handleKey(app: App, key: KeyEvent): void {
   }
   if (key.name === '?') { ui.help = true; return draw(app); }
 
-  // The log has the screen to itself: the arrows walk back through it, three keys hand it back.
+  // The foot has the screen to itself: the arrows walk back through it, three keys hand it back.
   if (ui.full) {
     if (key.name === 'up' || key.name === 'k') ui.scroll += 1;
     else if (key.name === 'down' || key.name === 'j') ui.scroll = Math.max(0, ui.scroll - 1);
     else if (key.name === 'return' || key.name === 'f' || key.name === 'escape') ui.full = false;
+    else if (key.name === 'a') ui.foot = 'activity';
+    else if (key.name === 'd') ui.foot = 'decisions';
     else return;
     return draw(app);
   }
 
-  const items = leftItems(snap, ui.hideClosed);
+  const items = leftItems(snap, ui.showArchived);
   ui.left = clamp(ui.left, items.length);
   const here = items[ui.left]!;
   const right = ui.focus === 'right';
   const inMessages = right && here.kind === 'inbox';
-  const inParts = right && here.kind === 'project';
+  const inParts = right && (here.kind === 'project' || here.kind === 'global');
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);
 
   if (inParts && ui.confirm) {
@@ -657,16 +705,15 @@ export function handleKey(app: App, key: KeyEvent): void {
       break;
     }
     case 'right':
-      // In Messages ←→ walk the answer row; everywhere else → is a second ↵.
-      if (inMessages) ui.answer = move(ui.answer, ANSWERS.length, 1);
-      else ui.focus = 'right';
+      ui.focus = 'right';
       break;
     case 'left':
-      if (inMessages) ui.answer = move(ui.answer, ANSWERS.length, -1);
-      else ui.focus = 'left';
+      ui.focus = 'left';
       break;
     case 'escape':
-      ui.focus = 'left';
+      // Esc is the way out of a set of toggles nobody applied; a second one leaves the pane.
+      if (inParts && pending(here.project, ui).length > 0) ui.toggles = {};
+      else ui.focus = 'left';
       break;
     case 'space':
       if (inParts) {
@@ -675,16 +722,8 @@ export function handleKey(app: App, key: KeyEvent): void {
       }
       break;
     case 'return': {
-      if (inMessages) {
-        const item = snap.inbox[ui.msg];
-        if (!item || ui.answered.has(ui.msg)) return;
-        // A question is a turn in someone else's session; only its tab can answer it.
-        if (item.kind === 'question') return toast(app, `answer ${item.origin} in tab ${item.tab ?? '—'}`);
-        const verdict = ANSWERS[ui.answer]!;
-        if (verdict === 'accept') return record(app, verdict, '');
-        ui.note = { verdict, text: '' };
-        break;
-      }
+      // Every message is answered in the session that raised it; the row says which command.
+      if (inMessages) return;
       if (inParts) {
         if (!pending(here.project, ui).length) return;
         ui.confirm = true;
@@ -697,16 +736,30 @@ export function handleKey(app: App, key: KeyEvent): void {
       if (inParts) ui.toggles = {};
       break;
     case 'f':
-      // The log opens at its foot, wherever the last visit left the scroll.
+      // The foot opens at its own foot, wherever the last visit left the scroll.
       ui.full = true;
       ui.scroll = 0;
       break;
+    case 'a':
+      ui.foot = 'activity';
+      break;
+    case 'd':
+      ui.foot = 'decisions';
+      break;
     case 'z': {
-      ui.hideClosed = !ui.hideClosed;
-      const next = leftItems(snap, ui.hideClosed);
+      ui.showArchived = !ui.showArchived;
+      const next = leftItems(snap, ui.showArchived);
       const found = next.findIndex((item) => itemKey(item) === itemKey(here));
       ui.left = found >= 0 ? found : clamp(ui.left, next.length);
       break;
+    }
+    case 'h': {
+      if (right) break;
+      if (here.kind !== 'mission') return toast(app, 'select a mission to archive it');
+      const m = here.mission;
+      if (m.status !== 'closed') return toast(app, `${m.name} is ${m.status} — close it first`);
+      return act(app, `${m.archived ? 'unarchiving' : 'archiving'} ${m.name}…`,
+        () => archive(here.project.path, m.name, m.archived));
     }
     case 't': {
       if (here.kind !== 'mission') break;
@@ -764,13 +817,12 @@ export async function run(snap: Snapshot, live?: Live): Promise<void> {
   r.on('resize', () => draw(app));
   const watcher = live?.((next) => {
     app.snap = next;
-    // A redraw destroys the note input and what the human had typed into it: the next key redraws.
-    if (!app.ui.note) draw(app);
+    draw(app);
   });
 
   await new Promise<void>((done) => {
     r.keyInput.on('keypress', (key: KeyEvent) => {
-      if (key.name === 'q' && !app.ui.note) {
+      if (key.name === 'q') {
         watcher?.close();
         r.destroy();
         return done();

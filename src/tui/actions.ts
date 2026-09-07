@@ -1,20 +1,20 @@
 import path from 'node:path';
 import { readdir, readFile, unlink } from 'node:fs/promises';
-import { gate } from '../commands/gate.js';
 import { install } from '../commands/install.js';
 import { removeParts } from '../core/parts.js';
-import { resolveMission, sessionLive, setAutonomy as writeAutonomy, writeState } from '../core/mission.js';
+import { archiveMission, resolveMission, sessionLive, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { writeCaffeinate, type Caffeinate } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import type { Autonomy, InboxItem } from './model.js';
+import type { Autonomy } from './model.js';
 
 /**
- * What a key actually does. Every action goes through the same functions the CLI runs — `gate`,
- * `install`, `removeParts`, `openSession`, `writeState` — so the screen can never write a mission
- * a command would have written differently. Each returns the line the toast shows; a refusal
- * throws, and the caller toasts that instead.
+ * What a key actually does. Every action goes through the same functions the CLI runs —
+ * `install`, `removeParts`, `openSession`, `archiveMission` — so the screen can never write a
+ * mission a command would have written differently. Each returns the line the toast shows; a
+ * refusal throws, and the caller toasts that instead. Gates and decisions are answered in the
+ * session, never here: one answer path, and the CLI records it.
  */
 
 /** The commands talk to a human on stdout, and stdout is the screen. */
@@ -26,17 +26,6 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
   } finally {
     console.log = log;
   }
-}
-
-// ── gates ────────────────────────────────────────────────────────────────────
-
-/** `factory gate answer <step> <verdict>` with the project as its cwd. First answer wins there. */
-export async function answerGate(project: string, item: InboxItem, verdict: string, note: string): Promise<string> {
-  const step = item.step;
-  if (!step) throw new Error(`${item.label} is not a gate`);
-  const flags = { mission: item.origin, ...(note === '' ? {} : { note }) };
-  await quiet(() => gate('answer', [step, verdict], flags, project));
-  return `${item.origin} ${step} ${verdict}${note === '' ? '' : ` — ${note}`}`;
 }
 
 // ── sessions ─────────────────────────────────────────────────────────────────
@@ -136,9 +125,15 @@ export async function setCaffeinate(mode: Caffeinate): Promise<string> {
   return `caffeinate ${mode.toUpperCase()}`;
 }
 
-// ── autonomy ─────────────────────────────────────────────────────────────────
+// ── missions ─────────────────────────────────────────────────────────────────
 
 export async function setAutonomy(project: string, name: string, autonomy: Autonomy): Promise<string> {
   await writeAutonomy(project, name, autonomy, 'set from Mission Control');
   return `${name} autonomy ${autonomy}`;
+}
+
+/** `git mv` between `.factory/missions/` and `.factory/archive/`; the closed-only rule is the core's. */
+export async function archive(project: string, name: string, back: boolean): Promise<string> {
+  const log = await archiveMission(project, name, back);
+  return log.length > 0 ? log.join(' · ') : `${name} is already ${back ? 'in missions' : 'archived'}`;
 }

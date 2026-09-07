@@ -192,7 +192,7 @@ const projects: Project[] = [
     parts: ivyParts.filter((p) => ['commit', 'mission', 'verify', 'permissions'].includes(p.name)),
     sessions: [
       {
-        id: 'b3f21c07', name: 'recall', preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
+        id: 'b3f21c07', name: 'recall', busy: false, preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
         last: { at: now - 12 * M, verb: 'Notification', detail: 'waiting on the human' },
         question: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
       },

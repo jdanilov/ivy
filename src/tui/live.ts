@@ -284,14 +284,16 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   const asks = asking(ev, tail);
   if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
-  const busy = working(tail);
+  const agent = working(tail);
   return {
     id: ev.session,
     ...(tail.title ? { name: tail.title } : {}),
-    ...(busy ? { working: busy } : {}),
+    // No hook fires between a prompt and its Stop: a prompt after the last Stop is a turn in flight.
+    busy: ev.asks === null || agent !== undefined,
+    ...(agent ? { agent } : {}),
     preset: ev.preset,
     cwd: ev.cwd,
-    idleSince: ev.at,
+    idleSince: ev.stops.at(-1) ?? ev.at,
     last: { at: ev.at, verb: ev.event, detail: ev.detail },
     ...(asks ? { question: asks } : {}),
   };

@@ -155,8 +155,10 @@ dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each ent
 line, and is absent at zero. A session under a project is named by what `--name` or `/rename`
 called it, else by its id, then `· <preset>`, never by its preset alone: two quick sessions must
 not read the same. The `no missions` hint is absent while a session is standing there. A session
-with a sub-agent out in the background reads `● working · <role>` instead of idle, and the turn
-that ended is not a question: the Inbox lists it only once the last sub-agent has reported back.
+is `● working` from its prompt to its Stop — no hook fires in between, so the last event's age
+says nothing — and `● working · <role>` while a sub-agent is out in the background; then the
+turn that ended is not a question, and the Inbox lists it only once the last sub-agent has
+reported back. `○ idle <since its last Stop>` otherwise.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.

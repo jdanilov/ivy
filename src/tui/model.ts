@@ -95,10 +95,13 @@ export interface Session {
   id: string;
   /** What `--name` or `/rename` called it; absent, the row shows the id. */
   name?: string;
-  /** The role of a sub-agent still out in the background: the session is working, not idle. */
-  working?: string;
+  /** A turn in progress: a prompt after the last Stop, or a sub-agent still out in the background. */
+  busy: boolean;
+  /** The role of the sub-agent out in the background, when that is what keeps it busy. */
+  agent?: string;
   preset: string;
   cwd: string;
+  /** When its last turn ended. Meaningless while busy. */
   idleSince: number;
   last?: EventRow;
   question?: string;

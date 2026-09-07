@@ -139,13 +139,14 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
   for (const raw of lines) {
     const line = raw === '' ? null : parse(raw);
     if (!line) continue;
+    // A background sub-agent reports back as a task notification, written as an attachment line.
+    if (line.type !== 'assistant') for (const [, done] of raw.matchAll(/<task-id>([a-z0-9]+)<\/task-id>/g)) tail.running.delete(done!);
     if (line.type === 'custom-title') {
       tail.title = text(line.customTitle);
       continue;
     }
     const blocks = Array.isArray(line.message?.content) ? line.message.content : [];
-    // An Agent result comes back as a user line naming the id its file is written under; one
-    // launched in the background reports back later as a task notification on a user line too.
+    // An Agent result comes back as a user line naming the id its file is written under.
     if (line.type === 'user') {
       for (const block of blocks) {
         const role = block.type === 'tool_result' && block.tool_use_id ? tail.spawns.get(block.tool_use_id) : undefined;
@@ -156,8 +157,6 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
           if (body.includes('in the background')) tail.running.add(agent);
         }
       }
-      const whole = typeof line.message?.content === 'string' ? line.message.content : blocks.map((b) => text(b.text)).join(' ');
-      for (const [, done] of whole.matchAll(/<task-id>([a-z0-9]+)<\/task-id>/g)) tail.running.delete(done!);
       continue;
     }
     if (line.type !== 'assistant') continue;

@@ -73,7 +73,7 @@ export function sessionPane(p: Pane, s: Session): void {
   p.row([['SESSION', C.bright], [`  ${s.name ?? id(s.id)}`, C.dim], [' · ', C.rule], [s.preset, C.dim]]);
   p.rule();
   p.row([['session ', C.dim], [id(s.id), C.bright], DOT,
-    ...(s.working ? ([['working · ', C.dim], [s.working, C.bright]] as Cell[])
+    ...(s.busy ? ([['working', C.bright], ...(s.agent ? [DOT, [s.agent, C.dim]] : [])] as Cell[])
       : ([['idle ', C.dim], [dur(Date.now() - s.idleSince), C.bright]] as Cell[]))]);
   p.row([['cwd ', C.dim], [s.cwd, C.bright]]);
   p.row([['last ', C.dim], [s.last ? `${s.last.verb}  ${s.last.detail}  ${ago(s.last.at)}` : '—', C.bright]]);

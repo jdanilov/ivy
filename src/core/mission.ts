@@ -415,6 +415,18 @@ export async function promoteMission(cwd: string, mission: Mission): Promise<voi
   if (!claim) await writeClaim(main, { mission: state.name, session: null, at: now() });
 }
 
+/**
+ * What every open does before a tab is spawned, the CLI's and Mission Control's alike: a closed
+ * mission refuses, a stub is promoted and the checkout gets its ignore lines. A dry run promotes
+ * nothing. Returns what `ensureIgnored` did, for the CLI to report.
+ */
+export async function readyToOpen(cwd: string, mission: Mission, dry = false): Promise<'added' | 'committed' | null> {
+  if (mission.state.status === 'closed') throw new Refusal(`mission ${mission.state.name} is closed`);
+  if (mission.state.status !== 'stub' || dry) return null;
+  await promoteMission(cwd, mission);
+  return ensureIgnored(await currentCheckout(cwd));
+}
+
 // ── mission close ────────────────────────────────────────────────────────────
 
 /** Every action checks its own postcondition, so a rerun after a crash finishes the job. */

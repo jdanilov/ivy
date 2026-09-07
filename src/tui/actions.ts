@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readdir, readFile, unlink } from 'node:fs/promises';
 import { install } from '../commands/install.js';
 import { removeParts } from '../core/parts.js';
-import { archiveMission, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { archiveMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { writeCaffeinate, type Caffeinate } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
@@ -33,10 +33,15 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
 /** The preset `mission open` uses with no flag: a mission's session is the Orchestrator's. */
 const PRESET = 'orchestrator';
 
-/** A mission whose tab is still live is not reopened; one whose session died gets a new tab. */
+/**
+ * A mission whose tab is still live is not reopened; one whose session died gets a new tab. A
+ * stub is promoted first, as the CLI's `open` does: the tab's session must find a mission, not a
+ * stub, or its own `open` refuses itself as live.
+ */
 export async function openTab(project: string, name: string): Promise<string> {
   const mission = await resolveMission(project, name);
   if (await sessionLive(mission.state.session)) return `factory-${name} is already open — switch to that tab`;
+  await readyToOpen(project, mission);
 
   const spawn = await openSession(project, mission, await loadPreset(PRESET), false);
   return spawn.warp ? `opened tab factory-${name}` : `no warp — run it from ${spawn.configPath}`;

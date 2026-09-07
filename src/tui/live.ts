@@ -3,7 +3,7 @@ import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { readCaffeinate } from '../core/config.js';
 import { readDecisions, type Decision } from '../core/decision.js';
-import { ROLE_MODEL, stepRole } from '../core/workflow.js';
+import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
@@ -41,6 +41,8 @@ interface Ev {
   preset: string;
   /** Every Stop the session has logged: the one activity row the transcript does not carry. */
   stops: number[];
+  /** The final message of a Stop nobody has answered yet; `null` when nothing is waiting. */
+  asks: string | null;
 }
 
 interface EventLine { at?: string; event?: string; cwd?: string; detail?: string | null }
@@ -71,23 +73,36 @@ async function readEvents(): Promise<Map<string, Ev>> {
 
     const stops: number[] = [];
     let preset = 'quick';
+    // What the session is waiting on the human with is the end of a turn, and only a prompt
+    // answers it: an idle Notification after a Stop is the same question asked again, and one
+    // before any Stop is a permission box nobody can read off this screen.
+    let asks: string | null = null;
     for (const raw of lines) {
       const line = parse(raw);
       if (!line) continue;
-      if (line.event === 'Stop') stops.push(Date.parse(line.at ?? ''));
+      if (line.event === 'Stop') {
+        stops.push(Date.parse(line.at ?? ''));
+        asks = line.detail ?? '';
+      }
+      if (line.event === 'UserPromptSubmit') asks = null;
       if (line.event === 'SessionStart' && PRESETS.includes(line.detail ?? '')) preset = line.detail!;
     }
     const cwd = last.cwd ?? '';
     out.set(name.slice(0, -6), {
       session: name.slice(0, -6), cwd, real: await realpath(cwd).catch(() => cwd), at, event: last.event ?? '',
-      detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)),
+      detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)), asks,
     });
   }
   return out;
 }
 
-/** A session waits on the human when its last event was the end of a turn or a prompt. */
-const waiting = (ev: Ev | undefined): boolean => ev?.event === 'Stop' || ev?.event === 'Notification';
+/**
+ * What a session is asking the human, from the hook's own record of the turn that ended: the Stop
+ * carries the exact final message, where the transcript tail carries the last text it happened to
+ * have read. The tail is the fallback for a Stop that logged no message at all.
+ */
+const asking = (ev: Ev | undefined, tail: Tail | null): string =>
+  ev?.asks == null ? '' : ev.asks || tail?.text || '';
 
 // ── steps ────────────────────────────────────────────────────────────────────
 
@@ -110,7 +125,6 @@ function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): Ste
         kind: stepKind(step),
         status: (gateOpen ? 'blocked' : state?.status ?? 'pending') as RunState,
         role,
-        ...(ROLE_MODEL[role] ? { model: ROLE_MODEL[role] } : {}),
         ...(from ? { wall: to - from } : {}),
         ...(from && tail ? { tokens: sumUsage(tail.usage, from, to) } : {}),
         ...(gateOpen ? { gateOpen } : {}),
@@ -215,9 +229,8 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
 
   logRows(ctx, tail, ev, state.session ?? '');
   ctx.inbox.push(...(await waitItems(project, m, decisions)));
-  if (waiting(ev) && tail?.text) {
-    ctx.inbox.push(question(project, state.name, `factory-${state.name}`, tail.text, ev!.at));
-  }
+  const asks = asking(ev, tail);
+  if (asks) ctx.inbox.push(question(project, state.name, `factory-${state.name}`, asks, ev!.at));
 
   // A worktree mission's diff is counted where that mission's commits are.
   const diff = state.status === 'open' && state.branch ? diffCount(state.worktree || dir, state.branch) : undefined;
@@ -248,7 +261,7 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
 async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   const tail = await readTranscript(transcriptPath(ev.cwd, ev.session), ev.session, ev.cwd);
   logRows(ctx, tail, ev, ev.session);
-  const asks = waiting(ev) ? tail.text : '';
+  const asks = asking(ev, tail);
   if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
   return {

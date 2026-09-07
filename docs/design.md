@@ -20,6 +20,8 @@ to both surfaces so they read as one product. Terse-visual vocabulary: `● enti
 | error           | `#cc5555` | 167      | failed, conflict, extrapolated (absent in shots)  |
 | selected row bg | `#b8b8b8` | 251      | inverted row background on focus                  |
 | selected row fg | `#141414` | 233      | text on an inverted row                           |
+| agent blue      | `#6b8fd9` | 68       | agent work: a step a sub-agent runs                |
+| cyan            | `#5fafaf` | 73       | HIGH confidence, the calm end of the decision scale |
 
 Sampled from solid fills (progress bar, orange dot) where anti-aliasing is negligible; small text
 undershoots these values on screen but the hierarchy holds.
@@ -85,19 +87,38 @@ One row per decision of whatever the left column has selected — a mission, a p
 project on the Inbox row — newest last, the mission column present only when more than one is in
 scope. A decision is a fork an agent took; the screen never answers one.
 
+A row is the verdict, the id, one confidence glyph and the decision itself. The step and the agent
+that filed it are in `decisions.md`; on screen they cost the columns the summary needs. Nothing is
+cut: a summary too long for the line wraps under its own column, so a row copies whole into the
+session that answers it.
+
 ```
-D3   implement   worker        LOW     Do not implement auth here, KISS and YAGNI     ⊘ waiting
-D2   implement   worker        MEDIUM  Reuse readJson for the manifest              ✓ accepted
-D4   review      orchestrator  MEDIUM  Triage r2: fix F1 and F3    ✗ overruled: fix F2 too
-D1   spec        orchestrator  HIGH    Four workers, serial                                auto
+✓ D2   ● Reuse readJson for the manifest rather than a second parser
+· D3   ● Do not implement auth here: the contract names one endpoint and the session store already
+         carries the flag — KISS and YAGNI
+✗ D4   ● Triage r2: fix F1 and F3, skip F2 as cosmetic — fix F2 too, it is on the contract
+  D1   ● Four workers, serial — one context per ground
 ```
 
 | Status      | Glyph | Colour        | Row                                   |
 |-------------|-------|---------------|----------------------------------------|
-| `waiting`   | `⊘`   | warning amber | bright, it is holding the mission up   |
+| `waiting`   | `·`   | warning amber | bright, it is holding the mission up   |
 | `accepted`  | `✓`   | success olive | bright                                 |
-| `overruled` | `✗`   | error red     | bright, the note follows the word      |
+| `overruled` | `✗`   | error red     | bright, the note follows the summary   |
 | `auto`      | none  | dim label     | dim: a record, not a question          |
+
+| Confidence | Glyph | Colour       | Reads as                                        |
+|------------|-------|--------------|--------------------------------------------------|
+| `LOW`      | `●`   | error red    | the agent wants a human on it                    |
+| `MEDIUM`   | `●`   | warning amber| a fork worth knowing about                       |
+| `HIGH`     | `●`   | cyan `#5fafaf` | it went the obvious way                        |
+| any, `auto`| `●`   | dim label    | never surfaced: the dial let it through          |
+
+PARTS wraps its descriptions the same way, under the description column. A graph row in MISSION
+ends in two right-aligned columns, tokens then wall time, so the numbers read down the pane. A
+session under a project is named `session · <preset>`, never by its preset alone, and the
+`no missions` hint is absent while a session is standing there.
+
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.
 - The key bar sits on the last row and lists the focused pane's keys; `?` is the first pair
@@ -127,22 +148,35 @@ magenta because Claude Code has no grey.
 
 ### Keys
 
-| Key      | Pane             | Does                                                          |
-|----------|------------------|---------------------------------------------------------------|
-| `↑↓`     | any              | move the selection                                            |
-| `→` `↵`  | left             | enter the right pane                                          |
-| `←` `esc`| right            | back to the left pane; in Parts `esc` first discards a toggle |
-| `Space` `↵` `Y` `N` `R` | Parts | toggle a part, apply the set, confirm, cancel, reset     |
-| `O`      | mission row      | open the mission's Warp tab, or name the tab that is live      |
-| `X`      | mission, session | SIGTERM the session's process, SIGKILL on a second press       |
-| `T`      | mission row      | autonomy full → partial → none                                 |
-| `H`      | mission row      | archive a closed mission, or bring an archived one back        |
-| `Z`      | left             | show the archived missions                                     |
-| `C`      | any              | caffeinate auto → on → off                                     |
-| `D` `A`  | any              | the foot draws DECISIONS, or ACTIVITY                          |
-| `F`      | any              | the foot at full height; header and status bar hidden          |
-| `↑↓`     | full foot        | scroll it; `↵`, `F` or `esc` restore the columns               |
-| `?` `Q`  | any              | help panel, quit                                               |
+One key to a line, in the panel and here: a line listing three keys is read as one thing three
+keys do, and none of these three do the same thing.
+
+| Key     | Pane             | Does                                                            |
+|---------|------------------|------------------------------------------------------------------|
+| `↑↓`    | any              | move the selection; scroll the foot while it is full             |
+| `→`     | left             | enter the right pane                                             |
+| `↵`     | any              | open the selection, or apply what Parts has pending              |
+| `←`     | right            | back to the left pane                                            |
+| `esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
+| `Space` | Parts            | toggle a part                                                    |
+| `Y`     | Parts            | confirm the apply                                                |
+| `N`     | Parts            | cancel it                                                        |
+| `R`     | Parts            | reset the toggles                                                |
+| `O`     | mission row      | open the mission's Warp tab; a bound mission is refused          |
+| `X`     | mission, session | SIGTERM the session's process, SIGKILL on a second press         |
+| `T`     | mission row      | autonomy full → partial → none                                   |
+| `H`     | mission row      | archive a closed mission, or bring an archived one back          |
+| `Z`     | left             | show the archived missions                                       |
+| `C`     | any              | caffeinate auto → on → off                                       |
+| `D`     | any              | the foot draws DECISIONS                                         |
+| `A`     | any              | the foot draws ACTIVITY                                          |
+| `F`     | any              | the foot at full height; header and status bar hidden            |
+| `?`     | any              | the KEYS panel                                                   |
+| `Q`     | any              | quit                                                             |
+
+The panel is KEYS, then TERMS — one row per step kind in its own colour, then the words the screen
+uses — then HOW FACTORY WORKS. The primer is what a short terminal loses: all of it or none, never
+a sentence cut in half.
 
 Messages answers nothing: a gate row and a decision row each carry the command that answers them
 in the session that raised them, and `←`, `→` and `↵` on one write nothing.
@@ -173,7 +207,6 @@ in the session that raised them, and `←`, `→` and `↵` on one write nothing
 | pending          | `○`   | dim label     | `pending`            |
 | running          | `●`   | accent orange | `RUNNING`, `running`  |
 | done             | `✓`   | success olive | `done`, `Success`     |
-| failed           | `✗`   | error red     | `failed`              |
 | blocked          | `⊘`   | warning amber | `blocked`, `no session` |
 | selected (focus) | none, inverted background | selected row bg/fg | (whole row inverts) |
 | waiting-on-human | `⊘`   | warning amber | `gate open`           |

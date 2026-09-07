@@ -1,5 +1,5 @@
 type: fixture
-description: report session events to ~/.factory/events, file decisions, ring when the session waits on the human
+description: report session events, file decisions, ring when the session waits on the human
 default: true
 files:
   - source: hook-factory.ts

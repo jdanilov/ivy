@@ -7,6 +7,7 @@ import { C, GLYPH, stateColor, stepColor } from './theme.js';
 import { ago, clock, dur, id, len, line, spread, tokens, wrap, type Cell } from './format.js';
 import { applyParts, archive, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
 import { factoryHome, home } from '../core/projects.js';
+import { runnerLabel } from '../core/workflow.js';
 import type {
   Activity, Autonomy, Caffeinate, Decision, InboxItem, Mission, Project, Session, Snapshot, StepKind,
 } from './model.js';
@@ -219,10 +220,11 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
   p.row(spread([...cells, ...tail], right, p.width), selected && focused);
 }
 
+/** Named by what it is, not by its preset: a bare `quick` under a project reads as a mission. */
 function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): void {
   p.row([
-    marker(selected, focused), [' ', C.dim], ['○ ', C.dim], [s.preset, C.bright], ['  ', C.dim],
-    [id(s.id), C.dim], [`  idle ${dur(Date.now() - s.idleSince)}`, C.dim],
+    marker(selected, focused), [' ', C.dim], ['○ ', C.dim], ['session', C.bright], [' · ', C.rule],
+    [s.preset, C.dim], ['  ', C.dim], [id(s.id), C.dim], [`  idle ${dur(Date.now() - s.idleSince)}`, C.dim],
   ], selected && focused);
 }
 
@@ -244,8 +246,8 @@ function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
       : [[item.project.name, item.kind === 'global' ? C.dim : C.bright]];
     p.row([marker(selected, focused), ...head], selected && focused);
     // Nothing under a heading reads as a screen that failed to load: the hint names the way out,
-    // indented where the row it stands in for would be.
-    if (item.kind === 'project' && item.project.missions.length === 0) {
+    // indented where the row it stands in for would be. A session row is something under it.
+    if (item.kind === 'project' && item.project.missions.length === 0 && item.project.sessions.length === 0) {
       p.row([['    no missions · factory mission new <name>', C.dim]]);
     }
   });
@@ -296,12 +298,14 @@ function messageDetail(p: Pane, item: InboxItem, h: number): void {
 
 // ── mission and session ───────────────────────────────────────────────────────
 
-/** Who runs a step, and with what. The Orchestrator's own steps name no model: it is this session. */
-const runner = (s: { role: string; model?: string } | undefined): string =>
-  s === undefined ? '—' : s.model && s.role !== 'orchestrator' ? `${s.role} · ${s.model}` : s.role;
+/** Who runs a step, and with what: `runnerLabel` is the one place the pair is worded. */
+const runner = (s: { role: string } | undefined): string => (s === undefined ? '—' : runnerLabel(s.role));
 
 /** The four facts, label column and value column, so they read as a table without one being drawn. */
 const LABEL = 13;
+/** `310.2K` and `2h 14m`, plus two cells between them: the two columns a graph row ends in. */
+const SPEND_COL = 8;
+const TIME_COL = 9;
 const DOT: Cell = [' · ', C.rule];
 
 function fact(p: Pane, label: string, cells: Cell[]): void {
@@ -322,7 +326,10 @@ function missionPane(p: Pane, m: Mission): void {
     // A duration is only news for a step that is getting somewhere: skipped and blocked both
     // measure a time nobody wants, and the word is what the row is for.
     const timed = s.status === 'running' || s.status === 'done';
-    p.row(spread(cells, [[spend ? `${tokens(spend)}  ` : '', C.dim], [timed && s.wall ? dur(s.wall) : s.status, C.dim]], p.width));
+    // Two columns, each right-aligned in its own width: the graph reads down, not ragged.
+    const spent = spend ? tokens(spend) : '';
+    const took = timed && s.wall ? dur(s.wall) : s.status;
+    p.row(spread(cells, [[spent.padStart(SPEND_COL), C.dim], [took.padStart(TIME_COL), C.dim]], p.width));
   }
   if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
 
@@ -368,6 +375,9 @@ function pending(project: Project, ui: Ui): string[] {
   return [...add.map((name) => `install ${name}`), ...drop.map((name) => `uninstall ${name}`)];
 }
 
+/** The longest description any part ships takes three rows beside the status columns. */
+const DESCRIPTION_ROWS = 3;
+
 function partsPane(p: Pane, project: Project, ui: Ui): void {
   const parts = project.parts;
   const installed = parts.filter((part) => partStatus(part.name, part.status, ui) !== 'not-installed').length;
@@ -381,16 +391,19 @@ function partsPane(p: Pane, project: Project, ui: Ui): void {
   parts.forEach((part, i) => {
     const status = partStatus(part.name, part.status, ui);
     const on = status !== 'not-installed';
-    const selected = i === ui.part;
+    const selected = i === ui.part && ui.focus === 'right';
     const changed = on !== (part.status !== 'not-installed');
     // A part whose files no longer match the Factory is neither installed nor available: `update` fixes it.
     const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
-    const cells: Cell[] = [
-      marker(selected, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
+    const head: Cell[] = [
+      marker(i === ui.part, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
       [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
-      [part.description, C.dim],
     ];
-    p.row(spread(cells, [[changed ? '±' : ' ', C.accent]], p.width), selected && ui.focus === 'right');
+    // What a part is for is the one thing worth reading here, so it wraps under itself, never cut.
+    const indent = len(head);
+    const body = wrap(part.description, Math.max(20, p.width - indent - 2), DESCRIPTION_ROWS);
+    p.row(spread([...head, [body[0] ?? '', C.dim]], [[changed ? '±' : ' ', C.accent]], p.width), selected);
+    for (const text of body.slice(1)) p.row([[' '.repeat(indent), C.dim], [text, C.dim]], selected);
   });
 
   p.rule();
@@ -429,20 +442,38 @@ function missionsOf(snap: Snapshot, here: LeftItem): Mission[] {
     : here.kind === 'project' ? here.project.missions : [];
 }
 
-/** `D3  implement  worker  MEDIUM  summary  ⊘ waiting`. An `auto` row is a record, so it reads dim. */
-function decisionRow(p: Pane, mission: string | null, d: Decision): void {
+/** Where a decision stands, left of its id: a blank margin is a fork nobody was asked about. */
+const VERDICT: Record<Decision['status'], [glyph: string, color: string]> = {
+  waiting: ['·', C.warning], accepted: ['✓', C.success], overruled: ['✗', C.error], auto: [' ', C.dim],
+};
+
+/** How sure the agent was, as one glyph: the word costs a column and says no more than the colour. */
+const SURE: Record<Decision['confidence'], string> = { LOW: C.error, MEDIUM: C.warning, HIGH: C.info };
+const SURE_GLYPH = '●';
+
+/** A summary long enough to need a fifth row is a paragraph nobody reads off a foot pane. */
+const SUMMARY_ROWS = 4;
+
+/**
+ * `✓ D15 ● what was decided`: the verdict, the id, the confidence, then the decision itself. The
+ * summary wraps under its own column instead of being cut, so a row copies whole into the session
+ * that answers it. An `auto` row is a record, not a question, so it reads dim end to end.
+ */
+function decisionLines(mission: string | null, d: Decision, width: number): Cell[][] {
   const auto = d.status === 'auto';
-  const [glyph, color] =
-    d.status === 'waiting' ? ['⊘ ', C.warning]
-    : d.status === 'accepted' ? ['✓ ', C.success]
-    : d.status === 'overruled' ? ['✗ ', C.error] : ['  ', C.dim];
-  const said = d.status === 'overruled' && d.note !== '' ? `overruled: ${d.note}` : d.status;
-  p.row(spread([
-    [d.id.padEnd(5), auto ? C.dim : C.bright],
+  const [glyph, color] = VERDICT[d.status];
+  const head: Cell[] = [
+    [`${glyph} `, color], [d.id.padEnd(5), auto ? C.dim : C.bright],
+    [`${SURE_GLYPH} `, auto ? C.dim : SURE[d.confidence]],
     ...(mission === null ? [] : ([[mission.padEnd(10), C.dim]] as Cell[])),
-    [d.step.padEnd(12), C.dim], [d.by.padEnd(14), C.dim], [d.confidence.padEnd(8), auto ? C.dim : C.bright],
-    [d.summary, auto ? C.dim : C.bright],
-  ], [['  ', C.dim], [glyph, color], [said, color]], p.width));
+  ];
+  // An overruled row without its note reads as a verdict with no reason.
+  const said = d.status === 'overruled' && d.note !== '' ? `${d.summary} — ${d.note}` : d.summary;
+  const indent = len(head);
+  const body = wrap(said, Math.max(20, width - indent), SUMMARY_ROWS);
+  return body.map((text, i): Cell[] => i === 0
+    ? [...head, [text, auto ? C.dim : C.bright]]
+    : [[' '.repeat(indent), C.dim], [text, auto ? C.dim : C.bright]]);
 }
 
 function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui): void {
@@ -453,8 +484,10 @@ function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui
   p.row(spread([['DECISIONS', C.bright], [`  ${subject(here)}`, C.dim]],
     [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
   p.rule();
-  const shown = visible(rows, room, ui);
-  for (const [name, d] of shown) decisionRow(p, missions.length > 1 ? name : null, d);
+  // A wrapped row is more lines than rows, so the scroll and the room are counted in lines.
+  const lines = rows.flatMap(([name, d]) => decisionLines(missions.length > 1 ? name : null, d, p.width));
+  const shown = visible(lines, room, ui);
+  for (const cells of shown) p.row(cells);
   if (rows.length === 0) p.row([['no decisions filed yet', C.dim]]);
   pad(p, Math.max(shown.length, 1), room);
 }
@@ -500,22 +533,26 @@ function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boole
 
 // ── help ──────────────────────────────────────────────────────────────────────
 
-/** Every key the screen answers, one per line, under the pane it belongs to. */
+/** Every key the screen answers, one key to a line, under the pane it belongs to. */
 const HELP: [group: string, key: string, does: string][] = [
   ['Global', '↑↓', 'Move the selection'],
-  ['', '→ ↵', 'Enter the right pane'],
-  ['', '← esc', 'Back to the left column'],
+  ['', '→', 'Enter the right pane'],
+  ['', '↵', 'Open the selection, or apply what is pending'],
+  ['', '←', 'Back to the left column'],
+  ['', 'esc', 'Back, or discard the pending toggles first'],
   ['', 'C', 'Caffeinate auto → on → off'],
-  ['', '? Q', 'This panel, and quit'],
+  ['', '?', 'This panel'],
+  ['', 'Q', 'Quit'],
   ['Projects', 'O', 'Open the mission\'s Warp tab'],
   ['', 'X', 'Kill its session, again within 5s to SIGKILL'],
   ['', 'T', 'Autonomy full → partial → none'],
   ['', 'H', 'Archive a closed mission, or bring it back'],
   ['', 'Z', 'Show the archived ones'],
-  ['Messages', '↑↓', 'Read what waits — gates and decisions answer in the session'],
+  ['Messages', '↑↓', 'Read what waits — every one answers in its session'],
   ['Parts', 'Space', 'Toggle a part'],
-  ['', '↵ Y', 'Apply the set, then confirm'],
-  ['', 'R esc', 'Reset or discard the toggles'],
+  ['', 'Y', 'Confirm the apply'],
+  ['', 'N', 'Cancel it'],
+  ['', 'R', 'Reset the toggles'],
   ['Foot', 'D', 'Decisions, the forks this mission took'],
   ['', 'A', 'Activity, what its session did'],
   ['', 'F', 'Either at full height, ↑↓ scrolls'],
@@ -531,9 +568,12 @@ const TERMS: [term: string, color: string, means: string][] = [
   ['autonomy', C.bright, 'which confidences wait: full none, partial LOW, none every one'],
 ];
 
-/** The four step families, each in the colour the graph draws it in. */
-const KINDS: [string, StepKind][] = [
-  ['human', 'human'], ['gatekeeper', 'gatekeeper'], ['agent', 'agent'], ['technical', 'technical'],
+/** The four step families, each in the colour the graph draws it in and with who runs it. */
+const KINDS: [term: string, kind: StepKind, means: string][] = [
+  ['human', 'human', 'a gate you answer: intent, merge'],
+  ['gatekeeper', 'gatekeeper', 'work checked by whoever did not write it: verify, validate'],
+  ['agent', 'agent', 'a sub-agent with its own context: implement, research'],
+  ['technical', 'technical', 'the Orchestrator\'s own bookkeeping: spec, an ungated merge'],
 ];
 
 const GROUP_W = 10;
@@ -542,27 +582,31 @@ const TERM_W = 11;
 /** The screen explains itself once, to the human who opened it before reading any doc. */
 const PRIMER = [
   'A mission is one unit of work: its own branch, its workflow copied in as a graph.',
-  'The Orchestrator session grills you, writes the intent, then runs the steps.',
   'Gates stop for the human; a decision waits when its confidence is under the dial.',
-  'Gatekeepers check work they did not write: the Verifier and the Validator.',
 ];
 
-/** Not an overlay: while `?` is open this is the right pane, at the full height of the body. */
-function helpPane(p: Pane): void {
-  p.row([['KEYS', C.bright]]);
-  p.rule();
-  for (const [group, key, does] of HELP) {
-    p.row([[group.padEnd(GROUP_W), C.bright], [key.padEnd(7), C.accent], [does, C.dim]]);
-  }
-  p.rule();
-  p.row([['TERMS', C.bright]]);
-  p.row([['steps'.padEnd(TERM_W), C.bright],
-    ...KINDS.flatMap(([word, kind]): Cell[] => [[word, stepColor(kind)], [' · ', C.rule]]),
-    ['coloured by who runs them', C.dim]]);
-  for (const [term, color, means] of TERMS) p.row([[term.padEnd(TERM_W), color], [means, C.dim]]);
-  p.rule();
-  p.row([['HOW FACTORY WORKS', C.bright]]);
-  for (const text of PRIMER) for (const l of wrap(text, p.width, 2)) p.row([[l, C.dim]]);
+/**
+ * Not an overlay: while `?` is open this is the right pane, at the full height of the body. The
+ * keys and the terms are what it was opened for, so the primer is what a short terminal loses.
+ */
+function helpPane(p: Pane, h: number): void {
+  const rule: Cell[] = [['─'.repeat(p.width), C.rule]];
+  const lines: Cell[][] = [
+    [['KEYS', C.bright]], rule,
+    ...HELP.map(([group, key, does]): Cell[] =>
+      [[group.padEnd(GROUP_W), C.bright], [key.padEnd(7), C.accent], [does, C.dim]]),
+    rule, [['TERMS', C.bright]],
+    ...KINDS.map(([term, kind, means]): Cell[] => [[term.padEnd(TERM_W), stepColor(kind)], [means, C.dim]]),
+    ...TERMS.map(([term, color, means]): Cell[] => [[term.padEnd(TERM_W), color], [means, C.dim]]),
+  ];
+  const primer: Cell[][] = [
+    rule, [['HOW FACTORY WORKS', C.bright]],
+    ...PRIMER.flatMap((text) => wrap(text, p.width, 2).map((l): Cell[] => [[l, C.dim]])),
+  ];
+  // All of the primer or none of it: a heading with one line under it says less than the rows
+  // it costs, and a sentence cut in half says nothing at all.
+  const all = h >= lines.length + primer.length ? [...lines, ...primer] : lines;
+  for (const cells of all.slice(0, h)) p.row(cells);
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -605,7 +649,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
     leftPane(left, items, snap, ui);
-    if (ui.help) helpPane(right);
+    if (ui.help) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui);
     else if (here.kind === 'mission') missionPane(right, here.mission);

@@ -146,6 +146,10 @@ export const ROLE_MODEL: Record<string, string> = {
   summarizer: 'sonnet',
 };
 
+/** How a runner reads on a row: the Orchestrator's own steps name no model, it is this session. */
+export const runnerLabel = (role: string): string =>
+  role === 'orchestrator' || !ROLE_MODEL[role] ? role : `${role} · ${ROLE_MODEL[role]}`;
+
 export function findStep(wf: Workflow, name: string): WorkflowStep | undefined {
   return wf.steps.find((s) => s.name === name);
 }

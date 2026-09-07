@@ -1,4 +1,4 @@
-import { ROLE_MODEL, stepRole } from '../core/workflow.js';
+import { stepRole } from '../core/workflow.js';
 import type { WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
 import type { Activity, Decision, InboxItem, Mission, PartRow, Project, Snapshot, StepRow } from './model.js';
@@ -10,13 +10,12 @@ const H = 60 * M;
 const D = 24 * H;
 const now = Date.now();
 
-/** The kind, the runner and the model are never spelled out here: the fixture reads all three
- *  through the mappings the live snapshot uses, so a look review is a review of what ships. */
+/** The kind and the runner are never spelled out here: the fixture reads both through the
+ *  mappings the live snapshot uses, so a look review is a review of what ships. */
 function steps(spec: [name: string, status: StepRow['status'], wall?: number, of?: Omit<WorkflowStep, 'name'>][]): StepRow[] {
   return spec.map(([name, status, wall, of]) => {
     const step: WorkflowStep = { name, ...of };
-    const role = stepRole(step);
-    return { name, status, wall, kind: stepKind(step), role, ...(ROLE_MODEL[role] ? { model: ROLE_MODEL[role] } : {}) };
+    return { name, status, wall, kind: stepKind(step), role: stepRole(step) };
   });
 }
 
@@ -112,12 +111,13 @@ function decisions(spec: [string, string, string, Decision['confidence'], string
 const refitDecisions = decisions([
   ['D1', 'spec', 'orchestrator', 'HIGH', 'Four workers, serial — one context per ground', 'auto'],
   ['D2', 'implement', 'worker', 'MEDIUM', 'Reuse readJson for the manifest rather than a second parser', 'accepted'],
-  ['D3', 'implement', 'worker', 'LOW', 'Do not implement auth here, KISS and YAGNI', 'waiting'],
+  // Long on purpose: a summary the human has to read whole is what the foot pane wraps for.
+  ['D3', 'implement', 'worker', 'LOW', 'Do not implement auth here: the contract names one endpoint and the session store already carries the flag, so a second path would be two ways of saying one thing — KISS and YAGNI', 'waiting'],
   ['D4', 'review', 'orchestrator', 'MEDIUM', 'Triage r2: fix F1 and F3, skip F2 as cosmetic', 'overruled', 'fix F2 too, it is on the contract'],
 ]);
 
 const authDecisions = decisions([
-  ['D1', 'implement', 'worker', 'HIGH', 'Rotate the refresh token on every reuse', 'auto'],
+  ['D1', 'implement', 'worker', 'HIGH', 'Rotate the refresh token on every reuse', 'accepted'],
   ['D2', 'verify', 'verifier', 'LOW', 'Device-list paging is out of the contract, left alone', 'waiting'],
 ]);
 

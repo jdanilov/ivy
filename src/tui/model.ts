@@ -33,9 +33,8 @@ export interface StepRow {
   name: string;
   kind: StepKind;
   status: RunState;
-  /** Who runs it and with which model: `stepRole` and `ROLE_MODEL`, never guessed here. */
+  /** Who runs it, from `stepRole` and never guessed here; the model follows through `runnerLabel`. */
   role: string;
-  model?: string;
   wall?: number;
   /** Transcript usage inside the step's own window. */
   tokens?: { input: number; cached: number; output: number };

@@ -17,6 +17,8 @@ export const C = {
   track: '#404040',
   // Agent work, desaturated to sit beside the olive and the amber.
   agent: '#6b8fd9',
+  // A fork nobody needs to look at: the calm end of the LOW red, MEDIUM amber, HIGH cyan scale.
+  info: '#5fafaf',
 };
 
 export const GLYPH: Record<RunState, string> = {

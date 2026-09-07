@@ -11,19 +11,9 @@ export function arrivals(prev: InboxItem[] | null, next: InboxItem[]): InboxItem
   return next.filter((item) => !seen.has(inboxKey(item)));
 }
 
-/** A new Inbox item is the one thing worth interrupting the human for. The bell and Warp's own
- *  notification reach the terminal, `osascript` reaches the desktop. Nothing here is awaited. */
+/** A new Inbox item is the one thing worth interrupting the human for, and the terminal is where
+ *  they are: the bell and Warp's own `777;notify`. A desktop banner on top of both is noise. */
 export function notify(item: InboxItem): void {
   const label = `${item.project}/${item.origin} ${item.label}`;
   process.stdout.write(`\x07\x1b]777;notify;Factory;${label.replaceAll('\x07', '')}\x07`);
-  if (process.platform !== 'darwin') return;
-
-  try {
-    // Fire and forget: unref so a slow Notification Centre never holds the screen up.
-    Bun.spawn(['osascript', '-e', `display notification "${label.replaceAll('"', '')}" with title "Factory"`], {
-      stdout: 'ignore', stderr: 'ignore',
-    }).unref();
-  } catch {
-    // A notification is never worth taking the screen down for.
-  }
 }

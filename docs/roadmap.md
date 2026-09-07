@@ -11,3 +11,5 @@ a human prunes it, nothing else reads it.
 - [ ] Fresh-system install path: the `factory` command shipped or documented instead of a hand `bun link`, README rewritten why-first for a human reader (2026-09-07-decisions)
 - [ ] Graph editing from the screen: toggle a mission's steps on and off in the MISSION pane, `validate` first (2026-09-07-decisions)
 - [ ] Workflows: keep `story`, `research` and `quick`; drop `fix`; `chore` takes `--verify`, which adds the verifier loop after implement. `intent` stays the start of every shaped mission (2026-09-07-decisions)
+- [ ] Rename a session or a mission from the screen, `N` on the row; a session's name is Claude Code's own `custom-title`, so the Factory needs its own store for what it cannot write (2026-09-07-copies)
+- [ ] Reorder projects, missions and sessions with `Shift+↑↓`, the order kept in `~/.factory/config.yaml` (2026-09-07-copies)

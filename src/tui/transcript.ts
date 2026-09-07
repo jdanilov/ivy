@@ -62,12 +62,15 @@ const VERB: Record<string, Activity['verb']> = {
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-/** One line of prose: the log has one row per block, not a paragraph. */
+/** What a `Text` row holds: two lines of a wide pane, since the foot wraps a row to two. */
+const SENTENCE_MAX = 320;
+
+/** One sentence of prose: the log has one row per block, not a paragraph. */
 function sentence(raw: string): string {
   const flat = raw.trim().replace(/\s+/g, ' ');
   const end = flat.search(/[.?!](\s|$)/);
   const cut = end === -1 ? flat : flat.slice(0, end + 1);
-  return cut.length > 160 ? `${cut.slice(0, 159)}…` : cut;
+  return cut.length > SENTENCE_MAX ? `${cut.slice(0, SENTENCE_MAX - 1)}…` : cut;
 }
 
 /** The activity table from spec.md: what the tool was, in the words the human would use. */

@@ -143,17 +143,17 @@ its own column, so a row copies whole into the session that answers it.
 | `overruled` | `✗`   | error red     | bright, the note follows the summary        |
 | `auto`      | `✓`   | dim label     | dim: settled by the dial, not by a human    |
 
-PARTS wraps its descriptions the same way, under the description column. On the `Global` row it
-draws one more thing, because scope is chosen there and nowhere else: the three choices `project
-global off` hold the right edge of every row, the chosen one `● word` in bright, the rest `○ word`
-in dim, and the one `part.yaml` recommends in accent until it is the chosen one. The description
-takes the room they leave, on one line, and none when a narrow terminal leaves too little to read;
-under the rule the selected part names its recommendation before its files. A graph row in MISSION
-ends in two right-aligned columns, tokens then wall time, so the numbers read down the pane, and a
-step the mission looped back to carries a dim `×N` after its name. Under the facts, a DEVIATIONS
-sub-panel gives each entry its own wrapped line, and is absent at zero. A session under a project
-is named `session · <preset>`, never by its preset alone, and the `no missions` hint is absent
-while a session is standing there.
+PARTS wraps its descriptions the same way, under the description column. On the `Global` row the
+status column is the scope, because scope is chosen there and nowhere else: one word, `project`,
+`global` or `off`, `●` for a part that is going somewhere and `○` for one that is not, success
+while a global part is in `~/.claude`, warning while it is not there yet or its copy has drifted,
+dim for `project` and `off`. A status word beside it would say the same thing twice, so there is
+none and the description keeps the rest of the row; under the rule the selected part names its
+recommendation before its files. A graph row in MISSION ends in two right-aligned columns, tokens
+then wall time, so the numbers read down the pane, and a step the mission looped back to carries a
+dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each entry its own wrapped
+line, and is absent at zero. A session under a project is named `session · <preset>`, never by its
+preset alone, and the `no missions` hint is absent while a session is standing there.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.

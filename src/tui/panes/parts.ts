@@ -19,7 +19,7 @@ export function partStatus(name: string, base: string, ui: Ui): string {
 }
 
 /** The scope `↵` would leave the part in: what Space cycled to, else what the config holds now. */
-export function partScope(part: PartRow, ui: Ui): ScopeChoice {
+function partScope(part: PartRow, ui: Ui): ScopeChoice {
   const choice = ui.toggles[part.name];
   return typeof choice === 'string' ? choice : part.scope;
 }
@@ -54,19 +54,13 @@ export function pending(project: Project, ui: Ui, global: boolean): string[] {
   return [...add.map((name) => `install ${name}`), ...drop.map((name) => `uninstall ${name}`)];
 }
 
-/** The three choices, the chosen one filled and bright, the recommended one in accent until it is
- *  the chosen: what the author advises is only worth saying while the human has left it. One the
- *  part cannot take keeps its column but loses its glyph, so the row reads as three and offers two. */
-function choices(part: PartRow, ui: Ui): Cell[] {
-  const chosen = partScope(part, ui);
-  const can = offered(part);
-  return CHOICES.map((choice): Cell => {
-    if (!can.includes(choice)) return [`  ${choice.padEnd(9)}`, C.rule];
-    return [
-      `${choice === chosen ? '●' : '○'} ${choice.padEnd(9)}`,
-      choice === chosen ? C.bright : choice === part.recommended ? C.accent : C.dim,
-    ];
-  });
+/** The one column a global row carries, in the place a project row keeps its status: where the part
+ *  is to live, and for a global one whether `~/.claude` holds it yet — nothing else on the row says
+ *  so, and a status word beside the scope only ever repeated it. `off` is the hollow glyph. */
+function scopeCell(part: PartRow, status: string, ui: Ui): Cell {
+  const scope = partScope(part, ui);
+  const colour = scope !== 'global' ? C.dim : status === 'installed' ? C.success : C.warning;
+  return [`${scope === 'off' ? '○' : '●'} ${scope.padEnd(11)}`, colour];
 }
 
 export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean): void {
@@ -88,17 +82,15 @@ export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean): v
     const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
     const head: Cell[] = [
       marker(i === ui.part, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
-      [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
+      global ? scopeCell(part, status, ui)
+        : [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
     ];
-    // The choices hold the right edge, so they read down as three columns and nothing crowds them
-    // out. What a part is for wraps under itself, the one thing worth reading on a project row;
-    // beside the choices it takes the room they leave, on one line, and none when that is unreadable.
-    const tail: Cell[] = [...(global ? choices(part, ui) : []), [changed ? '±' : ' ', C.accent]];
+    // One column either way, so what a part is for takes the rest of the row and wraps under it:
+    // the pane where a part is chosen is the one that has to say what the part is.
+    const tail: Cell[] = [[changed ? '±' : ' ', C.accent]];
     const indent = len(head);
     const room = p.width - indent - len(tail) - 2;
-    const body = global
-      ? (room >= 12 ? wrap(part.description, room, 1) : [''])
-      : wrap(part.description, Math.max(20, room), DESCRIPTION_ROWS);
+    const body = wrap(part.description, Math.max(20, room), DESCRIPTION_ROWS);
     p.row(spread([...head, [body[0] ?? '', C.dim]], tail, p.width), selected);
     for (const text of body.slice(1)) p.row([[' '.repeat(indent), C.dim], [text, C.dim]], selected);
   });

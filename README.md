@@ -97,9 +97,10 @@ that raised them; the screen shows the command and records nothing itself.
 Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summarizer` with
 `/mission`, `Verifier` with `/verify`, `Validator` with `/validate`, `Commit` with `/commit`.
 
-`/commit`, `/explain`, `/research`, `permissions` and `hook-safe-bash` carry `scope: global`: they
-are the user's, not a project's. `factory install --global` copies them into `~/.claude/`, where every
-session on the machine reads them, and no project command ever lists them.
+`/commit`, `/explain`, `/research`, `permissions` and `hook-safe-bash` recommend `scope: global`:
+they are the user's, not a project's. `factory install --global` copies them into `~/.claude/`, where
+every session on the machine reads them, and no project command ever lists them — until `parts:` in
+`~/.factory/config.yaml` says otherwise.
 
 | Type        | Prefix | What it is                                                         |
 |-------------|--------|--------------------------------------------------------------------|
@@ -118,12 +119,17 @@ that grows with every retro is a pointer, not something to pull into every conte
 already names the same path has that line rewritten in place, and gets it back on uninstall. A part
 may also declare `recipes.init` and `recipes.uninit`, shell lines run once in the project root when
 the part arrives and leaves, and `vars` defaults for `${name}` used in its hooks, MCP command and
-recipes. `~/.factory/config.yaml` overrides a var for the whole machine:
+recipes. `~/.factory/config.yaml` holds what this machine decides for every project: a var
+override, and under `parts:` where each part installs — `project`, `global` or `off` — over the
+scope its `part.yaml` recommends.
 
 ```yaml
 vars:
   codegraph: codegraph      # a local build on PATH instead of the pinned npx default
   archify: ~/src/archify    # a local clone instead of the upstream GitHub URL
+parts:
+  commit: "project"         # the author recommends global; this machine wants it per project
+  research: "off"           # installed nowhere, and update takes it back out
 ```
 
 `archify` is that shape: it ships no files, its `init` clones `${archify}` into

@@ -1,7 +1,7 @@
 import { BoxRenderable, createCliRenderer, type CliRenderer, type KeyEvent } from '@opentui/core';
 import path from 'node:path';
 import { C, GLYPH, stateColor } from './theme.js';
-import { dur, len, spread, tokens, type Cell } from './format.js';
+import { dur, id, len, spread, tokens, type Cell } from './format.js';
 import { column, newUi, select, type LeftItem, type Pane, type Ui } from './panes/pane.js';
 import { leftPane } from './panes/left.js';
 import { messagesPane } from './panes/messages.js';
@@ -10,7 +10,7 @@ import { partsPane, pending } from './panes/parts.js';
 import { footPane } from './panes/foot.js';
 import { helpPane } from './panes/help.js';
 import { onKey } from './keys.js';
-import type { Mission, Snapshot } from './model.js';
+import type { Mission, Session, Snapshot } from './model.js';
 
 /** Chrome rows: blank, header, rule, status, rule — rule, key bar. The key bar sits on the last
  *  terminal row: a row left undrawn under it reads as a gap the screen forgot to fill. */
@@ -92,9 +92,17 @@ function missionBar(p: Pane, m: Mission): void {
   p.row(spread([...left, ...middle, ...count], metrics, p.width));
 }
 
+/** A session has no steps to bar: its state word, then whose tab it is and how long it has waited. */
+function sessionBar(p: Pane, s: Session): void {
+  const left: Cell[] = [[`${GLYPH.pending} `, C.dim], ['IDLE'.padEnd(STATE_W), C.bright],
+    ['  ', C.dim], [id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [' · ', C.rule], [s.cwd, C.dim]];
+  p.row(spread(left, [['since ', C.dim], [dur(Date.now() - s.idleSince), C.bright]], p.width));
+}
+
 function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   if (ui.toast) return p.row([[ui.toast, C.dim]]);
   if (here.kind === 'mission') return missionBar(p, here.mission);
+  if (here.kind === 'session') return sessionBar(p, here.session);
   if (here.kind === 'inbox') return summary(p, snap.projects.flatMap((project) => project.missions));
   if (here.kind === 'global') {
     const on = here.project.parts.filter((part) => part.status !== 'not-installed').length;

@@ -19,12 +19,9 @@ export interface Usage { at: number; input: number; cached: number; output: numb
 export interface Tail {
   activity: Activity[];
   usage: Usage[];
-  /**
-   * The last text block of an **assistant** record, never a user one — a skill preamble and a
-   * pasted prompt are both injected as user text and would otherwise read as the session's last
-   * word. It is the last text seen so far, not the last of a given turn, so it is only the
-   * fallback for a Stop the hook recorded with no final message.
-   */
+  /** The last text block of an **assistant** record, never a user one: a skill preamble is
+   *  injected as user text and would otherwise read as the session's last word. It is the last
+   *  text seen, not the last of one turn — the fallback for a Stop that recorded no message. */
   text: string;
   offset: number;
   /** Message ids already counted: one API response is written as one line per content block. */

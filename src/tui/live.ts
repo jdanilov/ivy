@@ -96,11 +96,8 @@ async function readEvents(): Promise<Map<string, Ev>> {
   return out;
 }
 
-/**
- * What a session is asking the human, from the hook's own record of the turn that ended: the Stop
- * carries the exact final message, where the transcript tail carries the last text it happened to
- * have read. The tail is the fallback for a Stop that logged no message at all.
- */
+/** What a session is asking the human, from the hook's own record of the turn that ended: the Stop
+ *  carries the exact final message, where the tail carries the last text it happened to have read. */
 const asking = (ev: Ev | undefined, tail: Tail | null): string =>
   ev?.asks == null ? '' : ev.asks || tail?.text || '';
 

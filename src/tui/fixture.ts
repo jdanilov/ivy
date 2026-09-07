@@ -37,34 +37,26 @@ function log(session: string, spec: string): Activity[] {
 const refitLog = log('75cb46e1', `
 30.0|Text|Round 2 opens. Three findings from the Verifier, all in the render path.
 29.5|Read|.factory/missions/2026-09-06-refit/findings.md
-29.1|Read|src/tui/screen.ts
 28.6|Bash|rg -n "destroyRecursively" src
 28.0|Text|Triage: fix F1 and F2, skip F3 — the divider is cosmetic and out of the contract.
 27.4|Agent|Worker implement round 2
-26.9|Read|src/tui/screen.ts
 26.3|Read|src/ui/format.ts
 25.7|Edit|src/tui/screen.ts destroy the old row tree instead of removing it
-25.0|Bash|bun x tsc --noEmit
 24.4|Edit|src/tui/format.ts spread() pads to the pane width
-23.8|Bash|bun x tsc --noEmit
 23.1|Bash|bun scripts/test.ts
 22.4|Text|Two cases fail: the status bar no longer fits its metrics at 100 columns.
-21.8|Read|src/tui/format.ts
 21.1|Edit|src/tui/screen.ts cap the progress bar at a third of the line
 20.3|Bash|bun scripts/test.ts
-19.6|Bash|bun x tsc --noEmit
 18.9|Stop|Worker handed off: 4 files, 2 fixes, F3 skipped with a reason
 18.1|Text|Handoff reads clean. Verify before the accept gate.
 17.4|Agent|Verifier round 2
 16.8|Read|.factory/missions/2026-09-06-refit/acceptance.md
-16.1|Bash|git diff --stat main...mission/refit
 15.3|Read|src/tui/screen.ts
 14.6|Text|A2 pass, A5 pass, A9 unchecked — nothing drives the 100-column case.
 13.8|Stop|Verifier findings written
 13.0|Agent|Worker implement round 2
 12.3|Edit|scripts/test.ts a 100x24 render case
 11.6|Bash|bun scripts/test.ts
-10.8|Bash|bun x tsc --noEmit
 10.0|Stop|Worker handed off: A9 now checked
 9.2|Text|All nine assertions pass, so the accept gate is the next thing.
 8.4|Ask|Accept round 2 and move on to validate?

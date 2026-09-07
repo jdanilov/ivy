@@ -9,7 +9,7 @@ import { applyParts, archive, killSession, openTab, setAutonomy, setCaffeinate }
 import { factoryHome, home } from '../core/projects.js';
 import { runnerLabel } from '../core/workflow.js';
 import type {
-  Activity, Autonomy, Caffeinate, Decision, InboxItem, Mission, Project, Session, Snapshot, StepKind,
+  Activity, Autonomy, Caffeinate, Decision, InboxItem, Mission, Project, Session, Snapshot,
 } from './model.js';
 
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
@@ -303,9 +303,6 @@ const runner = (s: { role: string } | undefined): string => (s === undefined ? '
 
 /** The four facts, label column and value column, so they read as a table without one being drawn. */
 const LABEL = 13;
-/** `310.2K` and `2h 14m`, plus two cells between them: the two columns a graph row ends in. */
-const SPEND_COL = 8;
-const TIME_COL = 9;
 const DOT: Cell = [' · ', C.rule];
 
 function fact(p: Pane, label: string, cells: Cell[]): void {
@@ -326,10 +323,10 @@ function missionPane(p: Pane, m: Mission): void {
     // A duration is only news for a step that is getting somewhere: skipped and blocked both
     // measure a time nobody wants, and the word is what the row is for.
     const timed = s.status === 'running' || s.status === 'done';
-    // Two columns, each right-aligned in its own width: the graph reads down, not ragged.
+    // `310.2K` then `2h 14m`, each right-aligned in its own width: the graph reads down, not ragged.
     const spent = spend ? tokens(spend) : '';
     const took = timed && s.wall ? dur(s.wall) : s.status;
-    p.row(spread(cells, [[spent.padStart(SPEND_COL), C.dim], [took.padStart(TIME_COL), C.dim]], p.width));
+    p.row(spread(cells, [[spent.padStart(8), C.dim], [took.padStart(9), C.dim]], p.width));
   }
   if (!m.steps.length) p.row([[' no steps yet', C.dim]]);
 
@@ -375,9 +372,6 @@ function pending(project: Project, ui: Ui): string[] {
   return [...add.map((name) => `install ${name}`), ...drop.map((name) => `uninstall ${name}`)];
 }
 
-/** The longest description any part ships takes three rows beside the status columns. */
-const DESCRIPTION_ROWS = 3;
-
 function partsPane(p: Pane, project: Project, ui: Ui): void {
   const parts = project.parts;
   const installed = parts.filter((part) => partStatus(part.name, part.status, ui) !== 'not-installed').length;
@@ -399,9 +393,10 @@ function partsPane(p: Pane, project: Project, ui: Ui): void {
       marker(i === ui.part, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
       [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
     ];
-    // What a part is for is the one thing worth reading here, so it wraps under itself, never cut.
+    // What a part is for is the one thing worth reading here, so it wraps under itself, never
+    // cut; three rows takes the longest description any part ships.
     const indent = len(head);
-    const body = wrap(part.description, Math.max(20, p.width - indent - 2), DESCRIPTION_ROWS);
+    const body = wrap(part.description, Math.max(20, p.width - indent - 2), 3);
     p.row(spread([...head, [body[0] ?? '', C.dim]], [[changed ? '±' : ' ', C.accent]], p.width), selected);
     for (const text of body.slice(1)) p.row([[' '.repeat(indent), C.dim], [text, C.dim]], selected);
   });
@@ -449,10 +444,6 @@ const VERDICT: Record<Decision['status'], [glyph: string, color: string]> = {
 
 /** How sure the agent was, as one glyph: the word costs a column and says no more than the colour. */
 const SURE: Record<Decision['confidence'], string> = { LOW: C.error, MEDIUM: C.warning, HIGH: C.info };
-const SURE_GLYPH = '●';
-
-/** A summary long enough to need a fifth row is a paragraph nobody reads off a foot pane. */
-const SUMMARY_ROWS = 4;
 
 /**
  * `✓ D15 ● what was decided`: the verdict, the id, the confidence, then the decision itself. The
@@ -464,13 +455,14 @@ function decisionLines(mission: string | null, d: Decision, width: number): Cell
   const [glyph, color] = VERDICT[d.status];
   const head: Cell[] = [
     [`${glyph} `, color], [d.id.padEnd(5), auto ? C.dim : C.bright],
-    [`${SURE_GLYPH} `, auto ? C.dim : SURE[d.confidence]],
+    ['● ', auto ? C.dim : SURE[d.confidence]],
     ...(mission === null ? [] : ([[mission.padEnd(10), C.dim]] as Cell[])),
   ];
   // An overruled row without its note reads as a verdict with no reason.
   const said = d.status === 'overruled' && d.note !== '' ? `${d.summary} — ${d.note}` : d.summary;
+  // Four rows is a paragraph already; nothing a foot pane is read for runs longer.
   const indent = len(head);
-  const body = wrap(said, Math.max(20, width - indent), SUMMARY_ROWS);
+  const body = wrap(said, Math.max(20, width - indent), 4);
   return body.map((text, i): Cell[] => i === 0
     ? [...head, [text, auto ? C.dim : C.bright]]
     : [[' '.repeat(indent), C.dim], [text, auto ? C.dim : C.bright]]);
@@ -533,47 +525,35 @@ function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boole
 
 // ── help ──────────────────────────────────────────────────────────────────────
 
-/** Every key the screen answers, one key to a line, under the pane it belongs to. */
+/** Every key the screen answers, one key to a line on screen, under the pane it belongs to. */
 const HELP: [group: string, key: string, does: string][] = [
-  ['Global', '↑↓', 'Move the selection'],
-  ['', '→', 'Enter the right pane'],
-  ['', '↵', 'Open the selection, or apply what is pending'],
-  ['', '←', 'Back to the left column'],
-  ['', 'esc', 'Back, or discard the pending toggles first'],
-  ['', 'C', 'Caffeinate auto → on → off'],
-  ['', '?', 'This panel'],
-  ['', 'Q', 'Quit'],
-  ['Projects', 'O', 'Open the mission\'s Warp tab'],
-  ['', 'X', 'Kill its session, again within 5s to SIGKILL'],
-  ['', 'T', 'Autonomy full → partial → none'],
-  ['', 'H', 'Archive a closed mission, or bring it back'],
+  ['Global', '↑↓', 'Move the selection'], ['', '→', 'Enter the right pane'],
+  ['', '↵', 'Open the selection, or apply what is pending'], ['', '←', 'Back to the left column'],
+  ['', 'esc', 'Back, or discard the pending toggles first'], ['', 'C', 'Caffeinate auto → on → off'],
+  ['', '?', 'This panel'], ['', 'Q', 'Quit'],
+  ['Projects', 'O', 'Open the mission\'s Warp tab'], ['', 'X', 'Kill its session, again within 5s to SIGKILL'],
+  ['', 'T', 'Autonomy full → partial → none'], ['', 'H', 'Archive a closed mission, or bring it back'],
   ['', 'Z', 'Show the archived ones'],
   ['Messages', '↑↓', 'Read what waits — every one answers in its session'],
-  ['Parts', 'Space', 'Toggle a part'],
-  ['', 'Y', 'Confirm the apply'],
-  ['', 'N', 'Cancel it'],
-  ['', 'R', 'Reset the toggles'],
-  ['Foot', 'D', 'Decisions, the forks this mission took'],
-  ['', 'A', 'Activity, what its session did'],
+  ['Parts', 'Space', 'Toggle a part'], ['', 'Y', 'Confirm the apply'],
+  ['', 'N', 'Cancel it'], ['', 'R', 'Reset the toggles'],
+  ['Foot', 'D', 'Decisions, the forks this mission took'], ['', 'A', 'Activity, what its session did'],
   ['', 'F', 'Either at full height, ↑↓ scrolls'],
 ];
 
-/** The words the screen uses, in the colours it draws them in. */
+/** The words the screen uses, in the colours it draws them in — the four step families first,
+ *  each in the colour the graph gives it, so the panel doubles as the legend for a graph row. */
 const TERMS: [term: string, color: string, means: string][] = [
+  ['human', stepColor('human'), 'a step that stops for you: intent, merge'],
+  ['gatekeeper', stepColor('gatekeeper'), 'work checked by whoever did not write it: verify, validate'],
+  ['agent', stepColor('agent'), 'a sub-agent with its own context: implement, research'],
+  ['technical', stepColor('technical'), 'the Orchestrator\'s own bookkeeping: spec, an ungated merge'],
   ['mission', C.bright, 'one unit of work: a branch, a folder, a workflow copied in as its graph'],
   ['workflow', C.bright, 'the ordered steps; add, skip and loop bend one mission\'s copy'],
   ['gate', C.warning, 'a step that stops until the human answers it — accept, amend, reject'],
   ['round', C.bright, 'one pass through a loop: gatekeepers check, the work resumes'],
   ['decision', C.bright, 'a fork an agent took, filed with a confidence: auto, or waiting on you'],
   ['autonomy', C.bright, 'which confidences wait: full none, partial LOW, none every one'],
-];
-
-/** The four step families, each in the colour the graph draws it in and with who runs it. */
-const KINDS: [term: string, kind: StepKind, means: string][] = [
-  ['human', 'human', 'a gate you answer: intent, merge'],
-  ['gatekeeper', 'gatekeeper', 'work checked by whoever did not write it: verify, validate'],
-  ['agent', 'agent', 'a sub-agent with its own context: implement, research'],
-  ['technical', 'technical', 'the Orchestrator\'s own bookkeeping: spec, an ungated merge'],
 ];
 
 const GROUP_W = 10;
@@ -596,7 +576,6 @@ function helpPane(p: Pane, h: number): void {
     ...HELP.map(([group, key, does]): Cell[] =>
       [[group.padEnd(GROUP_W), C.bright], [key.padEnd(7), C.accent], [does, C.dim]]),
     rule, [['TERMS', C.bright]],
-    ...KINDS.map(([term, kind, means]): Cell[] => [[term.padEnd(TERM_W), stepColor(kind)], [means, C.dim]]),
     ...TERMS.map(([term, color, means]): Cell[] => [[term.padEnd(TERM_W), color], [means, C.dim]]),
   ];
   const primer: Cell[][] = [

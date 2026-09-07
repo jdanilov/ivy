@@ -41,7 +41,10 @@ undershoots these values on screen but the hierarchy holds.
   right-aligned on the same line (`TIME 56m 54s · Input 324.0K · Cached 16.8M · Output 111.0K`).
   `Input` is what the turns added, cache writes included; `Cached` is what they re-read. A graph
   row's tokens are input plus output, so two steps compare and a late one is not heavier by
-  its history.
+  its history. A row counts its own runner's turns: the session's for an orchestrator step, the
+  sub-agent's for a worker or gatekeeper one, read from the `subagents/` files beside the
+  transcript and matched to a role through the Agent call that spawned it. The mission total
+  counts everyone.
   Thin separator rule directly below.
 - Status bar: state dot and word left (`● RUNNING`), a two-tone progress bar (olive fill, `#404040`
   track) filling the middle, fraction and queued count right (`3/17 [+6]`).

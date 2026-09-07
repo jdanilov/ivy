@@ -125,7 +125,7 @@ function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): Ste
         role,
         ...(state?.runs ? { runs: state.runs } : {}),
         ...(from ? { wall: to - from } : {}),
-        ...(from && tail ? { tokens: sumUsage(tail.usage, from, to) } : {}),
+        ...(from && tail ? { tokens: sumUsage(tail.usage, from, to, role, tail.agents) } : {}),
         ...(gateOpen ? { gateOpen } : {}),
       };
     });

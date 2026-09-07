@@ -93,11 +93,21 @@ A project — or the Inbox, over every project — is one bar over its missions 
 alone: closed green, open amber, stub grey, one segment each. The counts stay behind it as the
 dim legend that names the colours.
 
+### The Inbox
+
+Every open gate, waiting decision and waiting question across all projects, keyed
+`project/origin/label`. Each names the session command that answers it; a question names the tab
+that owns it. A key the last snapshot did not have rings the terminal bell and Warp's own
+`777;notify`. Messages, the right pane over it, shows the selected item's body and that command.
+
 ### The foot: DECISIONS
 
 One row per decision of whatever the left column has selected — a mission, a project, or every
 project on the Inbox row — newest last, the mission column present only when more than one is in
 scope. A decision is a fork an agent took; the screen never answers one.
+
+ACTIVITY is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`,
+`Tool` — plus the hook's `Stop`, newest last.
 
 A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
 filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict

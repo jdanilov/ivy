@@ -134,7 +134,7 @@ copy and `vars.archify` re-points them all at a fork.
 2. Put the files it installs beside it — `skill.md`, `agents/<Agent>.md`, `scripts/…`.
 3. Run `bun src/cli.ts install <project>`.
 
-See `AGENTS.md` for the target rules and `docs/terminology.md` for the names.
+See `docs/parts.md` for the target rules and `docs/terminology.md` for the names.
 
 ## Environment variables
 

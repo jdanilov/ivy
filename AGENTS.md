@@ -5,10 +5,15 @@ project via symlinks, and runs missions across those projects. Install, update, 
 in a manifest.
 
 ## Important Files
-- Docs format: @.claude/docs-format.md
 - Terminology: @docs/terminology.md
-- Roadmap: `docs/roadmap.md`
+- Docs format: @.claude/docs-format.md
 - Code format: @.claude/code-format.md
+- Parts: `docs/parts.md` — part.yaml, targets, scope, `${name}`, manifest, the install family
+- Missions: `docs/missions.md` — the mission family's grammar and invariants
+- Design: `docs/design.md` — palette, layout, keys, glyphs, formats for Mission Control
+- Roadmap: `docs/roadmap.md`
+
+Read the doc for the subsystem you touch before editing it; the invariants there are the tests.
 
 ## Tech Stack
 
@@ -69,173 +74,12 @@ closed missions' retros back into work. Shared context reaches every agent throu
 `## Important Files` snippets, never through a sentence repeated in each prompt. The `mission`
 skill stays under 120 lines, `Worker` under 40, `/retro` under 60, every other prompt under 80.
 
-### part.yaml
-
-```yaml
-type: skill          # skill | tool | fixture | mcp
-description: one line
-scope: project       # optional, project | global — global installs into ~/.claude/ instead
-default: true        # preselected in the install menu
-files:
-  - source: skill.md         # relative to the part folder
-  - source: agents/Verifier.md
-  - source: sounds/          # a directory, expanded at load to every file under it
-  - source: terminology.md   # a template
-    target: docs/terminology.md
-    skipIfExists: true       # seed it once, then it belongs to the project
-hooks:               # optional, merged into .claude/settings.local.json, or settings.json when global
-  - { event: PreToolUse, matcher: Bash, command: ... }   # matcher omitted where the event takes none
-  - { events: [Stop, SessionEnd], command: ... }          # sugar: one entry per event, ${event} names it
-settings:            # optional, merged into .claude/settings.json: lists union, scalars overwrite
-  permissions: { allow: [...] }
-mcp:                 # optional, written to .mcp.json
-envVars:             # optional, checked against process.env and the project .env
-snippet:             # optional, one line the part owns in the project's agent file
-  section: "## Important Files"                  # an ATX heading, created at EOF when missing
-  line: "- Terminology: @docs/terminology.md"    # appended at the end of that section, deduped
-  file: AGENTS.md    # optional, overrides AGENTS.md → CLAUDE.md → create AGENTS.md
-recipes:             # optional, shell lines run in the project root
-  init:   ["${codegraph} init"]             # once, when the part becomes installed
-  uninit: ["${codegraph} uninit --force"]   # once, when it is uninstalled or dropped
-vars:                # optional, defaults for ${name}
-  codegraph: "npx -y @colbymchenry/codegraph@1.6.0"
-requires: [mission]  # optional, parts selected and installed with this one, never removable under it
-```
-
-Target defaults for `skill` and `tool`: `agents/X.md` → `.claude/agents/X.md`, everything else →
-`.claude/skills/<name>/X`. Fixtures and mcp parts give each file an explicit `target`, which may
-sit outside `.claude`. A `source` naming a directory, with or without a trailing slash, expands at
-registry load to every file under it, each targeted `<target>/<relative>`; the manifest holds the
-expanded list, so nothing downstream knows the shorthand existed.
-
-A part's `scope` decides the target dir and nothing else: `project` links into the project's
-`.claude/`, `global` into `~/.claude/`, where hooks and settings share one `settings.json` because
-there is no `settings.local.json` at user level. A project command never lists a global part and
-`--global` never lists a project one, so a part that changes scope is unlinked by the next `update`
-the same way a retired one is. A global part with a `snippet` or `recipes` is a registry error:
-nothing global has a project root to write a line in or run a command in.
-
-`${name}` is substituted in `mcp.config.command`, `mcp.config.args`, `hooks[].command` and both recipe
-lists: `~/.factory/config.yaml` `vars.<name>` wins over the part's `vars.<name>`, over the one built-in
-`${root}` — `$CLAUDE_PROJECT_DIR` for a project, `$HOME` for a global part — and nothing defining
-it is a refusal. A value may carry arguments; in `mcp.config.command` the first word is the command and
-the rest leads the args. Substitution happens as the manifest entry is built, so the manifest, `.mcp.json`
-and the hooks hold resolved strings and `update` re-points a project after a config edit. The everyday
-override is hook-factory's `sound` (`off` silences it, a bare name is a macOS system sound) and
-`quiet`, the turn length in seconds below which the end of a turn does not ring.
-
-The manifest records where each file came from under the Factory root, so uninstall knows a link is
-ours without reading it; a manifest written before that falls back to `readlink`. It also records each
-part's `snippet: { file, section, line }` and, after `recipes.init` succeeded, `initAt`. A section that already carries a line naming the same path gets that line rewritten in place
-instead of a second one appended, and the original is kept as `snippet.replaced`. Uninstall works from
-those records, not from a fresh resolution: it puts a replaced line back, otherwise removes the recorded
-line from the recorded file and drops the section when only blank lines are left. A settings or mcp file
-the uninstall emptied is deleted, and so are `.claude/` and `docs/` once nothing is left in either.
-With no manifest at all, `status` reads a `skipIfExists` file that exists as installed: a project
-seeded with the templates by hand owns them already. `init` runs when `initAt` is
-absent and refuses on a non-zero exit with the part left linked, so a fix plus `update` retries. `uninit`
-runs on uninstall and when `update` drops a part the registry no longer has; a failure prints `◈` and the
-unlink continues.
-
 ### Two command families
 
-`install | uninstall | status | update [project]` act on a project and fall back to the picker.
-All four take `--global`, which stands where the project path would: the home dir, the registry
-filtered to `scope: global`, and nothing written to `~/.factory/projects`. `install` and `uninstall`
-take `--yes`: the defaults plus what is already installed, no menu, no confirm. `install` also takes
-`--parts a,b`: exactly those parts plus their `requires`, no menu, no confirm, an unknown name is a
-refusal and a name the other scope owns names the command that does install it. `update` alone takes
-`--skip a,b`, which records the part in the manifest, so the project keeps its own copy for good.
-
-`update` is the non-interactive install: relink, add parts the registry marks `default`, drop parts
-and files it no longer has, rewrite hooks, settings, snippets and manifest. It only ever removes a
-symlink pointing into the Factory. `install --global` refuses while any registered project's manifest
-still lists a part it is about to link, naming the projects: the same skill loaded twice is worse than
-an unfinished migration, and `update` on each project is what finishes it.
-
-`mission | step | gate | decision | handoff <sub>` act on the checkout you are standing in, never prompt
-(the one exception is the worktree offer in `mission new` on a claimed checkout) and exit 1 with a
-one-line `✗ …` on a refusal.
-
-```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
-factory mission shape <preset> [--autonomy L] | autonomy full|partial|none [name]
-factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
-factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
-factory mission archive <name> | unarchive <name>
-factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>
-factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list
-factory decision add "<summary>" --confidence HIGH|MEDIUM|LOW [--step S] [--by R]
-factory decision answer <id> accept|overrule [--note N] | list [--waiting]
-factory handoff save <step>            # reads the handoff from stdin
-```
-
-### Mission invariants
-
-- `mission new` creates the branch and folder first and writes `state.json` last, so an interrupted
-  run leaves an orphan branch the next run reuses, never state pointing at a branch that is not there.
-- Every `state.json` write is a temp file plus rename. No partial JSON ever lands.
-- `step start`, `gate open`, `gate answer`, `mission adopt`, `mission close` are idempotent. First
-  answer wins on a gate; a conflicting second answer is refused, not overwritten.
-- `mission close` checks its own postconditions, so a rerun after a crash finishes the remaining work.
-- The mission folder always resolves through `git worktree list`, so worktrees find it in the main checkout.
-- Any transition that disagrees with `workflow.yaml` appends a `deviations` entry with a reason.
-- `mission open` writes the session id to `state.json` before the tab exists, so the first hook
-  event the new session emits already finds a mission bound to it.
-- `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
-- A decision is one row in the mission's `decisions.md`, `id | step | by | confidence | summary |
-  status | note`, written temp plus rename by `src/core/decision.ts` and, standalone, by the hook.
-  `waits(autonomy, confidence)` decides `waiting` over `auto` at filing: `full` waits on nothing,
-  `partial` on `LOW`, `none` on all three. `step start` refuses while a decision waits, naming the
-  ids; first answer wins, the same verdict again is a no-op and a different one is refused.
-- The hook files the `Decisions:` block of a `SubagentStop` final message and, on `PostToolUse`
-  matcher `Agent` and on `UserPromptSubmit`, tells the Orchestrator which decisions wait. It never
-  logs `PostToolUse` to the events file: one Agent result per row would drown the bus.
-- A `SubagentStop` handoff lands in `handoffs/<step>[-<agent>][-r<round>].md`: a message under five
-  lines is not saved, and an existing handoff is never overwritten, whatever the lengths — the second
-  save of one name takes `-2`, the third `-3`.
-- A claimed mission whose `state.json` has `session: null` adopts the first session to send a
-  `SessionStart` or `UserPromptSubmit`; a session already recorded is never overwritten.
-- `mission new` and the promotion in `mission open` add `.factory/claim`, `.factory/missions/` and
-  `.factory/archive/` to the project `.gitignore`, only the lines nothing ignores yet, committing
-  them when the file is otherwise clean, and `mission close` never counts anything under
-  `.factory/` as dirt: the Factory's own files cannot block the Factory.
-- A stub is a mission with `status: stub` and `branch: null`: folder, workflow copy and an
-  `intent.md` skeleton, no branch and no claim. Every command that needs a branch refuses with
-  `mission <name> is a stub, open it first`; `mission open` promotes it and then proceeds as usual,
-  landing in the same state `mission new` would have.
-- `mission close` commits nothing and never `git add`s the mission folder, which is ignored:
-  `status: closed` in its own `state.json` is the postcondition a rerun reads back. It refuses
-  when anything outside `.factory/` is dirty, naming the paths, and merges the branch when the
-  trunk does not already hold it.
-- `mission close` deletes `mission/<name>` last, after the worktree is gone and the merge landed;
-  `--keep-branch` keeps it, and a branch git will not delete is reported, never forced.
-- `mission new` without `--workflow` copies `intent.yaml`, one human-gated step and nothing after
-  it. `mission shape <preset>` appends that preset's own steps behind `intent`, adds their pending
-  `steps` entries and records the preset as `state.workflow`; it refuses once anything follows
-  `intent` (`already shaped as story`) unless the preset is the one already there, and refuses a
-  preset that does not start with `intent`. `--autonomy` on either sets the dial; `mission autonomy
-  L` moves it later, with a `deviations` entry.
-- One pointer rule serves `step add` and `mission shape`: after an insert, when the step before the
-  new one is done or skipped and the pointer stands on it or on the step the insert displaced, the
-  pointer moves to the new step. Anywhere else the pointer stays where it was.
-- `mission new`, `mission list` and everything that resolves a mission refuse when the main
-  checkout is not in `~/.factory/projects`: `✗ /x is not a registered project — run: factory
-  install /x`. The projects file lives under `HOME`, which is what makes a scratch `HOME` a sandbox
-  rather than a suggestion. The hook is unaffected — it binds by claim, not by the projects list.
-- `mission open --dry-run` writes nothing at all, a stub's promotion included, and `mission open`
-  on a closed mission refuses. Either way `state.json` is byte-identical afterwards.
-- `mission open` on a mission whose `state.json` names a session that is still live refuses with
-  `mission X is bound to session <id> — factory mission adopt X --session <id> to rebind`: a second
-  open would point the mission at an empty tab and every event of the session already on it would go
-  nowhere. A recorded session with no live events file is replaced, so a mission whose tab was closed
-  opens again. Mission Control's `O` raises the same refusal as a toast.
-- `mission new` on a claimed checkout with no tty on stdin refuses with `add --worktree` instead of
-  hanging on a prompt nobody can answer, and leaves no folder behind.
-- `mission archive <name>` refuses unless the mission is closed and renames its folder into
-  `.factory/archive/`; git is not involved, both folders are ignored. `unarchive` is the reverse,
-  both are idempotent, and only `mission list --all` reads the archive.
-- `mission list` and `gate list` skip a registered project whose path is gone. The projects file keeps it.
+`install | uninstall | status | update [project]` act on a project and fall back to the picker;
+`--global` stands where the project path would. `mission | step | gate | decision | handoff <sub>`
+act on the checkout you are standing in, never prompt, and exit 1 with a one-line `✗ …` on a
+refusal. Grammar and rules in `docs/parts.md` and `docs/missions.md`.
 
 ## Conventions
 

@@ -7,7 +7,7 @@ import { readManifest } from '../core/manifest.js';
 import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy, setTitle } from '../core/mission.js';
 import { loadPreset, openSession, stopSession } from '../core/spawn.js';
 import { inboxOf, post } from '../core/peer.js';
-import { resetConfig, writeCaffeinate, writePartScope, type Caffeinate } from '../core/config.js';
+import { resetConfig, writeCaffeinate, writeLaunch, writePartScope, type Caffeinate, type Launch } from '../core/config.js';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { id } from './format.js';
 import type { Autonomy, ScopeChoice } from './model.js';
@@ -183,6 +183,14 @@ export async function setCaffeinate(mode: Caffeinate): Promise<string> {
   else if (mode === 'auto') await stop(CONTROL());
   else for (const name of await readdir(PIDS()).catch(() => [])) await stop(path.join(PIDS(), name));
   return `caffeinate ${mode.toUpperCase()}`;
+}
+
+// ── launch ───────────────────────────────────────────────────────────────────
+
+/** The mode is the file: the next `O` reads it. */
+export async function setLaunch(mode: Launch): Promise<string> {
+  await writeLaunch(mode);
+  return `launch ${mode.toUpperCase()}`;
 }
 
 // ── missions ─────────────────────────────────────────────────────────────────

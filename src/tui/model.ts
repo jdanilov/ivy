@@ -1,11 +1,11 @@
 /** What Mission Control draws. `live.ts` fills these from state.json, events and manifests. */
 
-import type { Caffeinate } from '../core/config.js';
+import type { Caffeinate, Launch } from '../core/config.js';
 import { stepRole } from '../core/workflow.js';
 import type { Decision } from '../core/decision.js';
 import type { ScopeChoice, Scope, WorkflowStep } from '../types.js';
 
-export type { Caffeinate, Decision, Scope, ScopeChoice };
+export type { Caffeinate, Decision, Launch, Scope, ScopeChoice };
 
 export type RunState = 'pending' | 'running' | 'done' | 'blocked' | 'skipped';
 
@@ -71,6 +71,8 @@ export interface Mission {
   step: string | null;
   round: number;
   session: string | null;
+  /** The bound session runs under Claude Code's daemon, with a tab attached or none. */
+  bg?: boolean;
   /** The preset the bound session was spawned with, from the hook's own SessionStart line. */
   preset: string | null;
   branch: string | null;
@@ -96,6 +98,8 @@ export interface Session {
   /** The role of the sub-agent out in the background, when that is what keeps it busy. */
   agent?: string;
   preset: string;
+  /** Runs under Claude Code's daemon, with a tab attached or none. */
+  bg?: boolean;
   cwd: string;
   /** When its last turn ended. Meaningless while busy. */
   idleSince: number;
@@ -151,4 +155,5 @@ export interface Snapshot {
   inbox: InboxItem[];
   activity: Activity[];
   caffeinate: Caffeinate;
+  launch: Launch;
 }

@@ -91,9 +91,18 @@ export async function readLaunch(): Promise<Launch> {
  * here outlive the change. Quoted, because YAML reads a bare `on` as true.
  */
 export async function writeCaffeinate(mode: Caffeinate): Promise<void> {
+  await writeLine('caffeinate', mode);
+}
+
+export async function writeLaunch(mode: Launch): Promise<void> {
+  await writeLine('launch', mode);
+}
+
+async function writeLine(key: string, value: string): Promise<void> {
   const text = await Bun.file(configPath()).text().catch(() => '');
-  const line = `caffeinate: "${mode}"`;
-  const next = /^caffeinate:.*$/m.test(text) ? text.replace(/^caffeinate:.*$/m, line) : `${line}\n${text}`;
+  const line = `${key}: "${value}"`;
+  const at = new RegExp(`^${key}:.*$`, 'm');
+  const next = at.test(text) ? text.replace(at, line) : `${line}\n${text}`;
   await mkdir(factoryHome(), { recursive: true });
   await Bun.write(configPath(), next.endsWith('\n') ? next : `${next}\n`);
 }

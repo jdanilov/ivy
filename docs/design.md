@@ -65,7 +65,7 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 
 ```
 row 0        blank
-row 1        ⌬ FACTORY  <project or path>                        caffeinate AUTO [ON]
+row 1        ⌬ FACTORY  <project or path>           Launch DIRECT   Caffeinate AUTO [ON]
 row 2        ───────────────────────────────────────────────────────────────────────
 row 3        status: mission bar or project bar, or the toast that replaces it
 row 4        ───────────────────────────────────────────────────────────────────────
@@ -78,13 +78,15 @@ row 4        ──────────────────────�
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Tab  X Kill  T Autonomy  H Archive  R Rename  M New Mission  Z Archived  C Caffeinate  D Decisions  ? Help  Q Quit
+             ↑↓ Select  ↵ Message  O Tab  X Kill  T Autonomy  H Archive  R Rename  M New Mission  Z Archived  L Launch  C Caffeinate  D Decisions  ? Help  Q Quit
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
   screen breathes on the side the eye starts from and fills the rest.
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
-  Two cells of padding on the left pane keep its right-aligned tokens off the divider.
+  Two cells of padding on the left pane keep its right-aligned wall time and diff off the divider.
+  An open mission row ends in those two and no token count: the status bar has the tokens, and
+  the row has no room. A mission or session under Claude Code's daemon carries a dim `bg`.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `Z` asks for them.
 - The foot keeps a third of the body, never fewer than 5 rows; `A` or `D` pressed on the tab already drawn gives it all of it. Its header
@@ -287,6 +289,7 @@ keys do, and none of these three do the same thing.
 | `R`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
 | `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
+| `L`     | any              | launch direct → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
 | `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
 | `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |

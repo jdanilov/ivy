@@ -201,7 +201,7 @@ const projects: Project[] = [
     ],
     missions: [
       mission({
-        name: 'auth', workflow: 'chore', state: 'blocked', step: 'merge', round: 2, session: '8a9e6b42',
+        name: 'auth', workflow: 'chore', state: 'blocked', step: 'merge', round: 2, session: '8a9e6b42', bg: true,
         preset: 'orchestrator', branch: 'mission/auth', wall: 2 * H + 4 * M, autonomy: 'partial',
         tokens: { input: 96_400, cached: 1_100_000, output: 22_800 },
         diff: { added: 120, removed: 34 }, steps: authSteps, decisions: authDecisions,
@@ -267,5 +267,5 @@ const inbox: InboxItem[] = [
 ];
 
 export const snapshot: Snapshot = {
-  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto',
+  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto', launch: 'direct',
 };

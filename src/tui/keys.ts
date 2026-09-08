@@ -2,7 +2,7 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, newMission, openTab, renameMission, renameSession, sendMessage, setAutonomy, setCaffeinate,
+  applyParts, applyScopes, archive, killSession, newMission, openTab, renameMission, renameSession, sendMessage, setAutonomy, setCaffeinate, setLaunch,
 } from './actions.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
@@ -11,12 +11,13 @@ import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './pan
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { draftOf, editKey, targetOf } from './panes/compose.js';
 import { act, draw, toast, type App } from './screen.js';
-import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
+import type { Autonomy, Caffeinate, Launch, Mission, Project } from './model.js';
 
 /** What every key does. The screen draws; this is the only place a keypress changes anything. */
 
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
 const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
+const LAUNCH: Launch[] = ['direct', 'bg'];
 
 /** The one focusable value in the MISSION pane. Turned at once and written behind that: the
  *  rebuild that follows reads state.json back. */
@@ -216,6 +217,11 @@ function handleKey(app: App, key: KeyEvent): void {
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;
       const mode = snap.caffeinate;
       return act(app, `caffeinate ${mode.toUpperCase()}…`, () => setCaffeinate(mode));
+    }
+    case 'l': {
+      snap.launch = LAUNCH[(LAUNCH.indexOf(snap.launch) + 1) % LAUNCH.length]!;
+      const mode = snap.launch;
+      return act(app, `launch ${mode.toUpperCase()}…`, () => setLaunch(mode));
     }
     case 'o':
       if (right) break;

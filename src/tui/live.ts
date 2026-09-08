@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
-import { loadConfig, readCaffeinate } from '../core/config.js';
+import { loadConfig, readCaffeinate, readLaunch } from '../core/config.js';
+import { isBackground } from '../core/spawn.js';
 import { readDecisions, type Decision } from '../core/decision.js';
 import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
@@ -327,6 +328,7 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
     step: state.step || null,
     round: state.round,
     session: state.session,
+    ...(state.session && (await isBackground(state.session)) ? { bg: true } : {}),
     preset: ev?.preset ?? null,
     branch: state.branch,
     worktree: state.worktree,
@@ -359,6 +361,7 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
     busy: ev.asks === null || agent !== undefined,
     ...(agent ? { agent } : {}),
     preset: ev.preset,
+    ...((await isBackground(ev.session)) ? { bg: true } : {}),
     cwd: ev.cwd,
     idleSince: ev.stops.at(-1) ?? ev.at,
     ...(now ? { now } : {}),
@@ -469,5 +472,5 @@ export async function buildSnapshot(): Promise<Snapshot> {
 
   ctx.inbox.sort((a, b) => a.at - b.at);
   ctx.activity.sort((a, b) => a.at - b.at);
-  return { projects, global: await globalParts(), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
+  return { projects, global: await globalParts(), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate(), launch: await readLaunch() };
 }

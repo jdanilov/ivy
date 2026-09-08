@@ -1,5 +1,5 @@
 import { C, GLYPH, SESSION, stateColor } from '../theme.js';
-import { ago, dur, id, spread, tokens, type Cell } from '../format.js';
+import { ago, dur, id, spread, type Cell } from '../format.js';
 import { marker, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { Mission, Session, Snapshot } from '../model.js';
 
@@ -17,10 +17,9 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
     m.archived ? [['  archived', C.dim]]
     : m.status === 'stub' ? [['  stub', C.dim]]
     : m.status === 'closed' ? [[`  closed ${ago(m.closedAt ?? Date.now())}`, C.dim]]
-    : [['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright], [m.round ? ` ↻${m.round}` : '', C.dim]];
-  const right: Cell[] = m.status === 'open'
-    ? [[dur(m.wall), C.dim], ['  ', C.dim], [tokens(m.tokens.input + m.tokens.cached + m.tokens.output), C.dim], ...diffCells(m)]
-    : [];
+    : [['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright], [m.round ? ` ↻${m.round}` : '', C.dim], [m.bg ? '  bg' : '', C.dim]];
+  // Wall time and the diff: the tokens are the status bar's, and the row has no room for them.
+  const right: Cell[] = m.status === 'open' ? [[dur(m.wall), C.dim], ...diffCells(m)] : [];
   const cells: Cell[] = [marker(selected, focused), [' ', C.dim], [`${GLYPH[m.state]} `, stateColor(m.state)], [m.name, quiet ? C.dim : C.bright]];
   p.row(spread([...cells, ...tail], right, p.width), selected && focused);
 }
@@ -31,7 +30,7 @@ function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): v
   const state = s.busy ? `working${s.agent ? ` · ${s.agent}` : ''}` : `idle ${dur(Date.now() - s.idleSince)}`;
   p.row([
     marker(selected, focused), [' ', C.dim], s.busy ? [`${SESSION.working} `, C.accent] : [`${SESSION.idle} `, C.dim],
-    [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim],
+    [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [s.bg ? '  bg' : '', C.dim],
     ...(s.name ? ([['  ', C.dim], [id(s.id), C.dim]] as Cell[]) : []), [`  ${state}`, C.dim],
   ], selected && focused);
 }

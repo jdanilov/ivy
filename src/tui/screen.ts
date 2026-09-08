@@ -34,10 +34,13 @@ function caffeinateCells(snap: Snapshot): Cell[] {
   return [['Caffeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
 }
 
+/** How `O` will run the next session: in the tab, or under the daemon with the tab attached. */
+const launchCells = (snap: Snapshot): Cell[] => [['Launch ', C.dim], [snap.launch.toUpperCase(), C.bright], ['   ', C.dim]];
+
 function header(p: Pane, here: LeftItem, snap: Snapshot): void {
   const where = here.kind === 'inbox' ? '' : here.project.path;
   const left: Cell[] = [[`${BRAND} `, C.accent], ['FACTORY', C.accent], ['  ', C.dim], [where, C.dim]];
-  p.row(spread(left, caffeinateCells(snap), p.width));
+  p.row(spread(left, [...launchCells(snap), ...caffeinateCells(snap)], p.width));
 }
 
 /** The bar is a third of the line at most, and only what the words on either side leave. */
@@ -137,7 +140,7 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
     ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
-      ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
+      ['Z', 'Archived'], ['L', 'Launch'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
     // Space picks the scope on the global row and the install on a project's: one key, two panes.

@@ -107,11 +107,16 @@ async function startSession(args: string[], cwd: string): Promise<{ short: strin
   return { short, session: job.sessionId };
 }
 
-/** A session `--bg` started is the daemon's to stop: its record names the full id it was given. */
+/** A session `--bg` started has the daemon's record under its short id, naming the full one. */
+export async function isBackground(session: string): Promise<boolean> {
+  const job = await Bun.file(jobFile(session.slice(0, 8))).json().catch(() => null) as { sessionId?: string } | null;
+  return job?.sessionId === session;
+}
+
+/** A session `--bg` started is the daemon's to stop. */
 export async function stopSession(session: string): Promise<string | null> {
+  if (!(await isBackground(session))) return null;
   const short = session.slice(0, 8);
-  const job = await Bun.file(jobFile(short)).json().catch(() => null) as { sessionId?: string } | null;
-  if (job?.sessionId !== session) return null;
   const proc = Bun.spawn(['claude', 'stop', short], { stdout: 'pipe', stderr: 'pipe' });
   const out = (await new Response(proc.stdout).text()).trim();
   await proc.exited;

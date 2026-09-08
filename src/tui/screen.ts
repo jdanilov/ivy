@@ -112,10 +112,10 @@ function status(width: number, snap: Snapshot, here: LeftItem, ui: Ui): Cell[] {
   return summary([here.project.path, C.bright], here.project.missions);
 }
 
-/** One row: the status of the selection, then the brand at the right edge. Two rows said no more. */
+/** One row: the brand, then the status of the selection over the rest. Two rows said no more. */
 function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
-  const brand: Cell[] = [[`${BRAND} `, C.accent], ['FACTORY', C.accent]];
-  p.row(spread(status(p.width - len(brand) - 2, snap, here, ui), brand, p.width));
+  const brand: Cell[] = [[`${BRAND} `, C.accent], ['FACTORY', C.accent], [' · ', C.rule]];
+  p.row([...brand, ...status(p.width - len(brand), snap, here, ui)]);
 }
 
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole

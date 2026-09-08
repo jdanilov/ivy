@@ -37,9 +37,9 @@ undershoots these values on screen but the hierarchy holds.
 
 ## Layout
 
-- Header row: the status of the selected row left — a mission's state, its bar and metrics
-  (`TIME 56m 54s · Input 324.0K · Cached 16.8M · Output 111.0K`), a project's path and counts —
-  and the brand glyph with the product name pinned right. One row, since two said no more.
+- Header row: the brand glyph and the product name left, then the status of the selected row
+  over the rest — a mission's state, its bar and metrics (`TIME 56m 54s · Input 324.0K · Cached
+  16.8M · Output 111.0K`), a project's path and counts. One row, since two said no more.
   `Input` is what the turns added, cache writes included; `Cached` is what they re-read. A graph
   row's tokens are input plus output, so two steps compare and a late one is not heavier by
   its history. A row counts its own runner's turns: the session's for an orchestrator step, the
@@ -68,7 +68,7 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 
 ```
 row 0        blank
-row 1        status: mission bar or project bar, or the toast that replaces it       ⌬ FACTORY
+row 1        ⌬ FACTORY · status: mission bar or project bar, or the toast that replaces it
 row 2        ───────────────────────────────────────────────────────────────────────
              PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | PARTS (60%)
              inbox, Global,          │  a list above a detail block; a gate and a

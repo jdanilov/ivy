@@ -1,5 +1,5 @@
 import { C } from '../theme.js';
-import { clock, dur, len, spread, wrap, type Cell } from '../format.js';
+import { clock, len, spread, wrap, type Cell } from '../format.js';
 import { itemKey, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { Activity, Decision, Mission, Project, Snapshot } from '../model.js';
 
@@ -13,18 +13,32 @@ const VERB: Record<Activity['verb'], string> = {
 /** What of a row is the human's or the model's own words, drawn bright; the rest is tooling, dim. */
 const SAID = new Set<Activity['verb']>(['user', 'agent', 'ask']);
 
-/** Where a `bash` or `sub` row stands, drawn before its verb: out, back, or back with an error. */
+/** Where a `bash` or `sub` row stands, drawn where its text starts: out, back, or back with an error. */
 const STATUS: Record<NonNullable<Activity['status']>, [glyph: string, color: string]> = {
   running: ['○', C.dim], ok: ['●', C.success], failed: ['●', C.error],
 };
 
-/** A row wraps under its text column to this many lines; a longer command is a paragraph nobody reads here. */
+/** A row wraps under its text column to this many lines; a longer command is a paragraph nobody
+ *  reads here. The last few `agent` rows are the exception: what the model just said is what the
+ *  pane is opened for, so those stand whole, line breaks and all, up to a cap that keeps one
+ *  report from being the whole foot. */
 const ACTIVITY_ROWS = 2;
+const WHOLE_ROWS = 40;
+const WHOLE_LAST = 3;
 
-/** `12:25:28` on the words, `+1m 4s` since the last of them on the tooling between: a turn reads
+/** `12:25:28` on the words, `+1:04` since the last of them on the tooling between: a turn reads
  *  as one clock time and the gaps under it, and a stop shares its agent's second, so it has none. */
 const TIME_COL = 8;
 const VERB_COL = 5;
+
+/** `+7s`, `+1:04`, `+1:02:03`: a gap in the shape a stopwatch shows it, so a column of them scans. */
+function gap(ms: number): string {
+  const s = Math.round(ms / 1000);
+  const two = (n: number): string => String(n).padStart(2, '0');
+  if (s < 60) return `+${s}s`;
+  const m = Math.floor(s / 60);
+  return m < 60 ? `+${m}:${two(s % 60)}` : `+${Math.floor(m / 60)}:${two(m % 60)}:${two(s % 60)}`;
+}
 
 /** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch.
  *  Each carries what came in since it was last open, so the hidden one says whether to look. */
@@ -137,19 +151,37 @@ function sessionsOf(snap: Snapshot, here: LeftItem): Map<string, string> {
 const activityRows = (snap: Snapshot, owners: Map<string, string>): Activity[] =>
   snap.activity.filter((a) => owners.has(a.session)).sort((a, b) => a.at - b.at);
 
-/** The lines of one row: the time or the gap, the status dot, the verb, then the text wrapped
+/** A `sub` row's text is `→ Commit · what it was asked`: the name is what the eye scans for. */
+function subCells(text: string): Cell[] {
+  const at = text.indexOf(' · ');
+  return at === -1 ? [[text, C.bright]] : [[text.slice(0, at), C.bright], [text.slice(at), C.dim]];
+}
+
+/** A message whole: each of its own lines wrapped, blank ones kept, up to the cap. */
+function whole(text: string, width: number): string[] {
+  const out: string[] = [];
+  for (const line of text.split('\n')) {
+    if (out.length >= WHOLE_ROWS) break;
+    if (line.trim() === '') { if (out.at(-1) !== '') out.push(''); continue; }
+    out.push(...wrap(line, width, WHOLE_ROWS - out.length));
+  }
+  return out;
+}
+
+/** The lines of one row: the time or the gap, the verb, then the status dot and the text wrapped
  *  under its own column. A stop closes its turn with one blank line, so turns read as paragraphs. */
-function activityLines(a: Activity, since: number | undefined, owner: string | undefined, width: number): Cell[][] {
+function activityLines(a: Activity, since: number | undefined, owner: string | undefined, width: number, full: boolean): Cell[][] {
   const clocked = a.verb === 'user' || a.verb === 'agent';
-  const when = clocked || since === undefined ? clock(a.at) : a.verb === 'stop' ? '' : `+${dur(a.at - since)}`;
-  const [glyph, color] = a.status ? STATUS[a.status] : [' ', C.dim];
+  const when = clocked || since === undefined ? clock(a.at) : a.verb === 'stop' ? '' : gap(a.at - since);
   const head: Cell[] = [
     [`${when.padStart(TIME_COL)}  `, C.dim], ...(owner === undefined ? [] : ([[owner.padEnd(9), C.dim]] as Cell[])),
-    [`${glyph} `, color], [`${a.verb.padEnd(VERB_COL)}  `, VERB[a.verb]],
+    [`${a.verb.padEnd(VERB_COL)}  `, VERB[a.verb]], ...(a.status ? ([[`${STATUS[a.status][0]} `, STATUS[a.status][1]]] as Cell[]) : []),
   ];
   const indent = len(head);
+  const room = Math.max(20, width - indent);
+  if (a.verb === 'sub') return [[...head, ...subCells(a.text)]];
   const tone = SAID.has(a.verb) ? C.bright : C.dim;
-  const lines = wrap(a.text, Math.max(20, width - indent), ACTIVITY_ROWS)
+  const lines = (full ? whole(a.text, room) : wrap(a.text, room, ACTIVITY_ROWS))
     .map((text, i): Cell[] => (i === 0 ? [...head, [text, tone]] : [[' '.repeat(indent), C.dim], [text, tone]]));
   return a.verb === 'stop' ? [...lines, []] : lines;
 }
@@ -164,10 +196,11 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
   // measured from the last word of its own session, so merged logs do not time each other, and
   // a stop clears it: whatever opens the next turn, a report back as often as a prompt, is clocked.
   const since = new Map<string, number>();
+  const recent = new Set(rows.filter((a) => a.verb === 'agent').slice(-WHOLE_LAST));
   const lines = rows.flatMap((a): Cell[][] => {
-    const out = activityLines(a, since.get(a.session), owners.size > 1 ? owners.get(a.session) : undefined, p.width);
+    const out = activityLines(a, since.get(a.session), owners.size > 1 ? owners.get(a.session) : undefined, p.width, recent.has(a));
     if (a.verb === 'stop') since.delete(a.session);
-    else if (a.verb === 'user' || a.verb === 'agent') since.set(a.session, a.at);
+    else if (a.verb === 'user' || a.verb === 'agent' || !since.has(a.session)) since.set(a.session, a.at);
     return out;
   });
   const shown = visible(lines, room, ui);

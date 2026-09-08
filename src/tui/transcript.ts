@@ -70,18 +70,19 @@ const TRACKED = new Set<Activity['verb']>(['bash', 'sub']);
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-/** What an `agent` row holds: two lines of a wide pane, since the foot wraps a row to two. */
-const TEXT_MAX = 320;
+/** What an `agent` row holds: the message as written, line breaks kept, so the foot can show the
+ *  latest ones whole and fold the rest to two lines. Past this it is a report nobody reads here. */
+const TEXT_MAX = 2000;
 
-/** Prose on one line, cut where the foot would stop wrapping it anyway. */
-function flat(raw: string): string {
-  const one = raw.trim().replace(/\s+/g, ' ');
-  return one.length > TEXT_MAX ? `${one.slice(0, TEXT_MAX - 1)}…` : one;
+/** Prose as written, blank runs folded to one, cut where nobody keeps reading. */
+function said(raw: string): string {
+  const kept = raw.trim().replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n');
+  return kept.length > TEXT_MAX ? `${kept.slice(0, TEXT_MAX - 1)}…` : kept;
 }
 
-/** One sentence of prose: a question row is the question, not its preamble. */
+/** One sentence of prose on one line: a question row is the question, not its preamble. */
 function sentence(raw: string): string {
-  const one = flat(raw);
+  const one = raw.trim().replace(/\s+/g, ' ');
   const end = one.search(/[.?!](\s|$)/);
   return end === -1 ? one : one.slice(0, end + 1);
 }
@@ -224,7 +225,7 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
         const body = text(block.text).trim();
         if (body === '') continue;
         tail.text = body.slice(0, 1000);
-        tail.activity.push({ at, session, verb: 'agent', text: flat(body) });
+        tail.activity.push({ at, session, verb: 'agent', text: said(body) });
       } else if (block.type === 'tool_use') {
         const row: Activity = { at, session, verb: VERB[block.name ?? ''] ?? 'tool', text: detail(block, cwd) };
         if (TRACKED.has(row.verb) && block.id) {

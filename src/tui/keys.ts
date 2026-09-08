@@ -7,7 +7,7 @@ import {
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import { clamp, itemKey, leftItems, select, type LeftItem } from './panes/pane.js';
+import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { act, draw, toast, type App } from './screen.js';
 import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
@@ -85,8 +85,8 @@ function handleKey(app: App, key: KeyEvent): void {
     if (key.name === 'up' || key.name === 'k') ui.scroll += 1;
     else if (key.name === 'down' || key.name === 'j') ui.scroll = Math.max(0, ui.scroll - 1);
     else if (key.name === 'return' || key.name === 'f' || key.name === 'escape') ui.full = false;
-    else if (key.name === 'a') ui.foot = 'activity';
-    else if (key.name === 'd') ui.foot = 'decisions';
+    // The tab's own key: switch to it, or, pressed on the tab already drawn, hand the screen back.
+    else if (key.name === 'a' || key.name === 'd') footKey(ui, key.name === 'a' ? 'activity' : 'decisions');
     else return;
     return draw(app);
   }
@@ -162,10 +162,10 @@ function handleKey(app: App, key: KeyEvent): void {
       ui.scroll = 0;
       break;
     case 'a':
-      ui.foot = 'activity';
+      footKey(ui, 'activity');
       break;
     case 'd':
-      ui.foot = 'decisions';
+      footKey(ui, 'decisions');
       break;
     case 'z': {
       ui.showArchived = !ui.showArchived;
@@ -230,6 +230,15 @@ function handleKey(app: App, key: KeyEvent): void {
 }
 
 /** A key must never take the screen down: the toast says what broke, the log says where. */
+
+/** `A` and `D` each name a foot tab: the first press draws it, the second gives it the screen,
+ *  the third hands the screen back — the same toggle `F` is, with the tab chosen on the way. */
+function footKey(ui: Ui, tab: Ui['foot']): void {
+  if (ui.foot !== tab) ui.foot = tab;
+  else ui.full = !ui.full;
+  ui.scroll = 0;
+}
+
 export function onKey(app: App, key: KeyEvent): void {
   try {
     handleKey(app, key);

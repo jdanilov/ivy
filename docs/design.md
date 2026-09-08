@@ -143,14 +143,17 @@ reads as it happened: prompt, tools, the model's words, stop, and a blank line u
 turns read as paragraphs. A `bash` row is the tool's description, what the model said it was
 doing, and only falls back to the command; a `sub` row is `→ <type> · <description>`; a `stop` row
 sums its turn, `turn 2m 38s · 5 tools`. The time column is a clock on `user`, `agent` and whatever
-opens a turn, and `+1m 4s` since the last of those on the tooling between them: a turn is one time
-and the gaps under it. A `bash` or `sub` row carries its outcome before the verb, `○` while out,
-`●` green once its result landed, `●` red when the result was an error or a background task ended
-`failed`: the transcript pairs each result to its call by id, and a task notification names the
-call it ends. Words are bright — `user` red, `agent` bright, `ask` yellow — tooling dim, `sub` blue,
-`edit` green as a change. A row wraps under its text column to two lines and no more; the hook
-clips a prompt at those two lines. Each tab carries `+N`, what came in since it was last open or
-left, so the hidden one says whether to look; both reset when the selection changes.
+opens a turn, and `+1:04` since the last of those on the tooling between them, in a stopwatch's
+shape so the column scans: a turn is one time and the gaps under it. A `bash` or `sub` row carries
+its outcome where its text starts, `○` while out, `●` green once its result landed, `●` red when
+the result was an error or a background task ended `failed`: the transcript pairs each result to
+its call by id, and a task notification names the call it ends. Words are bright — `user` red,
+`agent` bright, `ask` yellow — tooling dim, `sub` blue with the name after its arrow bright, `edit`
+green as a change. A row wraps under its text column to two lines and no more, except the last
+three `agent` rows, which stand whole with their own line breaks, up to forty lines: what the
+model just said is what the pane is opened for. The hook clips a prompt at two lines. Each tab
+carries `+N`, what came in since it was last open or left, so the hidden one says whether to
+look; both reset when the selection changes.
 
 A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
 filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict
@@ -254,8 +257,8 @@ keys do, and none of these three do the same thing.
 | `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
-| `D`     | any              | the foot draws DECISIONS                                         |
-| `A`     | any              | the foot draws ACTIVITY                                          |
+| `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
+| `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |
 | `F`     | any              | the foot at full height; header and status bar hidden            |
 | `?`     | any              | the KEYS panel                                                   |
 | `Q`     | any              | quit                                                             |

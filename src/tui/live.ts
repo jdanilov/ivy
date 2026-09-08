@@ -260,7 +260,11 @@ function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: strin
   ctx.logged.add(session);
   if (tail) ctx.activity.push(...tail.activity);
   for (const { at, text } of ev?.prompts ?? []) ctx.activity.push({ at, session, verb: 'user', text });
-  for (const { at, text } of ev?.reports ?? []) ctx.activity.push({ at, session, verb: 'sub', text: `← ${text}` });
+  // A report names what it was asked, the launch row names who was asked: the row gets both.
+  for (const { at, text } of ev?.reports ?? []) {
+    const role = /^→ (.+?) · /.exec(tail?.activity.find((a) => a.verb === 'sub' && a.text.endsWith(` · ${text}`))?.text ?? '')?.[1];
+    ctx.activity.push({ at, session, verb: 'sub', text: role ? `← ${role} · ${text}` : `← ${text}` });
+  }
   for (const at of ev?.stops ?? []) {
     const from = turnStart(ev!, at);
     const tools = toolCount(tail, from, at);

@@ -2,13 +2,14 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, newMission, openTab, renameMission, renameSession, setAutonomy, setCaffeinate,
+  applyParts, applyScopes, archive, killSession, newMission, openTab, renameMission, renameSession, sendMessage, setAutonomy, setCaffeinate,
 } from './actions.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
+import { draftOf, editKey, targetOf } from './panes/compose.js';
 import { act, draw, toast, type App } from './screen.js';
 import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
 
@@ -43,6 +44,33 @@ function typing(app: App, key: KeyEvent): void {
   draw(app);
 }
 
+/** The chord that sends: ⇧↵ where the terminal tells shift from plain, ^S everywhere. */
+const sends = (key: KeyEvent): boolean => (key.name === 'return' && key.shift) || (key.ctrl && key.name === 's');
+
+/** The message box has the keys: `↵` breaks a line, `esc` keeps the draft and hands them back. */
+function composing(app: App, key: KeyEvent): void {
+  const { ui } = app;
+  const { here } = select(app.snap, ui);
+  const target = targetOf(here);
+  const d = draftOf(ui, here);
+  if (key.name === 'escape' || target === null) ui.compose = false;
+  else if (sends(key)) {
+    const text = d.text.trim();
+    if (text === '') return toast(app, 'nothing to send');
+    ui.compose = false;
+    return act(app, `sending to ${target.name}…`, async () => {
+      const said = await sendMessage(target.session, text);
+      d.text = '';
+      d.cursor = 0;
+      return said;
+    });
+  } else if (key.ctrl && key.name === 'u') {
+    d.text = '';
+    d.cursor = 0;
+  } else if (!editKey(d, key, app.r.terminalWidth - 2)) return;
+  draw(app);
+}
+
 /**
  * Shift+↑↓ swaps the row with its neighbour of the same kind — the one shown, so a hidden archived
  * mission is stepped over — and keeps the whole list's order in config. The snapshot is swapped in
@@ -71,6 +99,7 @@ function handleKey(app: App, key: KeyEvent): void {
   const { snap, ui } = app;
 
   if (ui.input) return typing(app, key);
+  if (ui.compose) return composing(app, key);
 
   // The panel holds the right pane until it is asked to leave; nothing else acts behind it.
   if (ui.help) {
@@ -148,6 +177,12 @@ function handleKey(app: App, key: KeyEvent): void {
       if (inParts) {
         if (!pending(here.project, ui, inGlobal).length) return;
         ui.confirm = true;
+        break;
+      }
+      // A row with a session behind it is written to; the arrows already enter the right pane.
+      if (!right && (here.kind === 'session' || here.kind === 'mission')) {
+        if (targetOf(here) === null) return toast(app, `${here.kind === 'mission' ? here.mission.name : id(here.session.id)} has no session — O opens one`);
+        ui.compose = true;
         break;
       }
       if (!right) ui.focus = 'right';

@@ -75,8 +75,10 @@ row 4        ──────────────────────�
              sessions                │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
              ACTIVITY  DECISIONS     one third of the body, all of it on F
+             ───────────────────────────────────────────────────────────────────────
+             to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Open  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  D Decisions  F Full  ? Help  Q Quit
+             ↑↓ Select  ↵ Message  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  D Decisions  F Full  ? Help  Q Quit
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
@@ -113,10 +115,32 @@ turn's; `spend`, the session's own tokens in and out and `context`, what its las
 the one figure that says how full the window is. Its last word is the log's last row, and the
 pane does not repeat it.
 
-The bar is also the one line the screen takes typing on. `N` and `M` ask for a name or a title
+The bar is also the one line the screen takes a name on. `N` and `M` ask for a name or a title
 there — the label, what has been typed, a cursor — and while the line is open every key is a
 character but `↵`, `esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
 writes nothing.
+
+### The message box
+
+`↵` on a session row, or a mission row with a session, opens a box under the foot: `to <name>`,
+then the message, wrapped at the width and grown to six rows before it scrolls to keep the cursor
+in view. It is a small editor, because a reply is rarely one line: `↵` breaks a line, the arrows
+walk the text, `home` `end` `^A` `^E` take the line's ends, `^U` clears, and `⇧↵` or `^S` sends —
+two chords because a terminal that does not speak the kitty keyboard protocol sends `⇧↵` as `↵`.
+`esc` hands the keys back and keeps the draft: there is one per row, kept while the selection
+moves, so a half-written answer survives a look at another session, and the box stays drawn, dim,
+wherever a draft is waiting. Sent, the draft goes.
+
+The message goes into the session's inbox, the Unix socket Claude Code binds per session under
+`/tmp/cc-socks/` and lists in `~/.claude/sessions/<pid>.json`: one JSON line in the
+`stream-json` user shape. An idle session starts a turn on it; a busy one reads it between tool
+calls, never mid-tool. Claude Code hands it over as a message from another session, so its first
+line is `From the user, via Mission Control:` and the session treats what follows as the human's.
+What a peer message cannot do is consent: a permission prompt or an `AskUserQuestion` picker is
+answered in the tab, and the screen only shows that one is waiting. A session started with
+`--dangerously-skip-permissions` holds a message from a sender with no permission class behind a
+dialog unless its `crossSessionInbound` is `accept`; the sessions `O` starts carry that in their
+settings overlay, a hand-started one needs it in `~/.claude/settings.json`.
 
 ### The Inbox
 
@@ -242,7 +266,11 @@ keys do, and none of these three do the same thing.
 | `↑↓`    | any              | move the selection; scroll the foot while it is full             |
 | `→`     | left             | enter the right pane                                             |
 | `→`     | MISSION          | turn the autonomy dial, the pane's one focusable value           |
-| `↵`     | any              | open the selection, or apply what Parts has pending              |
+| `↵`     | session, mission | write to the row's session: the message box                      |
+| `↵`     | elsewhere        | open the selection, or apply what Parts has pending              |
+| `⇧↵` `^S` | message box    | send; `⇧↵` only where the terminal tells it from `↵`              |
+| `^U`    | message box      | clear the draft                                                  |
+| `esc`   | message box      | keep the draft, hand the keys back                               |
 | `←`     | right            | back to the left pane                                            |
 | `esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
 | `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
@@ -266,7 +294,7 @@ keys do, and none of these three do the same thing.
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O X T H N`, a session row `X N`, a project `M`, the Inbox
-and `Global` none of them.
+and `Global` none of them; `↵` reads `Message` on a row with a session behind it and `Open` on the rest.
 
 A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `N`
 keeps the Factory's word on the session's own events file: one `Rename` line carrying what the

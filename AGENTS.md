@@ -25,7 +25,8 @@ Read the doc for the subsystem you touch before editing it; the invariants there
 
 ```
 src/           CLI source (entry: src/cli.ts)
-├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env,
+├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env, peer
+│              (a session's inbox socket, and posting to it),
 │              projects (home and factoryHome read at call time, scopeOf), config (vars, the
 │              parts: scope block, caffeinate), recipes, args, workflow (YAML load + transitions,
 │              stepRole, ROLE_MODEL), mission (folder, state, claim, branch, autonomy, insert pointer,
@@ -35,7 +36,7 @@ src/           CLI source (entry: src/cli.ts)
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys
 │              (what a keypress does), panes/ (pane scaffolding plus left, messages, mission,
-│              parts, foot, help — one file each, none over 400 lines), actions (what a key
+│              parts, foot, compose, help — one file each, none over 400 lines), actions (what a key
 │              writes, through the CLI's own functions), notify, frames, format, theme
 ├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control
 └── types.ts   Shared type definitions

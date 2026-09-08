@@ -66,6 +66,7 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 | Inbox           | Every open gate, waiting decision and waiting question across all projects. Each names the session command that answers it. |
 | Messages        | The right pane over the Inbox: the selected item's body and its answering command. Read-only.   |
 | Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, for whatever the left column has selected. |
+| Message box     | Under the foot on `↵`: a message to the selected row's session, posted to its inbox socket. One draft per row, kept until sent. |
 | Caffeinate      | Whether the Mac is held awake: `auto` per turn, `on` per session, `off` never. Key `caffeinate` in `~/.factory/config.yaml`. |
 | Changes         | Warp's own diff panel. The Factory does not render diffs.                                       |
 | Tab config      | Warp TOML in `~/.warp/tab_configs/`. The Factory writes one per mission and opens it by URI.    |

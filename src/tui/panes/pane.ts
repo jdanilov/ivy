@@ -3,6 +3,7 @@ import { C } from '../theme.js';
 import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
 import type { Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
+import type { Draft } from './compose.js';
 
 /**
  * What every pane shares: the Ui state it reads, the rows the left column lists — one of which the
@@ -30,13 +31,16 @@ export interface Ui {
   toast: string | null;
   /** A line being typed on the status bar; `done` gets it on ↵, empty when nothing was typed. */
   input: { label: string; value: string; done: (value: string) => void } | null;
+  /** The keys are the message box's; the drafts stay by row whether or not they are. */
+  compose: boolean;
+  drafts: Record<string, Draft>;
 }
 
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
-    showArchived: false, toast: null, input: null,
+    showArchived: false, toast: null, input: null, compose: false, drafts: {},
   };
 }
 

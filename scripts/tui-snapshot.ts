@@ -29,6 +29,15 @@ const frames: Frame[] = [
   { name: 'decisions-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
   { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },
   { name: 'global', left: at((i) => i.kind === 'global'), focus: 'right' },
+  {
+    name: 'compose',
+    left: at((i) => i.kind === 'session'),
+    focus: 'left',
+    set: (ui) => {
+      ui.compose = true;
+      ui.drafts['s b3f21c07'] = { text: 'Yes, keep the rename on the events file.\nDrop the transcript read.', cursor: 41 };
+    },
+  },
   { name: 'help', left: at((i) => i.kind === 'inbox'), focus: 'right', set: (ui) => { ui.help = true; } },
   {
     name: 'parts-confirm',

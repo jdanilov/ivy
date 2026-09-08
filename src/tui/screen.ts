@@ -8,6 +8,7 @@ import { messagesPane } from './panes/messages.js';
 import { missionPane, sessionPane } from './panes/mission.js';
 import { partsPane, pending } from './panes/parts.js';
 import { footPane } from './panes/foot.js';
+import { composeHeight, composePane, targetOf } from './panes/compose.js';
 import { helpPane } from './panes/help.js';
 import { onKey } from './keys.js';
 import type { Mission, Session, Snapshot } from './model.js';
@@ -132,9 +133,10 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['esc', 'Cancel']] :
+    ui.compose ? [['⇧↵ ^S', 'Send'], ['↵', 'Newline'], ['↑↓←→', 'Cursor'], ['^U', 'Clear'], ['esc', 'Keep']] :
     ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ f esc', 'Back'], ['Q', 'Quit']] :
-    !right ? [['↑↓', 'Select'], ['↵', 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
+    !right ? [['↑↓', 'Select'], ['↵', targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
       ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
@@ -165,7 +167,9 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   // Everything under the status rule and above the key-bar rule. The foot keeps a third of it,
   // the columns take the rest — and either one takes all of it: `f` gives the foot the screen,
   // `?` gives the body to the panel, which needs the height to say anything worth reading.
-  const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME));
+  // The message box takes its rows off the top of the region, and the foot keeps its share of the rest.
+  const composeH = Math.min(composeHeight(ui, here, w), Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - 5));
+  const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - composeH);
   const actH = ui.full ? region : ui.help ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
   const bodyH = region - actH;
 
@@ -202,6 +206,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     root.box.add(body);
   }
   if (actH > 0) footPane(root, snap, here, actH, bodyH > 0, ui);
+  if (composeH > 0) composePane(root, ui, here);
 
   root.rule();
   keyBar(root, here, ui);
@@ -255,8 +260,8 @@ export async function run(snap: Snapshot, live?: Live): Promise<void> {
 
   await new Promise<void>((done) => {
     r.keyInput.on('keypress', (key: KeyEvent) => {
-      // Typed on the input line, `q` is a letter like any other.
-      if (key.name === 'q' && !app.ui.input) {
+      // Typed on the input line or into a message, `q` is a letter like any other.
+      if (key.name === 'q' && !app.ui.input && !app.ui.compose) {
         watcher?.close();
         r.destroy();
         return done();

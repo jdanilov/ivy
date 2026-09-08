@@ -6,6 +6,7 @@ import { removeParts } from '../core/parts.js';
 import { readManifest } from '../core/manifest.js';
 import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy, setTitle } from '../core/mission.js';
 import { loadPreset, openSession, stopSession } from '../core/spawn.js';
+import { inboxOf, post } from '../core/peer.js';
 import { resetConfig, writeCaffeinate, writePartScope, type Caffeinate } from '../core/config.js';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { id } from './format.js';
@@ -79,6 +80,18 @@ export async function killSession(session: string): Promise<string> {
   }
   termed.set(session, Date.now());
   return killed.length === 0 ? `no process for ${id(session)}` : `${signal} ${killed.join(' ')} · ${id(session)}`;
+}
+
+/** Claude Code hands the session a message from outside as one from another session, so the
+ *  first line says whose words these are. */
+const FROM = 'From the user, via Mission Control:';
+
+/** Into the session's inbox: a turn if it is idle, read between tool calls if it is not. */
+export async function sendMessage(session: string, text: string): Promise<string> {
+  const sock = await inboxOf(session);
+  if (sock === null) throw new Error(`${id(session)} has no inbox — is it running?`);
+  await post(sock, `${FROM}\n${text}`);
+  return `sent to ${id(session)}`;
 }
 
 // ── parts ────────────────────────────────────────────────────────────────────

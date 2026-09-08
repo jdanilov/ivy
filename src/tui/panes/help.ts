@@ -7,7 +7,7 @@ import type { Pane } from './pane.js';
 /** Every key the screen answers, one key to a line on screen, under the pane it belongs to. */
 const HELP: [group: string, key: string, does: string][] = [
   ['Global', '↑↓', 'Move the selection'], ['', '→', 'Enter the right pane, and in MISSION turn the autonomy dial'],
-  ['', '↵', 'Open the selection, or apply what is pending'], ['', '←', 'Back to the left column'],
+  ['', '↵', 'Write to the row\'s session; elsewhere open the selection or apply what is pending'], ['', '←', 'Back to the left column'],
   ['', 'esc', 'Back, or discard the pending toggles first'], ['', 'C', 'Caffeinate auto → on → off'],
   ['', '?', 'This panel'], ['', 'Q', 'Quit'],
   ['Projects', 'O', 'Start the mission\'s session and open its Warp tab'], ['', 'X', 'Stop its session; a hand-started one is signalled, again within 5s to SIGKILL'],
@@ -17,6 +17,8 @@ const HELP: [group: string, key: string, does: string][] = [
   ['Messages', '↑↓', 'Read what waits — every one answers in its session'],
   ['Parts', 'Space', 'Toggle a part; on Global, cycle its scope'], ['', 'Y', 'Confirm the apply'],
   ['', 'N', 'Cancel it'], ['', 'R', 'Reset the toggles'],
+  ['Message', '⇧↵ ^S', 'Send it; the session reads it as yours'], ['', '↵', 'A line break'],
+  ['', '^U', 'Clear the draft'], ['', 'esc', 'Keep the draft, hand the keys back'],
   ['Foot', 'A', 'Activity, what its session did; again, full height'], ['', 'D', 'Decisions, the forks this mission took; again, full height'],
   ['', 'F', 'Either at full height, ↑↓ scrolls'],
 ];

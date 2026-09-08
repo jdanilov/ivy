@@ -151,7 +151,8 @@ its call by id, and a task notification names the call it ends. Words are bright
 `agent` bright, `ask` yellow — tooling dim, `sub` blue with the name after its arrow bright, `edit`
 green as a change. A row wraps under its text column to two lines and no more, except the last
 three `agent` rows, which stand whole with their own line breaks, up to forty lines: what the
-model just said is what the pane is opened for. The hook clips a prompt at two lines. Each tab
+model just said is what the pane is opened for. A backticked span in a `user` or `agent` row is a
+name the reader can go open, drawn blue with the backticks dropped. The hook clips a prompt at two lines. Each tab
 carries `+N`, what came in since it was last open or left, so the hidden one says whether to
 look; both reset when the selection changes.
 

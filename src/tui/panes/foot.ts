@@ -157,13 +157,32 @@ function subCells(text: string): Cell[] {
   return at === -1 ? [[text, C.bright]] : [[text.slice(0, at), C.bright], [text.slice(at), C.dim]];
 }
 
-/** A message whole: each of its own lines wrapped, blank ones kept, up to the cap. */
-function whole(text: string, width: number): string[] {
-  const out: string[] = [];
-  for (const line of text.split('\n')) {
+/** A `code` span in prose is a name the reader can go open: drawn blue, the backticks dropped. A
+ *  span cut by the wrap carries into the next line through `open`; a new source line closes it. */
+function spans(line: string, tone: string, open: boolean): { cells: Cell[]; open: boolean } {
+  const cells: Cell[] = [];
+  for (const part of line.split('`')) {
+    if (part !== '') cells.push([part, open ? C.agent : tone]);
+    open = !open;
+  }
+  return { cells, open: !open };
+}
+
+/** Wrapped lines of one row, each split into its spans. `whole` wraps per source line, so the
+ *  code state is reset there; the fold treats the text as one line. */
+function prose(text: string, room: number, tone: string, full: boolean): Cell[][] {
+  const out: Cell[][] = [];
+  let open = false;
+  const sources = full ? text.split('\n') : [text.replace(/\s+/g, ' ')];
+  for (const source of sources) {
     if (out.length >= WHOLE_ROWS) break;
-    if (line.trim() === '') { if (out.at(-1) !== '') out.push(''); continue; }
-    out.push(...wrap(line, width, WHOLE_ROWS - out.length));
+    if (full && source.trim() === '') { if (out.at(-1)?.length !== 0) out.push([]); continue; }
+    open = false;
+    for (const line of wrap(source, room, full ? WHOLE_ROWS - out.length : ACTIVITY_ROWS)) {
+      const next = spans(line, tone, open);
+      out.push(next.cells);
+      open = next.open;
+    }
   }
   return out;
 }
@@ -181,8 +200,8 @@ function activityLines(a: Activity, since: number | undefined, owner: string | u
   const room = Math.max(20, width - indent);
   if (a.verb === 'sub') return [[...head, ...subCells(a.text)]];
   const tone = SAID.has(a.verb) ? C.bright : C.dim;
-  const lines = (full ? whole(a.text, room) : wrap(a.text, room, ACTIVITY_ROWS))
-    .map((text, i): Cell[] => (i === 0 ? [...head, [text, tone]] : [[' '.repeat(indent), C.dim], [text, tone]]));
+  const body = SAID.has(a.verb) ? prose(a.text, room, tone, full) : wrap(a.text, room, ACTIVITY_ROWS).map((text): Cell[] => [[text, tone]]);
+  const lines = body.map((cells, i): Cell[] => (i === 0 ? [...head, ...cells] : [[' '.repeat(indent), C.dim], ...cells]));
   return a.verb === 'stop' ? [...lines, []] : lines;
 }
 

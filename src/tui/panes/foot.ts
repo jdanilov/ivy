@@ -75,13 +75,14 @@ const pad = (p: Pane, shown: number, room: number): void => {
 };
 
 /**
- * Which missions the selection covers: a mission is one, a project its open ones, the Inbox every
- * open one. A closed mission's decisions are its record, read by selecting it; over a project they
- * would bury the live rows under every run that came before.
+ * Which missions the selection covers: a mission is one, a project its open ones, the Inbox and
+ * Global every open one — both rows stand for every project at once. A closed mission's decisions
+ * are its record, read by selecting it; over a project they would bury the live rows under every
+ * run that came before.
  */
 function missionsOf(snap: Snapshot, here: LeftItem): Mission[] {
   const open = (missions: Mission[]): Mission[] => missions.filter((m) => m.status === 'open');
-  return here.kind === 'inbox' ? open(snap.projects.flatMap((project) => project.missions))
+  return here.kind === 'inbox' || here.kind === 'global' ? open(snap.projects.flatMap((project) => project.missions))
     : here.kind === 'mission' ? [here.mission]
     : here.kind === 'project' ? open(here.project.missions) : [];
 }
@@ -141,7 +142,7 @@ function sessionsOf(snap: Snapshot, here: LeftItem): Map<string, string> {
     for (const m of project.missions) if (m.session) map.set(m.session, m.name);
     for (const session of project.sessions) map.set(session.id, session.preset);
   };
-  if (here.kind === 'inbox') snap.projects.forEach(add);
+  if (here.kind === 'inbox' || here.kind === 'global') snap.projects.forEach(add);
   else if (here.kind === 'project') add(here.project);
   else if (here.kind === 'mission') { if (here.mission.session) map.set(here.mission.session, here.mission.name); }
   else if (here.kind === 'session') map.set(here.session.id, here.session.preset);

@@ -131,7 +131,7 @@ session, if it still runs, is an unbound row that asks once under its own name. 
 ### The foot: DECISIONS
 
 One row per decision of whatever the left column has selected — a mission, a project's open
-missions, or every open mission on the Inbox row — newest last, the mission column present only
+missions, or every open mission on the Inbox and Global rows — newest last, the mission column present only
 when more than one is in scope. A closed mission's decisions are its record: select it to read
 them. A decision is a fork an agent took; the screen never answers one.
 

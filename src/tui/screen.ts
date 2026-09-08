@@ -1,4 +1,4 @@
-import { BoxRenderable, createCliRenderer, type CliRenderer, type KeyEvent } from '@opentui/core';
+import { BoxRenderable, createCliRenderer, decodePasteBytes, type CliRenderer, type KeyEvent, type PasteEvent } from '@opentui/core';
 import path from 'node:path';
 import { C, GLYPH, SESSION, stateColor } from './theme.js';
 import { dur, id, len, spread, tokens, type Cell } from './format.js';
@@ -10,7 +10,7 @@ import { partsPane, pending } from './panes/parts.js';
 import { footPane } from './panes/foot.js';
 import { composeHeight, composePane, targetOf } from './panes/compose.js';
 import { helpPane } from './panes/help.js';
-import { onKey } from './keys.js';
+import { onKey, onPaste } from './keys.js';
 import type { Mission, Session, Snapshot } from './model.js';
 
 /** Chrome rows: blank, header, rule, status, rule — rule, key bar. The key bar sits on the last
@@ -29,13 +29,14 @@ function awake(snap: Snapshot): boolean {
   return snap.caffeinate === 'on' || (snap.caffeinate === 'auto' && running);
 }
 
+/** The accented first letter is the key that turns the setting, as a key bar pair would say it. */
 function caffeinateCells(snap: Snapshot): Cell[] {
   const on = awake(snap);
-  return [['Caffeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
+  return [['C', C.accent], ['affeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
 }
 
-/** How `O` will run the next session: in the tab, or under the daemon with the tab attached. */
-const launchCells = (snap: Snapshot): Cell[] => [['Launch ', C.dim], [snap.launch.toUpperCase(), C.bright], ['   ', C.dim]];
+/** How `O` will run the next session: FG in the tab, BG under the daemon with the tab attached. */
+const launchCells = (snap: Snapshot): Cell[] => [['L', C.accent], ['aunch ', C.dim], [snap.launch.toUpperCase(), C.bright], ['   ', C.dim]];
 
 function header(p: Pane, here: LeftItem, snap: Snapshot): void {
   const where = here.kind === 'inbox' ? '' : here.project.path;
@@ -98,8 +99,9 @@ function missionBar(p: Pane, m: Mission): void {
 
 /** A session has no steps to bar: its state word, then whose tab it is and how long it has waited. */
 function sessionBar(p: Pane, s: Session): void {
-  const word = s.busy ? 'WORKING' : 'IDLE';
-  const left: Cell[] = [s.busy ? [`${SESSION.working} `, C.accent] : [`${SESSION.idle} `, C.dim], [word.padEnd(STATE_W), C.bright],
+  const asking = s.now?.verb === 'ask';
+  const word = asking ? 'ASKING' : s.busy ? 'WORKING' : 'IDLE';
+  const left: Cell[] = [s.busy ? [`${SESSION.working} `, asking ? C.warning : C.accent] : [`${SESSION.idle} `, C.dim], [word.padEnd(STATE_W), C.bright],
     ['  ', C.dim], [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [' · ', C.rule], [s.cwd, C.dim]];
   const right: Cell[] = s.busy ? (s.agent ? [[s.agent, C.bright]] : []) : [['since ', C.dim], [dur(Date.now() - s.idleSince), C.bright]];
   p.row(spread(left, right, p.width));
@@ -123,35 +125,40 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: ['M'], mission: ['O', 'X', 'T', 'H', 'R'], session: ['X', 'R'],
+  inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E', 'R'], session: ['K', 'R'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], ['H', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
+const ROW_PAIRS: string[][] = [['O', 'Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
- *  terminal is too narrow, because the overlay it opens lists everything anyway. */
+ *  terminal is too narrow, because the overlay it opens lists everything anyway. `L`, `C`, `A`
+ *  and `D` are not here: the header and the foot tabs carry them as their accented letter. */
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const parts = here.kind === 'project' || here.kind === 'global';
-  const foot: string[][] = ui.foot === 'activity' ? [['D', 'Decisions']] : [['A', 'Activity']];
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
-    ui.input ? [['↵', 'Done'], ['esc', 'Cancel']] :
-    ui.compose ? [['⇧↵', 'Send'], ['^U', 'Clear']] :
-    ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
-    ui.full ? [['↑↓', 'Scroll'], ['↵ esc', 'Back'], ['Q', 'Quit']] :
+    ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
+    ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
+    ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
+    ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
-      ['Z', 'Archived'], ['L', 'Launch'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
-    : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
-    : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['esc', 'Back'], ['Q', 'Quit']]
+      ['S', 'Show Archived'], ['?', 'Help'], ['Q', 'Quit']]
+    : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']]
+    : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
     // Space picks the scope on the global row and the install on a project's: one key, two panes.
     : parts ? [['↑↓', 'Select'], ['Space', here.kind === 'global' ? 'Scope' : 'Toggle'], ['↵', 'Apply'],
-      ...(pending(here.project, ui, here.kind === 'global').length ? [['R', 'Reset'], ['esc', 'Discard']] : [['←esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
+      ...(pending(here.project, ui, here.kind === 'global').length ? [['R', 'Reset'], ['Esc', 'Discard']] : [['← Esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
     // The mission pane has one thing to focus, and the row it sits on is the autonomy dial.
     : [...(here.kind === 'mission' ? [['→ T', 'Autonomy']] : []),
-      ['←esc', 'Back'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']];
+      ['← Esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']];
 
-  const cells = (list: string[][]): Cell[] =>
-    list.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]);
+  // A key that is a letter of its own label is that letter, accented, inside the word: `Rename`,
+  // `Kill`. The rest keep the pair, the key bright before the label: `↑↓ Select`, `O Tab`.
+  const cells = (list: string[][]): Cell[] => list.flatMap(([key, label]): Cell[] => {
+    const at = /^[A-Z]$/.test(key!) ? label!.toUpperCase().indexOf(key!) : -1;
+    return at === -1 ? [[`${key} `, C.bright], [`${label}  `, C.dim]]
+      : [[label!.slice(0, at), C.dim], [label![at]!, C.accent], [`${label!.slice(at + 1)}  `, C.dim]];
+  });
   const full = cells(pairs);
   p.row(len(full) <= p.width ? full : cells(pairs.filter(([key]) => key !== '?')));
 }
@@ -262,6 +269,7 @@ export async function run(snap: Snapshot, live?: Live): Promise<void> {
   });
 
   await new Promise<void>((done) => {
+    r.keyInput.on('paste', (e: PasteEvent) => onPaste(app, decodePasteBytes(e.bytes)));
     r.keyInput.on('keypress', (key: KeyEvent) => {
       // Typed on the input line or into a message, `q` is a letter like any other.
       if (key.name === 'q' && !app.ui.input && !app.ui.compose) {

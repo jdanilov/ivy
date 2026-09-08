@@ -52,7 +52,10 @@ undershoots these values on screen but the hierarchy holds.
   narrower for a list or a log. Each pane has its own bright heading, a thin rule, then rows. No
   vertical box-drawing rule between columns, a column gap does the separating.
 - Bottom key bar: `Key Label` pairs, key in bright value color, label in dim label color, two spaces
-  between pairs, pinned to the last line, thin rule above.
+  between pairs, pinned to the last line, thin rule above. A key that is a letter of its own label
+  is that letter in the accent inside the word — `Rename`, `Kill`, `Show Archived` — and the
+  header's `Launch` and `Caffeinate` and the foot's `ACTIVITY` and `DECISIONS` carry theirs the
+  same way, so the bar does not list `L`, `C`, `A` or `D`.
 - Spacing: one blank line between a pane heading and its first row is not used, rows start right
   after the rule. No blank lines between consecutive log rows. CLI output keeps the 3-space `I`
   indent from `src/ui/theme.ts` to match the `@clack/prompts` gutter; the TUI has no gutter to match
@@ -65,7 +68,7 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 
 ```
 row 0        blank
-row 1        ⌬ FACTORY  <project or path>           Launch DIRECT   Caffeinate AUTO [ON]
+row 1        ⌬ FACTORY  <project or path>           Launch FG   Caffeinate AUTO [ON]
 row 2        ───────────────────────────────────────────────────────────────────────
 row 3        status: mission bar or project bar, or the toast that replaces it
 row 4        ───────────────────────────────────────────────────────────────────────
@@ -78,7 +81,7 @@ row 4        ──────────────────────�
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Tab  X Kill  T Autonomy  H Archive  R Rename  M New Mission  Z Archived  L Launch  C Caffeinate  D Decisions  ? Help  Q Quit
+             ↑↓ Select  ↵ Message  O Tab  Kill  Autonomy  Archive  Rename  New Mission  Show Archived  ? Help  Quit
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
@@ -88,7 +91,7 @@ last row     ──────────────────────�
   An open mission row ends in those two and no token count: the status bar has the tokens, and
   the row has no room. A mission or session under Claude Code's daemon carries a dim `bg`.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
-  every project. Archived missions are off the list until `Z` asks for them.
+  every project. Archived missions are off the list until `S` asks for them.
 - The foot keeps a third of the body, never fewer than 5 rows; `A` or `D` pressed on the tab already drawn gives it all of it. Its header
   is the two tabs, the drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back.
 
@@ -119,20 +122,22 @@ pane does not repeat it.
 
 The bar is also the one line the screen takes a name on. `R` and `M` ask for a name or a title
 there — the label, what has been typed, a cursor — and while the line is open every key is a
-character but `↵`, `esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
+character but `↵`, `Esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
 writes nothing.
 
 ### The message box
 
 `↵` on a session row, or a mission row with a session, opens a box under the foot: the message,
-wrapped at the width and grown to six rows before it scrolls to keep the cursor in view, with no
+wrapped at the width and grown to twelve rows before it scrolls to keep the cursor in view, with no
 header naming the session, because the selected row already does. It is a small editor, because a reply is rarely one line: `↵` breaks a line, the arrows
-walk the text, `home` `end` `^A` `^E` take the line's ends, `^U` clears, and `⇧↵` or `^S` sends —
-two chords because a terminal that does not speak the kitty keyboard protocol sends `⇧↵` as `↵`.
-`esc` hands the keys back and keeps the draft: there is one per row, kept while the selection
-moves, so a half-written answer survives a look at another session, and the box stays drawn, dim,
-wherever a draft is waiting. Sent, the draft goes. The key bar names `⇧↵` and `^U` and nothing
-else: line breaks, arrows and `esc` are what any editor does.
+walk the text, `home` `end` `^A` `^E` take the line's ends, `⌥⌫` or `^W` erases the word before
+the cursor, `^K` the line, `^U` the draft, `^V` pastes the clipboard where `⌘V` is the terminal's
+own paste, and `⇧↵` or `^S` sends — two chords because a terminal that does not speak the kitty
+keyboard protocol sends `⇧↵` as `↵`. `Esc` hands the keys back and keeps the draft: there is one
+per row, kept while the selection moves, so a half-written answer survives a look at another
+session, and the box stays drawn, dim, wherever a draft is waiting. Sent, the draft goes. The key
+bar names `⇧↵`, `⌥⌫`, `^K` and `^U` and nothing else: line breaks, arrows and `Esc` are what any
+editor does.
 
 The message goes into the session's inbox, the Unix socket Claude Code binds per session under
 `/tmp/cc-socks/` and lists in `~/.claude/sessions/<pid>.json`: one JSON line in the
@@ -149,9 +154,9 @@ settings overlay, a hand-started one needs it in `~/.claude/settings.json`.
 
 Every open gate, waiting decision and waiting question across all projects, keyed
 `project/origin/label`. Each names the session command that answers it; a question names the tab
-that owns it. A turn that ended is a question only when its final message's last line ends in
-`?` or the turn put an AskUserQuestion to the human: most final messages are statements, and a
-statement rings nobody. A closed mission raises nothing: its session id is a record, and the
+that owns it. An AskUserQuestion picker still up is one, whatever else the turn does; a turn that
+ended is one only when its final message's last line ends in `?` or the turn put a picker up:
+most final messages are statements, and a statement rings nobody. A closed mission raises nothing: its session id is a record, and the
 session, if it still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
 `777;notify`. Messages, the right pane over it, shows the selected item's body and that command.
 
@@ -169,7 +174,10 @@ it as `SubagentReport` and the row reads `sub ← <what it was asked>`, never as
 reads as it happened: prompt, tools, the model's words, stop, and a blank line under the stop so
 turns read as paragraphs. A `bash` row is the tool's description, what the model said it was
 doing, and only falls back to the command; a `sub` row is `→ <type> · <description>`; a `stop` row
-sums its turn, `turn 2m 38s · 5 tools`. The time column is a clock on `user`, `agent` and whatever
+sums its turn, `turn 2m 38s · 5 tools`. An `ask` row is the first question of an AskUserQuestion,
+`· N more` when it put several, `○` while the picker is up and `●` once it is answered, the row
+then reading `question → answer` for each: the session's own row says `asking` meanwhile, its bar
+`ASKING`, and the Inbox lists the question. The time column is a clock on `user`, `agent` and whatever
 opens a turn, and `+1:04` since the last of those on the tooling between them, in a stopwatch's
 shape so the column scans: a turn is one time and the gaps under it. A `bash` or `sub` row carries
 its outcome where its text starts, `○` while out, `●` green once its result landed, `●` red when
@@ -211,7 +219,8 @@ status column is the scope, because scope is chosen there and nowhere else: one 
 while a global part is in `~/.claude`, warning while it is not there yet or its copy has drifted,
 dim for `project` and `off`. A status word beside it would say the same thing twice, so there is
 none and the description keeps the rest of the row; under the rule the selected part names its
-recommendation before its files. The rule and the lines under it keep the pane's bottom however
+recommendation before its files, while the pane has the focus — unfocused it has no selection to
+show, so it draws neither the marker nor those rows, the list alone. The rule and the lines under it keep the pane's bottom however
 long the list is, and the list is what a short terminal loses, clipped around the row the
 selection sits on: `↵` asks for a `Y` on the apply line, and an apply line drawn past the foot is
 one nobody can read. A graph row in MISSION ends in two right-aligned columns, tokens
@@ -274,22 +283,25 @@ keys do, and none of these three do the same thing.
 | `↵`     | elsewhere        | open the selection, or apply what Parts has pending              |
 | `⇧↵` `^S` | message box    | send; `⇧↵` only where the terminal tells it from `↵`              |
 | `^U`    | message box      | clear the draft                                                  |
-| `esc`   | message box      | keep the draft, hand the keys back                               |
+| `⌥⌫` `^W` | message box    | erase the word before the cursor                                 |
+| `^K`    | message box      | erase the line the cursor is on                                  |
+| `^V`    | message box      | paste the clipboard; `⌘V` is the terminal's own paste and lands the same |
+| `Esc`   | message box      | keep the draft, hand the keys back                               |
 | `←`     | right            | back to the left pane                                            |
-| `esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
+| `Esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
 | `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
 | `Y`     | Parts            | confirm the apply                                                |
 | `N`     | Parts            | cancel it                                                        |
 | `R`     | Parts            | reset the toggles                                                |
 | `O`     | mission row      | open the mission's Warp tab with `/mission` as the session's first prompt: `claude` in the tab, or under `claude --bg` with the tab attached when `launch: bg`; a bound mission is refused |
-| `X`     | mission, session | `claude stop` for a session started under `--bg`, which keeps its conversation; SIGTERM for any other, SIGKILL on a second press |
+| `K`     | mission, session | kill: `claude stop` for a session started under `--bg`, which keeps its conversation; SIGTERM for any other, SIGKILL on a second press |
 | `T`     | mission, MISSION | autonomy full → partial → none                                   |
-| `H`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
-| `Z`     | left             | show the archived missions                                       |
+| `E`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
+| `S`     | left             | show the archived missions                                       |
 | `R`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
 | `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
-| `L`     | any              | launch direct → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
+| `L`     | any              | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
 | `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
 | `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |
@@ -297,7 +309,7 @@ keys do, and none of these three do the same thing.
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
-would be a toast: a mission row answers `O X T H R`, a session row `X R`, a project `M`, the Inbox
+would be a toast: a mission row answers `O K T E R`, a session row `K R`, a project `M`, the Inbox
 and `Global` none of them; `↵` reads `Message` on a row with a session behind it and `Open` on the rest.
 
 A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `R`

@@ -45,7 +45,9 @@ function gap(ms: number): string {
 function tabs(ui: Ui, counts: Record<Ui['foot'], number>): Cell[] {
   const tab = (name: Ui['foot']): Cell[] => {
     const fresh = counts[name] - ui.seen[name];
-    return [[name.toUpperCase(), ui.foot === name ? C.bright : C.dim], ...(fresh > 0 ? ([[` +${fresh}`, C.warning]] as Cell[]) : [])];
+    // The first letter is the key that opens the tab, so it carries the accent the key bar would.
+    return [[name[0]!.toUpperCase(), C.accent], [name.slice(1).toUpperCase(), ui.foot === name ? C.bright : C.dim],
+      ...(fresh > 0 ? ([[` +${fresh}`, C.warning]] as Cell[]) : [])];
   };
   return [...tab('activity'), ['  ', C.dim], ...tab('decisions')];
 }

@@ -9,7 +9,7 @@ import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
-import { draftOf, editKey, targetOf } from './panes/compose.js';
+import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
 import { act, draw, toast, type App } from './screen.js';
 import type { Autonomy, Caffeinate, Launch, Mission, Project } from './model.js';
 
@@ -17,7 +17,7 @@ import type { Autonomy, Caffeinate, Launch, Mission, Project } from './model.js'
 
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
 const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
-const LAUNCH: Launch[] = ['direct', 'bg'];
+const LAUNCH: Launch[] = ['fg', 'bg'];
 
 /** The one focusable value in the MISSION pane. Turned at once and written behind that: the
  *  rebuild that follows reads state.json back. */
@@ -48,7 +48,16 @@ function typing(app: App, key: KeyEvent): void {
 /** The chord that sends: ⇧↵ where the terminal tells shift from plain, ^S everywhere. */
 const sends = (key: KeyEvent): boolean => (key.name === 'return' && key.shift) || (key.ctrl && key.name === 's');
 
-/** The message box has the keys: `↵` breaks a line, `esc` keeps the draft and hands them back. */
+/** `^V` reads the clipboard itself: the terminal pastes on ⌘V through its own paste event, and
+ *  `^V` reaches the screen as a key like any other. */
+function pasteClipboard(app: App, d: Draft): void {
+  void new Response(Bun.spawn(['pbpaste'], { stdout: 'pipe', stderr: 'ignore' }).stdout).text().then(
+    (text) => { insert(d, text); draw(app); },
+    (e: unknown) => toast(app, `✗ ${e instanceof Error ? e.message : String(e)}`),
+  );
+}
+
+/** The message box has the keys: `↵` breaks a line, `Esc` keeps the draft and hands them back. */
 function composing(app: App, key: KeyEvent): void {
   const { ui } = app;
   const { here } = select(app.snap, ui);
@@ -68,7 +77,8 @@ function composing(app: App, key: KeyEvent): void {
   } else if (key.ctrl && key.name === 'u') {
     d.text = '';
     d.cursor = 0;
-  } else if (!editKey(d, key, app.r.terminalWidth - 2)) return;
+  } else if (key.ctrl && key.name === 'v') return pasteClipboard(app, d);
+  else if (!editKey(d, key, app.r.terminalWidth - 2)) return;
   draw(app);
 }
 
@@ -112,8 +122,8 @@ function handleKey(app: App, key: KeyEvent): void {
 
   // The foot has the screen to itself: the arrows walk back through it, three keys hand it back.
   if (ui.full) {
-    if (key.name === 'up' || key.name === 'k') ui.scroll += 1;
-    else if (key.name === 'down' || key.name === 'j') ui.scroll = Math.max(0, ui.scroll - 1);
+    if (key.name === 'up') ui.scroll += 1;
+    else if (key.name === 'down') ui.scroll = Math.max(0, ui.scroll - 1);
     else if (key.name === 'return' || key.name === 'escape') ui.full = false;
     // The tab's own key: switch to it, or, pressed on the tab already drawn, hand the screen back.
     else if (key.name === 'a' || key.name === 'd') footKey(ui, key.name === 'a' ? 'activity' : 'decisions');
@@ -144,8 +154,8 @@ function handleKey(app: App, key: KeyEvent): void {
   }
 
   switch (key.name) {
-    case 'up': case 'k': case 'down': case 'j': {
-      const d = key.name === 'up' || key.name === 'k' ? -1 : 1;
+    case 'up': case 'down': {
+      const d = key.name === 'up' ? -1 : 1;
       if (key.shift && !right) return moveRow(app, here, d);
       if (inMessages) ui.msg = move(ui.msg, snap.inbox.length, d);
       else if (inParts) ui.part = move(ui.part, here.project.parts.length, d);
@@ -195,14 +205,14 @@ function handleKey(app: App, key: KeyEvent): void {
     case 'd':
       footKey(ui, 'decisions');
       break;
-    case 'z': {
+    case 's': {
       ui.showArchived = !ui.showArchived;
       const next = leftItems(snap, ui.showArchived);
       const found = next.findIndex((item) => itemKey(item) === itemKey(here));
       ui.left = found >= 0 ? found : clamp(ui.left, next.length);
       break;
     }
-    case 'h': {
+    case 'e': {
       if (right) break;
       if (here.kind !== 'mission') return toast(app, 'select a mission to archive it');
       const m = here.mission;
@@ -255,7 +265,7 @@ function handleKey(app: App, key: KeyEvent): void {
         ask(app, `title for ${name}:`, (title) => act(app, `creating ${name}…`, () => newMission(project.path, name, title)));
       });
     }
-    case 'x': {
+    case 'k': {
       if (right) break;
       const session = here.kind === 'mission' ? here.mission.session : here.kind === 'session' ? here.session.id : null;
       if (!session) return toast(app, 'no session on this row');
@@ -275,6 +285,16 @@ function footKey(ui: Ui, tab: Ui['foot']): void {
   if (ui.foot !== tab) ui.foot = tab;
   else ui.full = !ui.full;
   ui.scroll = 0;
+}
+
+/** A terminal paste, bracketed so it arrives whole: into the message box, or onto the line being
+ *  typed on the status bar as one line. Anywhere else it is nothing. */
+export function onPaste(app: App, text: string): void {
+  const { ui } = app;
+  if (ui.input) ui.input.value += text.replace(/\s+/g, ' ').trim();
+  else if (ui.compose) insert(draftOf(ui, select(app.snap, ui).here), text);
+  else return;
+  draw(app);
 }
 
 export function onKey(app: App, key: KeyEvent): void {

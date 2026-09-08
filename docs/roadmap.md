@@ -9,7 +9,7 @@ moves a line up into the order or drops it. Nothing else reads this file.
 - [ ] **A real mission through the new open.** `O` now starts the session under `claude --bg` and
   the tab attaches to it; that path has only run against the e2e stub. Open one mission for real:
   the hook binds it through the settings overlay, Warp shows the badge, a reply from the message
-  box lands, `X` stops it. Half a day, and it retires the risk in everything shipped on 2026-09-08.
+  box lands, `K` stops it. Half a day, and it retires the risk in everything shipped on 2026-09-08.
 - [ ] **Session status from Claude Code's own records.** `~/.claude/sessions/<pid>.json` says
   `busy`, `idle` or `waiting`, and what for: `permission prompt`, `input needed`. Watching it
   replaces the hook-gap guesswork: a row reads `◈ waiting · permission prompt`, liveness stops

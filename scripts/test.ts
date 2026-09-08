@@ -42,7 +42,9 @@ const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
-const { due, enabledOf, listRows, parseAtMost, parseDuration, readManifest: readDaemons, verdict } = await import('../src/core/daemons.js');
+const { due, enabledOf, listRows, parseAtMost, parseDuration, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
+const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
+const { readLog, runNow, setEnabled, stopRow } = await import('../src/commands/daemon.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
@@ -1063,6 +1065,9 @@ await check('a manifest that does not parse is one error line and no entries', a
   await writeFile(file, 'tick:\n  kind: daemon\n  cmd: "true"\n');
   ok((await readDaemons(dir)).error === 'tick: every is required on a daemon', `a missing every read as ${JSON.stringify(await readDaemons(dir))}`);
 
+  await writeFile(file, 'api:\n  kind: service\n  cmd: npm start\n  env:\n    PORT: [3061]\n');
+  ok((await readDaemons(dir)).error === 'api: env: PORT must be a string, a number or a boolean', `a list in env read as ${JSON.stringify(await readDaemons(dir))}`);
+
   // The project keeps a manifest the rest of the run can list: one bad entry, one error, no rows.
   await writeFile(file, 'tick:\n  kind: daemon\n  cmd: "true"\n  every: 5x\n');
   ok((await readDaemons(dir)).error === 'tick: every: "5x" is not a duration like 90s, 20m, 3h or 1d', `a bad duration read as ${JSON.stringify(await readDaemons(dir))}`);
@@ -1138,6 +1143,132 @@ await check('daemon enablement is one line in the machine config, default off, a
     ok(!rows.some((r) => r.key.startsWith('bots-bad/')) && (errors['bots-bad'] ?? '') !== '', `a broken manifest listed ${JSON.stringify(errors)}`);
   });
 });
+
+// ── the supervisor, on the scratch HOME and one scratch project ──────────────
+
+const PIDFILE = path.join(process.env.HOME!, '.factory', 'supervisor', 'pid');
+const runner = await repo('runner');
+await mkdir(path.join(runner, '.factory'), { recursive: true });
+await writeFile(path.join(runner, '.factory', 'daemons.yaml'),
+  'tick:\n  kind: daemon\n  cmd: echo \'{"summary":"hi"}\'\n  every: 1s\n  when: any\n' +
+  'sleep:\n  kind: service\n  cmd: "echo up; sleep 30"\n  restart: never\n' +
+  'boom:\n  kind: daemon\n  cmd: "echo trouble; exit 1"\n  every: 1h\n' +
+  'slow:\n  kind: daemon\n  cmd: sleep 30\n  every: 1h\n  timeout: 1s\n' +
+  'flap:\n  kind: service\n  cmd: "echo nope; exit 3"\n  restart: on-failure\n');
+
+/** The supervisor is a second process: a case says what it is waiting for, not how long. */
+async function until(what: string, ready: () => Promise<boolean>, ms = 8000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (await ready()) return;
+    await Bun.sleep(100);
+  }
+  throw new Error(what);
+}
+
+const pgidOf = async (pid: number): Promise<number> => {
+  const proc = Bun.spawn(['ps', '-o', 'pgid=', '-p', String(pid)], { stdout: 'pipe', stderr: 'ignore' });
+  return Number((await new Response(proc.stdout).text()).trim());
+};
+
+try {
+  await check('one supervisor per machine: a second start refuses and a stale pid file is not one', async () => {
+    const pid = await startSupervisor();
+    ok(alive(pid), `the supervisor it started (${pid}) is not alive`);
+
+    const second = await startSupervisor().then(() => null, (e: Error) => e);
+    ok(second?.message.includes(String(pid)), `a second start said ${second?.message ?? 'nothing'}`);
+
+    await stopSupervisor();
+    ok(!(await exists(PIDFILE)), 'the pid file outlived the supervisor');
+    await writeFile(PIDFILE, '999999\n');
+    ok((await supervisorPid()) === null && !(await exists(PIDFILE)), 'a stale pid file read as a live supervisor');
+    ok((await startSupervisor()) > 0, 'a stale pid file blocked the next start');
+  });
+
+  await check('a due daemon runs through the login shell and files its pid, verdict and next', async () => {
+    await setEnabled('runner/tick', true);
+    await until('the tick daemon never ran', async () => (await readRow('runner/tick')).lastStatus !== undefined);
+
+    const state = await readRow('runner/tick');
+    ok(state.lastStatus === 'ok' && state.lastSummary === 'hi', `the run filed ${JSON.stringify(state)}`);
+    ok(state.pid === undefined && !!state.lastStart && !!state.lastEnd && !!state.nextDue, `a finished run left ${JSON.stringify(state)}`);
+    ok((state.successes ?? []).length > 0, 'an ok run pushed no success');
+
+    const log = await readLogTail('runner/tick', 10);
+    ok(log.some((l) => / run echo /.test(l)) && log.includes('{"summary":"hi"}'), `the log holds ${JSON.stringify(log)}`);
+  });
+
+  await check('a service runs in its own process group, and a stop holds wanted down', async () => {
+    await setEnabled('runner/sleep', true);
+    await until('the service never started', async () => (await readRow('runner/sleep')).pid !== undefined);
+
+    const pid = (await readRow('runner/sleep')).pid!;
+    ok(alive(pid), `the service pid ${pid} is not alive`);
+    ok((await pgidOf(pid)) === pid, `the service is not its own group leader: pgid ${await pgidOf(pid)} for pid ${pid}`);
+    await until('the service wrote no log', async () => (await readLogTail('runner/sleep', 5)).includes('up'));
+
+    await stopRow('runner/sleep');
+    await until('the service outlived its stop', async () => !alive(pid) && (await readRow('runner/sleep')).pid === undefined);
+    ok((await readRow('runner/sleep')).wanted === false, 'a stopped service is still wanted');
+  });
+
+  await check('a failed run alerts, a timeout kills the group, and reading the log acknowledges', async () => {
+    const off = await runNow('runner/boom').then(() => null, (e: Error) => e);
+    ok(off?.message.includes('is off'), `a run on an off row said ${off?.message ?? 'nothing'}`);
+
+    await setEnabled('runner/boom', true);
+    await runNow('runner/boom');
+    await until('the failed run raised no alert', async () => (await readRow('runner/boom')).alert !== undefined);
+    ok((await readRow('runner/boom')).lastSummary === 'trouble', `the failure filed ${JSON.stringify(await readRow('runner/boom'))}`);
+    await readLog('runner/boom', 5);
+    ok((await readRow('runner/boom')).alert === undefined, 'reading the log did not clear the alert');
+
+    await setEnabled('runner/slow', true);
+    await runNow('runner/slow');
+    await until('the slow run never started', async () => (await readRow('runner/slow')).pid !== undefined);
+    const pid = (await readRow('runner/slow')).pid!;
+    await until('the timeout never fired', async () => (await readRow('runner/slow')).lastStatus === 'fail');
+    ok((await readRow('runner/slow')).lastSummary === 'timeout', `the timed-out run filed ${JSON.stringify(await readRow('runner/slow'))}`);
+    ok(!alive(pid), `the timed-out run left its group alive at ${pid}`);
+  });
+
+  await check('a service that keeps dying backs off and gives up after five restarts', async () => {
+    const now = Date.now();
+    await writeRow('runner/flap', { enabled: false, wanted: true, restarts: [1, 2, 3, 4, 5].map((i) => new Date(now - i * 30_000).toISOString()) });
+    await setEnabled('runner/flap', true);
+
+    await until('the flapping service never gave up', async () => (await readRow('runner/flap')).alert !== undefined);
+    const state = await readRow('runner/flap');
+    ok(state.alert === 'gave up after 5 restarts', `it gave up with ${JSON.stringify(state.alert)}`);
+    ok(state.wanted === false && state.pid === undefined, `a service that gave up is still ${JSON.stringify(state)}`);
+  });
+
+  await check('a supervisor restart leaves a wanted service alive and re-adopts its pid', async () => {
+    await runNow('runner/sleep');
+    await until('the service never came back', async () => (await readRow('runner/sleep')).pid !== undefined);
+    const pid = (await readRow('runner/sleep')).pid!;
+
+    await stopSupervisor();
+    ok(!(await exists(PIDFILE)), 'the pid file outlived the supervisor');
+    ok(alive(pid), 'stopping the supervisor took its service with it');
+
+    await startSupervisor();
+    await until('the service was never re-adopted', async () => (await readRow('runner/sleep')).pid === pid);
+    ok(alive(pid), 'the re-adopted service is not the one that was running');
+  });
+} finally {
+  // Nothing this walk started may outlive it: the supervisor first, then every group it spawned.
+  const pid = Number(await Bun.file(PIDFILE).text().catch(() => ''));
+  if (pid > 0) try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+  await unlink(PIDFILE).catch(() => {});
+  for (const row of (await listRows()).rows) {
+    const child = row.state.pid;
+    if (child) try { process.kill(-child, 'SIGKILL'); } catch { /* already gone */ }
+  }
+  await writeFile(CONFIG, BASE_CONFIG);
+  resetConfig();
+}
 
 await check('a config YAML cannot read is no config at all, and says so once', async () => {
   await withConfig('parts: {commit: project\nvars:\n  a: b\n', async () => {

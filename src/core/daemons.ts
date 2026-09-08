@@ -92,9 +92,12 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 
 const oneLine = (err: unknown): string => (err instanceof Error ? err.message : String(err)).split('\n')[0]!;
 
+/** The one place the manifest is named, so a message about it and the reader cannot disagree. */
+export const manifestFile = (projectDir: string): string => path.join(projectDir, '.factory', 'daemons.yaml');
+
 /** `<project>/.factory/daemons.yaml`, the committed list of what this project runs. */
 export async function readManifest(projectDir: string): Promise<Manifest> {
-  const file = Bun.file(path.join(projectDir, '.factory', 'daemons.yaml'));
+  const file = Bun.file(manifestFile(projectDir));
   if (!(await file.exists())) return { entries: [] };
 
   try {
@@ -147,10 +150,14 @@ function parseEntry(name: string, raw: unknown): Entry {
   return { ...common, kind, run, restart, port: raw.port as number | undefined };
 }
 
-/** A value written unquoted reads back as a number or a boolean; the child process wants strings. */
+/** A value written unquoted reads back as a number or a boolean; the child process wants strings.
+ *  Anything that is not a scalar has no string a shell would want, so it is the manifest's error. */
 function parseEnv(raw: unknown, fail: (msg: string) => never): Record<string, string> {
   if (!isRecord(raw)) fail('env must be a mapping');
-  return Object.fromEntries(Object.entries(raw as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
+  return Object.fromEntries(Object.entries(raw as Record<string, unknown>).map(([k, v]) => {
+    if (v === null || typeof v === 'object') fail(`env: ${k} must be a string, a number or a boolean`);
+    return [k, String(v)];
+  }));
 }
 
 // ── state, requests and logs, under ~/.factory/daemons/<project>/<name>/ ──────
@@ -158,6 +165,8 @@ function parseEnv(raw: unknown, fail: (msg: string) => never): Record<string, st
 export const daemonDir = (key: string): string => path.join(factoryHome(), 'daemons', key);
 
 export const requestFile = (key: string): string => path.join(daemonDir(key), 'request');
+
+export const logFile = (key: string): string => path.join(daemonDir(key), 'log');
 
 /** A hand-written or half-written state file is no state, never a throw in the reader's face. */
 export async function readState(key: string): Promise<DaemonState> {
@@ -187,7 +196,7 @@ export async function writeRequest(key: string, request: Request): Promise<void>
 
 /** Only the tail is ever shown and the log runs to 5 MB: read the last 64 KB, not the file. */
 export async function readLogTail(key: string, n: number): Promise<string[]> {
-  const file = Bun.file(path.join(daemonDir(key), 'log'));
+  const file = Bun.file(logFile(key));
   if (!(await file.exists())) return [];
   const text = await file.slice(Math.max(0, file.size - 64 * 1024)).text();
   return text === '' ? [] : text.replace(/\n$/, '').split('\n').slice(-n);

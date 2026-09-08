@@ -7,7 +7,7 @@ import { home } from './projects.js';
 import { readLaunch, type Launch } from './config.js';
 
 /** Warp reads tab configs from here and opens them with warp://tab_config/<file stem>. */
-const tabConfigs = (): string => path.join(home(), '.warp', 'tab_configs');
+export const tabConfigs = (): string => path.join(home(), '.warp', 'tab_configs');
 /** Where `claude --bg` keeps one record per session it started, under the short id it printed. */
 const jobFile = (short: string): string => path.join(home(), '.claude', 'jobs', short, 'state.json');
 

@@ -127,6 +127,7 @@ export function formPane(p: Pane, ui: Ui, here: LeftItem): void {
 
   dial(p, 'Autonomy:', AUTONOMY, d.autonomy, ui.form && d.field === AUTONOMY_FIELD);
   p.row([]);
+  p.row([]); // a dial has no input under it, so two blank rows keep the two apart
   dial(p, 'Shape:', SHAPES, d.shape, ui.form && d.field === SHAPE_FIELD);
 }
 

@@ -125,6 +125,18 @@ export async function setAutonomy(cwd: string, name: string | undefined, autonom
   return mission;
 }
 
+/** The title is the one line of a mission a human reads in a list; the name is its branch and stays. */
+export async function setTitle(cwd: string, name: string, title: string): Promise<Mission> {
+  const mission = await resolveMission(cwd, name);
+  mission.state.title = title;
+  await writeState(mission.dir, mission.state);
+  // The intent's heading is the same line, written from the same title when the folder was made.
+  const intent = path.join(mission.dir, 'intent.md');
+  const text = await readFile(intent, 'utf-8').catch(() => '');
+  if (text.startsWith('# Intent:')) await Bun.write(intent, text.replace(/^# Intent:.*$/m, `# Intent: ${title}`));
+  return mission;
+}
+
 /**
  * The pointer follows work that was inserted into the graph, whether by `step add` or by `mission
  * shape`: with the step before it finished, standing on that step or on the one the insert displaced

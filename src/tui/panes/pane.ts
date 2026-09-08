@@ -25,12 +25,14 @@ export interface Ui {
   foot: 'decisions' | 'activity';
   showArchived: boolean;
   toast: string | null;
+  /** A line being typed on the status bar; `done` gets it on ↵, empty when nothing was typed. */
+  input: { label: string; value: string; done: (value: string) => void } | null;
 }
 
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
-    scroll: 0, help: false, foot: 'decisions', showArchived: false, toast: null,
+    scroll: 0, help: false, foot: 'decisions', showArchived: false, toast: null, input: null,
   };
 }
 

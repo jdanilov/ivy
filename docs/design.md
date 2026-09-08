@@ -104,6 +104,13 @@ long since its last event on the right.
 
 A stub has no graph, so the MISSION pane gives its title and the first paragraph under `## Why`
 in its `intent.md` where the steps would be: two stubs differ by what they are for, not by name.
+An open mission whose title is not its name carries it in the pane header, `MISSION  copies ·
+Parts as copies`.
+
+The bar is also the one line the screen takes typing on. `N` and `M` ask for a name or a title
+there — the label, what has been typed, a cursor — and while the line is open every key is a
+character but `↵`, `esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
+writes nothing.
 
 ### The Inbox
 
@@ -221,6 +228,9 @@ keys do, and none of these three do the same thing.
 | `T`     | mission, MISSION | autonomy full → partial → none                                   |
 | `H`     | mission row      | archive a closed mission, or bring an archived one back          |
 | `Z`     | left             | show the archived missions                                       |
+| `N`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
+| `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |
+| `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
 | `D`     | any              | the foot draws DECISIONS                                         |
 | `A`     | any              | the foot draws ACTIVITY                                          |
@@ -229,8 +239,17 @@ keys do, and none of these three do the same thing.
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
-would be a toast: a mission row answers `O X T H`, a session row `X`, a project, the Inbox and
-`Global` none of them.
+would be a toast: a mission row answers `O X T H N`, a session row `X N`, a project `M`, the Inbox
+and `Global` none of them.
+
+A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `N`
+keeps the Factory's word on the session's own events file: one `Rename` line carrying what the
+last hook line carried, because the pid and the cwd the screen reads come off the last line. The
+screen's name outranks the transcript's; it is the later word. The order `⇧↑↓` leaves is an
+`order:` block in `~/.factory/config.yaml` — `projects`, `<project>/missions`,
+`<project>/sessions`, each a list of names — replaced whole on every move, so a hand-written line
+outside it stays. What a list does not name follows it, as it came: a new stub lands last, a
+session that appears lands last.
 
 The panel is KEYS, then TERMS — one row per step kind in its own colour, then the words the screen
 uses — then HOW FACTORY WORKS. The primer is what a short terminal loses: all of it or none, never

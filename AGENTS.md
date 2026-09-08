@@ -55,7 +55,9 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
 ~/.factory/    Home dir: projects list, config.yaml (var overrides, a `parts:` block choosing
                `project`, `global` or `off` per part over the scope its part.yaml recommends, plus
                `caffeinate: auto|on|off`, which the hook reads per event and Mission Control's `c`
-               rewrites), events/<session>.jsonl, caffeinate/<session>.pid and control.pid
+               rewrites, and an `order:` block Mission Control's `⇧↑↓` keeps), events/<session>.jsonl
+               (the hook's lines plus Mission Control's one `Rename`), caffeinate/<session>.pid and
+               control.pid
 ~/.claude/     Where `scope: global` parts install: the same copies, `.factory-manifest.json` and
                one `settings.json` holding both the hooks and the allow list
 .factory/archive/<dir>  a closed mission's folder, renamed there by `mission archive`. Both it

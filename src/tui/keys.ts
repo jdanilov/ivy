@@ -1,10 +1,13 @@
 import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
-import { applyParts, applyScopes, archive, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
+import {
+  applyParts, applyScopes, archive, killSession, newMission, openTab, renameMission, renameSession, setAutonomy, setCaffeinate,
+} from './actions.js';
+import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import { clamp, itemKey, leftItems, select } from './panes/pane.js';
+import { clamp, itemKey, leftItems, select, type LeftItem } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { act, draw, toast, type App } from './screen.js';
 import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
@@ -21,8 +24,53 @@ function cycleAutonomy(app: App, project: Project, m: Mission): void {
   act(app, `${m.name} autonomy ${m.autonomy}…`, () => setAutonomy(project.path, m.name, m.autonomy));
 }
 
+/** A line typed on the status bar. `done` gets it on ↵, trimmed, and empty when nothing was typed. */
+function ask(app: App, label: string, done: (value: string) => void): void {
+  app.ui.input = { label, value: '', done };
+  draw(app);
+}
+
+/** Every key is a character while the line is open, but the three that end or edit it. */
+function typing(app: App, key: KeyEvent): void {
+  const input = app.ui.input!;
+  if (key.name === 'escape') app.ui.input = null;
+  else if (key.name === 'return') {
+    app.ui.input = null;
+    input.done(input.value.trim());
+  } else if (key.name === 'backspace') input.value = input.value.slice(0, -1);
+  else if (!key.ctrl && !key.meta && key.sequence.length === 1 && key.sequence >= ' ') input.value += key.sequence;
+  else return;
+  draw(app);
+}
+
+/**
+ * Shift+↑↓ swaps the row with its neighbour of the same kind — the one shown, so a hidden archived
+ * mission is stepped over — and keeps the whole list's order in config. The snapshot is swapped in
+ * place too, so the row moves under the selection before the rebuild that reads config lands.
+ */
+function moveRow(app: App, here: LeftItem, delta: number): void {
+  const { snap, ui } = app;
+  const move = <T>(list: T[], shown: T[], item: T, key: string, nameOf: (t: T) => string): void => {
+    const other = shown[shown.indexOf(item) + delta];
+    if (other === undefined) return;
+    const i = list.indexOf(item);
+    const j = list.indexOf(other);
+    [list[i], list[j]] = [list[j]!, list[i]!];
+    ui.left = leftItems(snap, ui.showArchived).findIndex((row) => itemKey(row) === itemKey(here));
+    void writeOrder(key, list.map(nameOf)).catch((e: unknown) => toast(app, `✗ ${e instanceof Error ? e.message : String(e)}`));
+  };
+  if (here.kind === 'project') move(snap.projects, snap.projects, here.project, 'projects', (p) => p.name);
+  else if (here.kind === 'mission') {
+    const shown = here.project.missions.filter((m) => ui.showArchived || !m.archived);
+    move(here.project.missions, shown, here.mission, `${here.project.name}/missions`, (m) => m.name);
+  } else if (here.kind === 'session') move(here.project.sessions, here.project.sessions, here.session, `${here.project.name}/sessions`, (s) => s.id);
+  draw(app);
+}
+
 function handleKey(app: App, key: KeyEvent): void {
   const { snap, ui } = app;
+
+  if (ui.input) return typing(app, key);
 
   // The panel holds the right pane until it is asked to leave; nothing else acts behind it.
   if (ui.help) {
@@ -68,6 +116,7 @@ function handleKey(app: App, key: KeyEvent): void {
   switch (key.name) {
     case 'up': case 'k': case 'down': case 'j': {
       const d = key.name === 'up' || key.name === 'k' ? -1 : 1;
+      if (key.shift && !right) return moveRow(app, here, d);
       if (inMessages) ui.msg = move(ui.msg, snap.inbox.length, d);
       else if (inParts) ui.part = move(ui.part, here.project.parts.length, d);
       else ui.left = move(ui.left, items.length, d);
@@ -145,6 +194,29 @@ function handleKey(app: App, key: KeyEvent): void {
       if (right) break;
       if (here.kind !== 'mission') return toast(app, 'select a mission to open its tab');
       return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
+    case 'n': {
+      if (right) break;
+      if (here.kind === 'mission') {
+        const { project, mission } = here;
+        return ask(app, `title for ${mission.name}:`, (title) =>
+          title === '' ? draw(app) : act(app, `titling ${mission.name}…`, () => renameMission(project.path, mission.name, title)));
+      }
+      if (here.kind === 'session') {
+        const { session } = here;
+        return ask(app, `name for ${id(session.id)}:`, (name) =>
+          name === '' ? draw(app) : act(app, `naming ${id(session.id)}…`, () => renameSession(session.id, name)));
+      }
+      return toast(app, 'select a mission or a session to rename it');
+    }
+    case 'm': {
+      if (right || here.kind === 'inbox' || here.kind === 'global') return toast(app, 'select a project to add a mission to');
+      const { project } = here;
+      // Two lines: the name, which is the folder and later the branch, then the title a human reads.
+      return ask(app, `new mission in ${project.name} · name:`, (name) => {
+        if (name === '') return draw(app);
+        ask(app, `title for ${name}:`, (title) => act(app, `creating ${name}…`, () => newMission(project.path, name, title)));
+      });
+    }
     case 'x': {
       if (right) break;
       const session = here.kind === 'mission' ? here.mission.session : here.kind === 'session' ? here.session.id : null;

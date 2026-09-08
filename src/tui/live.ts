@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
-import { readCaffeinate } from '../core/config.js';
+import { loadConfig, readCaffeinate } from '../core/config.js';
 import { readDecisions, type Decision } from '../core/decision.js';
 import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
@@ -50,6 +50,8 @@ interface Ev {
   asks: string | null;
   /** The final message of the last Stop, answered or not. */
   said: string;
+  /** What Mission Control's `N` called it, on the one line of this file the hook did not write. */
+  name: string;
 }
 
 interface EventLine { at?: string; event?: string; cwd?: string; detail?: string | null }
@@ -82,6 +84,7 @@ async function readEvents(): Promise<Map<string, Ev>> {
     const prompts: Ev['prompts'] = [];
     const reports: Ev['reports'] = [];
     let said = '';
+    let called = '';
     let preset = 'quick';
     // What the session is waiting on the human with is the end of a turn, and only a prompt
     // answers it: an idle Notification after a Stop is the same question asked again, and one
@@ -102,12 +105,13 @@ async function readEvents(): Promise<Map<string, Ev>> {
         (report ? reports : prompts).push({ at: Date.parse(line.at ?? ''), text });
       }
       if (line.event === 'SessionStart' && PRESETS.includes(line.detail ?? '')) preset = line.detail!;
+      if (line.event === 'Rename') called = line.detail ?? '';
     }
     const cwd = last.cwd ?? '';
     out.set(name.slice(0, -6), {
       session: name.slice(0, -6), cwd, real: await realpath(cwd).catch(() => cwd), at, event: last.event ?? '',
       detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)),
-      prompts: prompts.filter((p) => !Number.isNaN(p.at)), reports: reports.filter((r) => !Number.isNaN(r.at)), asks, said,
+      prompts: prompts.filter((p) => !Number.isNaN(p.at)), reports: reports.filter((r) => !Number.isNaN(r.at)), asks, said, name: called,
     });
   }
   return out;
@@ -328,9 +332,11 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
   const agent = working(tail);
+  // The screen's own name outranks Claude Code's: it is the later word, given on this screen.
+  const name = ev.name || tail.title;
   return {
     id: ev.session,
-    ...(tail.title ? { name: tail.title } : {}),
+    ...(name ? { name } : {}),
     // No hook fires between a prompt and its Stop: a prompt after the last Stop is a turn in flight.
     busy: ev.asks === null || agent !== undefined,
     ...(agent ? { agent } : {}),
@@ -393,8 +399,16 @@ function owner(dirs: Dir[], real: string): string | null {
   return best;
 }
 
+/** The order the human moved a list into; what the list does not name follows it, as it came. */
+function ordered<T>(items: T[], names: string[] | undefined, nameOf: (t: T) => string): T[] {
+  if (!names) return items;
+  const rank = (t: T): number => { const i = names.indexOf(nameOf(t)); return i === -1 ? names.length : i; };
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}
+
 export async function buildSnapshot(): Promise<Snapshot> {
-  const dirs = await projectDirs();
+  const order = (await loadConfig()).order ?? {};
+  const dirs = ordered(await projectDirs(), order.projects, (d) => path.basename(d.dir));
   const events = await readEvents();
   const found = new Map<string, [mission: CoreMission, archived: boolean][]>();
   for (const { dir } of dirs) {
@@ -424,7 +438,11 @@ export async function buildSnapshot(): Promise<Snapshot> {
       if (!(await sessionLive(ev.session))) continue;
       sessions.push(await sessionRow(ctx, name, ev));
     }
-    projects.push({ name, path: dir, missions, sessions, parts: await parts(dir) });
+    projects.push({
+      name, path: dir, parts: await parts(dir),
+      missions: ordered(missions, order[`${name}/missions`], (m) => m.name),
+      sessions: ordered(sessions, order[`${name}/sessions`], (s) => s.id),
+    });
   }
 
   ctx.inbox.sort((a, b) => a.at - b.at);

@@ -15,7 +15,8 @@
  *   --wait <ms>         pause after each key so an action's write lands (default 400)
  *   --quiet             only the last frame
  *   --spans <substr>    after the last key, print colour + column of every span holding substr ('*' = all)
- *   keys: up down left right return escape space a d f h z t c o x y n r ? q  |  sleep:ms  |  reload
+ *   keys: up down left right return escape space backspace a d f h m n z t c o x y r ? q
+ *         S-up S-down (shifted)  |  type:<text> (one key per character)  |  sleep:ms  |  reload
  */
 import type { KeyEvent } from '@opentui/core';
 import { render, type App } from '../src/tui/screen.js';
@@ -83,8 +84,12 @@ for (const key of keys) {
   } else if (key === 'reload') {
     // The watcher does this in the real screen; headless, an action's write needs asking for again.
     app.snap = await rebuild();
+  } else if (key.startsWith('type:')) {
+    for (const ch of key.slice(5)) onKey(app, { name: ch, ctrl: false, meta: false, shift: false, sequence: ch } as KeyEvent);
   } else {
-    onKey(app, { name: key, ctrl: false, meta: false, shift: false, sequence: key } as KeyEvent);
+    const shift = key.startsWith('S-');
+    const name = shift ? key.slice(2) : key;
+    onKey(app, { name, ctrl: false, meta: false, shift, sequence: name === 'space' ? ' ' : name } as KeyEvent);
   }
   await Bun.sleep(wait);
   await frame(key);

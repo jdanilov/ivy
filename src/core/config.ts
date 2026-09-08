@@ -9,6 +9,9 @@ export interface FactoryConfig {
   vars?: Record<string, string>;
   /** Where this machine wants each part, over what `part.yaml` recommends. `off` is nowhere. */
   parts?: Record<string, ScopeChoice>;
+  /** How Mission Control lists things: `projects`, `<project>/missions`, `<project>/sessions`, each the
+   *  names in the order the human moved them into. Whatever a list does not name follows it. */
+  order?: Record<string, string[]>;
 }
 
 const CHOICES: ScopeChoice[] = ['project', 'global', 'off'];
@@ -53,10 +56,11 @@ export async function loadConfig(): Promise<FactoryConfig> {
   const raw = parse(await file.text());
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return (cache = {});
 
-  const { vars, parts } = raw as Record<string, unknown>;
+  const { vars, parts, order } = raw as Record<string, unknown>;
   return (cache = {
     vars: pairs<string>(vars, (v) => typeof v === 'string'),
     parts: pairs<ScopeChoice>(parts, (v) => CHOICES.includes(v as ScopeChoice)),
+    order: pairs<string[]>(order, (v) => Array.isArray(v) && v.every((s) => typeof s === 'string')),
   });
 }
 
@@ -115,4 +119,27 @@ export async function writePartScope(name: string, choice: ScopeChoice): Promise
 
   await mkdir(factoryHome(), { recursive: true });
   await Bun.write(configPath(), lines.join('\n') + '\n');
+}
+
+/**
+ * The `order:` block replaced whole, the rest of the file untouched: it holds only what Mission
+ * Control wrote, so nothing a human put there is lost, and one flow list per line reads back through
+ * `loadConfig` like anything else. A block that was a flow mapping on one line is one line replaced.
+ */
+export async function writeOrder(key: string, names: string[]): Promise<void> {
+  resetConfig();
+  const order = { ...((await loadConfig()).order ?? {}), [key]: names };
+  const text = await Bun.file(configPath()).text().catch(() => '');
+  const lines = text === '' ? [] : text.replace(/\n$/, '').split('\n');
+  const block = ['order:', ...Object.entries(order).map(([k, v]) => `  ${k}: [${v.map((s) => JSON.stringify(s)).join(', ')}]`)];
+
+  const head = lines.findIndex((l) => l.startsWith('order:'));
+  let end = head + 1;
+  while (head !== -1 && end < lines.length && /^\s+\S/.test(lines[end]!)) end++;
+  if (head === -1) lines.push(...block);
+  else lines.splice(head, end - head, ...block);
+
+  await mkdir(factoryHome(), { recursive: true });
+  await Bun.write(configPath(), lines.join('\n') + '\n');
+  resetConfig();
 }

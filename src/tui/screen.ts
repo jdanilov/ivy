@@ -102,6 +102,8 @@ function sessionBar(p: Pane, s: Session): void {
 }
 
 function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
+  // The one line the screen takes typing on: what the key asked for, then what has been typed.
+  if (ui.input) return p.row([[`${ui.input.label} `, C.dim], [ui.input.value, C.bright], ['▏', C.accent]]);
   if (ui.toast) return p.row([[ui.toast, C.dim]]);
   if (here.kind === 'mission') return missionBar(p, here.mission);
   if (here.kind === 'session') return sessionBar(p, here.session);
@@ -117,9 +119,9 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: [], mission: ['O', 'X', 'T', 'H'], session: ['X'],
+  inbox: [], global: [], project: ['M'], mission: ['O', 'X', 'T', 'H', 'N'], session: ['X', 'N'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], ['H', 'Archive']];
+const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], ['H', 'Archive'], ['N', 'Rename'], ['M', 'New']];
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. */
@@ -129,6 +131,7 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const foot: string[][] = ui.foot === 'decisions' ? [['A', 'Activity'], ['F', 'Full']] : [['D', 'Decisions'], ['F', 'Full']];
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
+    ui.input ? [['↵', 'Done'], ['esc', 'Cancel']] :
     ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ f esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
@@ -252,7 +255,8 @@ export async function run(snap: Snapshot, live?: Live): Promise<void> {
 
   await new Promise<void>((done) => {
     r.keyInput.on('keypress', (key: KeyEvent) => {
-      if (key.name === 'q') {
+      // Typed on the input line, `q` is a letter like any other.
+      if (key.name === 'q' && !app.ui.input) {
         watcher?.close();
         r.destroy();
         return done();

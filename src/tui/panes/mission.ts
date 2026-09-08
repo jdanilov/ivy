@@ -25,7 +25,9 @@ const NAME_COL = 13;
 
 export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
-  p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
+  // The title a human gave it rides the header; a stub's stands alone below, where its graph would be.
+  const titled: Cell[] = m.title !== m.name && m.steps.length ? [DOT, [m.title, C.dim]] : [];
+  p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim], ...titled], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
   // A stub has no graph, so the pane says what it is for: the title, then the intent's own why.
   if (!m.steps.length) {

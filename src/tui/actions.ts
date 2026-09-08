@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { readdir, readFile, unlink } from 'node:fs/promises';
+import { appendFile, readdir, readFile, unlink } from 'node:fs/promises';
 import { install } from '../commands/install.js';
 import { update } from '../commands/update.js';
 import { removeParts } from '../core/parts.js';
 import { readManifest } from '../core/manifest.js';
-import { archiveMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy, setTitle } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
 import { resetConfig, writeCaffeinate, writePartScope, type Caffeinate } from '../core/config.js';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
@@ -170,6 +170,31 @@ export async function setCaffeinate(mode: Caffeinate): Promise<string> {
 export async function setAutonomy(project: string, name: string, autonomy: Autonomy): Promise<string> {
   await writeAutonomy(project, name, autonomy, 'set from Mission Control');
   return `${name} autonomy ${autonomy}`;
+}
+
+/** What `mission new --stub` makes: a folder and an intent skeleton, no branch. `O` promotes it. */
+export async function newMission(project: string, name: string, title: string): Promise<string> {
+  const created = await createMission(project, { name, title: title || undefined, workflow: 'intent', autonomy: 'partial', worktree: false, stub: true });
+  return `stub ${created.state.name} · O opens it`;
+}
+
+/** The title moves; the name is the branch and the folder, and stays. */
+export async function renameMission(project: string, name: string, title: string): Promise<string> {
+  await setTitle(project, name, title);
+  return `${name} titled "${title}"`;
+}
+
+/**
+ * Claude Code keeps a session's name in its own transcript, which nothing else may write, so the
+ * Factory's copy is one line on the session's own events file: `Rename`, carrying everything the
+ * last hook line carried, because the pid and the cwd the screen reads come off the last line.
+ */
+export async function renameSession(session: string, name: string): Promise<string> {
+  const file = path.join(factoryHome(), 'events', `${session}.jsonl`);
+  const lines = (await readFile(file, 'utf-8')).split('\n').filter((l) => l !== '');
+  const last = JSON.parse(lines.at(-1) ?? '{}') as Record<string, unknown>;
+  await appendFile(file, `${JSON.stringify({ ...last, at: new Date().toISOString(), event: 'Rename', detail: name })}\n`);
+  return `${id(session)} named ${name}`;
 }
 
 /** A rename between `.factory/missions/` and `.factory/archive/`; the closed-only rule is the core's. */

@@ -53,8 +53,8 @@ undershoots these values on screen but the hierarchy holds.
   vertical box-drawing rule between columns, a column gap does the separating.
 - Bottom key bar: `Key Label` pairs, key in bright value color, label in dim label color, two spaces
   between pairs, pinned to the last line, thin rule above. The header's `Launch` and `Caffeinate`
-  and the foot's `ACTIVITY` and `DECISIONS` carry their key as an accented first letter, so the
-  bar does not list `L`, `C`, `A` or `D`.
+  and the foot's `ACTIVITY` and `DECISIONS` carry their key as a bright first letter, the key's
+  own colour, so the bar does not list `L`, `C`, `A` or `D`.
 - Spacing: one blank line between a pane heading and its first row is not used, rows start right
   after the rule. No blank lines between consecutive log rows. CLI output keeps the 3-space `I`
   indent from `src/ui/theme.ts` to match the `@clack/prompts` gutter; the TUI has no gutter to match

@@ -29,14 +29,14 @@ function awake(snap: Snapshot): boolean {
   return snap.caffeinate === 'on' || (snap.caffeinate === 'auto' && running);
 }
 
-/** The accented first letter is the key that turns the setting, as a key bar pair would say it. */
+/** The bright first letter is the key that turns the setting, drawn as the key bar draws a key. */
 function caffeinateCells(snap: Snapshot): Cell[] {
   const on = awake(snap);
-  return [['C', C.accent], ['affeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
+  return [['C', C.bright], ['affeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
 }
 
 /** How `O` will run the next session: FG in the tab, BG under the daemon with the tab attached. */
-const launchCells = (snap: Snapshot): Cell[] => [['L', C.accent], ['aunch ', C.dim], [snap.launch.toUpperCase(), C.bright], ['   ', C.dim]];
+const launchCells = (snap: Snapshot): Cell[] => [['L', C.bright], ['aunch ', C.dim], [snap.launch.toUpperCase(), C.bright], ['   ', C.dim]];
 
 function header(p: Pane, here: LeftItem, snap: Snapshot): void {
   const where = here.kind === 'inbox' ? '' : here.project.path;
@@ -131,7 +131,7 @@ const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. `L`, `C`, `A`
- *  and `D` are not here: the header and the foot tabs carry them as their accented first letter. */
+ *  and `D` are not here: the header and the foot tabs carry them as their bright first letter. */
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const parts = here.kind === 'project' || here.kind === 'global';

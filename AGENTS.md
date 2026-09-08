@@ -31,7 +31,7 @@ src/           CLI source (entry: src/cli.ts)
 │              parts: scope block, caffeinate), recipes, args, workflow (YAML load + transitions,
 │              stepRole, ROLE_MODEL), mission (folder, state, claim, branch, autonomy, insert pointer,
 │              archive), decision (decisions.md table, waits, first answer wins),
-│              spawn (preset, the mission's settings overlay, `claude --bg`, the Warp tab that attaches)
+│              spawn (preset, the mission's settings overlay, the Warp tab: `claude` in it, or `claude --bg` and attach)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys
@@ -57,7 +57,8 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
 ~/.factory/    Home dir: projects list, config.yaml (var overrides, a `parts:` block choosing
                `project`, `global` or `off` per part over the scope its part.yaml recommends, plus
                `caffeinate: auto|on|off`, which the hook reads per event and Mission Control's `c`
-               rewrites, and an `order:` block Mission Control's `⇧↑↓` keeps), events/<session>.jsonl
+               rewrites, `launch: direct|bg`, how `mission open` runs claude, and an `order:` block
+               Mission Control's `⇧↑↓` keeps), events/<session>.jsonl
                (the hook's lines plus Mission Control's one `Rename`), caffeinate/<session>.pid and
                control.pid
 ~/.claude/     Where `scope: global` parts install: the same copies, `.factory-manifest.json` and

@@ -4,6 +4,7 @@ import type { Mission, Preset } from '../types.js';
 import { Refusal, mainCheckout, now, readClaim, sessionLive, writeClaim, writeState } from './mission.js';
 import { FACTORY_ROOT } from './registry.js';
 import { home } from './projects.js';
+import { readLaunch, type Launch } from './config.js';
 
 /** Warp reads tab configs from here and opens them with warp://tab_config/<file stem>. */
 const tabConfigs = (): string => path.join(home(), '.warp', 'tab_configs');
@@ -12,12 +13,14 @@ const jobFile = (short: string): string => path.join(home(), '.claude', 'jobs', 
 
 export interface Spawn {
   preset: Preset;
-  /** The full id `--bg` gave the session; empty on a dry run, where nothing was started. */
+  launch: Launch;
+  /** The session's id: chosen here for a direct launch, read back from the daemon for `bg`, empty on
+   *  a `bg` dry run, where nothing was started. */
   session: string;
   cwd: string;
-  /** What starts the session, and what the tab runs to show it. */
+  /** What starts the session, and what the tab runs: the same line for a direct launch. */
   command: string;
-  attach: string;
+  tab: string;
   configPath: string;
   uri: string;
   warp: boolean;
@@ -60,13 +63,14 @@ const KICKOFF = '/mission';
 const settingsPath = (mission: Mission): string => path.join(mission.dir, 'settings.json');
 
 /**
- * `--bg` hands the session to a daemon, so no id can be chosen for it and no variable on the
- * command line reaches it: the id is read back from the daemon's record, the mission dir goes in
- * through the settings overlay, which its hooks do inherit.
+ * A direct launch runs in the tab under an id chosen here. `--bg` hands the session to a daemon,
+ * so no id can be chosen for it and no variable on the command line reaches it: the id is read
+ * back from the daemon's record. Either way the mission dir goes in through the settings overlay,
+ * which the hooks of both inherit.
  */
-export function assembleArgs(preset: Preset, mission: Mission): string[] {
+export function assembleArgs(preset: Preset, mission: Mission, launch: Launch, session: string): string[] {
   return [
-    'claude', '--bg',
+    'claude', ...(launch === 'bg' ? ['--bg'] : ['--session-id', session]),
     '--name', mission.state.name,
     '--model', preset.model,
     '--effort', preset.effort,
@@ -79,7 +83,8 @@ export function assembleArgs(preset: Preset, mission: Mission): string[] {
   ];
 }
 
-export const assembleCommand = (preset: Preset, mission: Mission): string => assembleArgs(preset, mission).map(quote).join(' ');
+export const assembleCommand = (preset: Preset, mission: Mission, launch: Launch, session: string): string =>
+  assembleArgs(preset, mission, launch, session).map(quote).join(' ');
 
 /**
  * `accept` lets Mission Control's messages in: a session that bypasses permission prompts would
@@ -144,12 +149,12 @@ export async function warpInstalled(): Promise<boolean> {
 // ── open ─────────────────────────────────────────────────────────────────────
 
 /**
- * The session starts first, under `claude --bg`, and its id is in state.json before the tab
- * exists: the tab only attaches, and Warp sees `claude` in it, which is what its badge reads. A
- * mission carrying a *live* session is never rebound here: the old tab keeps sending events at a
- * mission that has moved on, and every one of them goes nowhere. `mission adopt` is the deliberate
- * rebind, and it says so. A recorded session that is gone is simply replaced, or the mission
- * could never be reopened.
+ * The session id is in state.json before the tab exists, so the first hook event the session
+ * emits finds a mission bound to it: chosen here for a direct launch, and under `bg` read back
+ * from the daemon that started it, the tab then only attaching. A mission carrying a *live*
+ * session is never rebound here: the old tab keeps sending events at a mission that has moved on,
+ * and every one of them goes nowhere. `mission adopt` is the deliberate rebind, and it says so. A
+ * recorded session that is gone is simply replaced, or the mission could never be reopened.
  */
 export async function openSession(cwd: string, mission: Mission, preset: Preset, dryRun: boolean): Promise<Spawn> {
   const bound = mission.state.session;
@@ -160,16 +165,23 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
 
   const checkout = mission.state.worktree ?? (await mainCheckout(cwd));
   const name = `factory-${mission.state.name}`;
-  const command = assembleCommand(preset, mission);
+  const launch = await readLaunch();
+  const chosen = launch === 'direct' ? crypto.randomUUID() : '';
+  const command = assembleCommand(preset, mission, launch, chosen);
   const configPath = path.join(tabConfigs(), `${name}.toml`);
   const uri = `warp://tab_config/${encodeURIComponent(name)}`;
   const warp = await warpInstalled();
+  const spawn = { preset, launch, session: chosen, cwd: checkout, command, tab: launch === 'direct' ? command : 'claude attach <id>', configPath, uri, warp };
 
-  if (dryRun) return { preset, session: '', cwd: checkout, command, attach: 'claude attach <id>', configPath, uri, warp };
+  if (dryRun) return spawn;
 
   await writeSettings(preset, mission);
-  const { short, session } = await startSession(assembleArgs(preset, mission), checkout);
-  const attach = `claude attach ${short}`;
+  if (launch === 'bg') {
+    const { short, session } = await startSession(assembleArgs(preset, mission, launch, ''), checkout);
+    spawn.session = session;
+    spawn.tab = `claude attach ${short}`;
+  }
+  const { session, tab } = spawn;
 
   mission.state.session = session;
   await writeState(mission.dir, mission.state);
@@ -179,9 +191,9 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
   if (claim?.mission === mission.state.name) await writeClaim(main, { ...claim, session, at: now() });
 
   await mkdir(path.dirname(configPath), { recursive: true });
-  await Bun.write(configPath, tabConfig(name, checkout, attach));
+  await Bun.write(configPath, tabConfig(name, checkout, tab));
 
   if (warp) await Bun.spawn(['open', uri], { stdout: 'ignore', stderr: 'ignore' }).exited;
 
-  return { preset, session, cwd: checkout, command, attach, configPath, uri, warp };
+  return spawn;
 }

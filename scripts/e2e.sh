@@ -76,6 +76,12 @@ mkdir -p "$HOME/.factory/events" && : > "$HOME/.factory/events/$SESSION.jsonl"
 refuses "$REPO" 'is bound to session' mission open x
 rm "$HOME/.factory/events/$SESSION.jsonl"
 f mission open x --dry-run
+# The other launch: the stub claude's --bg leaves the one record the real daemon would.
+echo 'launch: "bg"' >> "$HOME/.factory/config.yaml"
+f mission open x
+grep -q '"session": "[0-9a-f]\{8\}-e2e0-' "$REPO"/.factory/missions/*-x/state.json || die 'a bg open did not read the session id back from the job record'
+grep -q 'claude attach' "$HOME"/.warp/tab_configs/factory-x.toml || die 'a bg open did not write an attaching tab'
+sed -i '' '/^launch:/d' "$HOME/.factory/config.yaml"
 
 # No tty to offer a worktree to, so the caller is told to ask for one.
 refuses "$REPO" 'add --worktree' mission new b --no-open

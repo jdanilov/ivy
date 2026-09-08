@@ -59,8 +59,8 @@ export type Autonomy = 'full' | 'partial' | 'none';
 
 export interface Mission {
   name: string;
-  /** What `intent.md` holds, when the mission has one: the goal's first line is the one line the
-   *  MISSION pane gives a mission, and the intent form edits the whole of it. */
+  /** What `intent.md` holds, when the mission has one: the goal's first paragraph is the two rows
+   *  the MISSION pane gives a mission, and the intent form edits the whole of it. */
   intent?: Intent;
   workflow: string;
   status: 'open' | 'stub' | 'closed';

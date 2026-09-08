@@ -1,4 +1,4 @@
-import { C } from '../theme.js';
+import { C, COMMAND } from '../theme.js';
 import { ago, spread, wrap, type Cell } from '../format.js';
 import { marker, type Pane, type Ui } from './pane.js';
 import type { InboxItem, Snapshot } from '../model.js';
@@ -39,5 +39,5 @@ function messageDetail(p: Pane, item: InboxItem, h: number): void {
   p.row([]);
   // Warp cannot focus a tab from outside; the name is what the human types into its tab switcher.
   if (item.kind === 'question') return p.row([['answer in tab ', C.dim], [item.tab ?? '—', C.bright]]);
-  p.row([['answer in the session: ', C.dim], [item.answer ?? '', C.bright]]);
+  p.row([['answer in the session  ', C.dim], [`${COMMAND} `, C.dim], [item.answer ?? '', C.bright]]);
 }

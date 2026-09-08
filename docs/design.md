@@ -217,13 +217,14 @@ dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each ent
 line, and is absent at zero. A session under a project is named by what `--name` or `/rename`
 called it, else by its id, then `· <preset>`, never by its preset alone: two quick sessions must
 not read the same. The `no missions` hint is absent while a session is standing there; with
-nothing under a project at all it says `create one with M`. A session's mark is a triangle, `▸`
-working and `▹` idle, where every mission row carries a circle: a session is a place you type
+nothing under a project at all it says `create one with M`. A session's mark is a diamond, `◈`
+working and `◇` idle, where every mission row carries a circle: a session is a place you type
 into, and the two kinds sit in one list where the tail of a row is too far to read a kind from.
-A session is `▸ working` from its prompt to its Stop — no hook fires in between, so the last event's age
-says nothing — and `▸ working · <role>` while a sub-agent is out in the background; then the
+The triangle `▸` is a command's, in front of the line a message says to type into a shell.
+A session is `◈ working` from its prompt to its Stop — no hook fires in between, so the last event's age
+says nothing — and `◈ working · <role>` while a sub-agent is out in the background; then the
 turn that ended is not a question, and the Inbox lists it only once the last sub-agent has
-reported back. `▹ idle <since its last Stop>` otherwise. A session is listed while the pid the
+reported back. `◇ idle <since its last Stop>` otherwise. A session is listed while the pid the
 hook logged on its last event line is still a `claude` process: a tab closed on an idle session
 fires no hook, and an idle session fires none either, so the file's age tells the two apart no
 better than it tells a long think from a walk. A line from before pids were logged has only the
@@ -321,7 +322,8 @@ in the session that raised them, and `←`, `→` and `↵` on one write nothing
 | `●` list row marker   | current or active item            | `●` entity     | `symbols.installed ●`        | same glyph as "installed", keep, context differs |
 | `○` list row marker   | not started yet                   | `○` pending    | `symbols.notInstalled ○`     | same glyph as "not installed", keep              |
 | `✓`                   | completed, success                | `✓` done       | `symbols.check ✓`            | aligned, no change                               |
-| none                  | n/a                               | `▸` `▹` session | none                         | a session row, working or idle, so it never reads as a mission's `●` `○` |
+| none                  | n/a                               | `◈` `◇` session | none                         | a session row, working or idle, so it never reads as a mission's `●` `○`; the doc glyphs' warning and decision readings do not apply on screen |
+| none                  | n/a                               | `▸` command    | none                          | in front of a command a message says to type, never on a row |
 | none shown (`Failed (0)` tab) | failure state             | `✗` failed     | `symbols.cross ✗`            | Factory renders `✗` where Droid had nothing      |
 | `▲` (theme.ts only)   | n/a in Droid                      | `◈` warning    | `symbols.modified ▲`         | keep `▲` yellow for modified/drift only          |
 | `▲` (theme.ts only)   | n/a in Droid                      | `✗` failed     | `symbols.conflict ▲`         | CONFLICT: modified and conflict share `▲`, differ only by color. Pick: conflict becomes `✗` red, modified keeps `▲` yellow |

@@ -1,33 +1,31 @@
 # ⌬ Factory
 
-**A portable harness for running real work through Claude Code.**
+**A portable harness for running Agentic work through Claude Code with Missions.**
 
-A long agent session drifts. Context fills with files read four steps ago, the reasoning behind a
-choice is gone the moment the tab closes, and every project ends up with its own slightly different
-copy of the same prompts. Factory is a CLI that fixes those three things: it copies one curated set
-of skills, hooks and MCP servers into every project you work in, it runs each unit of work as a
-**mission** — one branch, one session, an ordered workflow of steps with gates you answer — and it
-puts every mission across every project on one screen. It is a personal tool, shared as-is:
-nothing is a service, everything is files on disk you can read.
+Factory is a CLI that reduces drifts in agent sessions. It maintains one curated set of skills across
+all projects, runs each unit of work as a **mission** - one branch, one session, an ordered workflow
+of steps with intent capture, spec, implementation, validator and verifier gates, and it puts every
+mission across every project on one screen.
 
-## What you get
+Factory is an opinionated personal tool, shared as-is.
 
-**Parts.** Skills, tools, fixtures and MCP entries, one folder each under `parts/`. `factory
+## Whats inside
+
+**Parts.** Skills, tools, fixtures and MCP entries, one folder for each under `parts/`. `factory
 install` copies the ones you pick into a project's `.claude/`, records them in a manifest, and
-`factory uninstall` takes back exactly what it added. Some parts belong to you rather than to a
-project — `/commit`, `/explain`, `/research` — and install into `~/.claude/` instead.
+`factory uninstall` takes back exactly what it added.
 
 **Missions.** `factory mission new <name>` makes a folder under `.factory/missions/`, a branch
-`mission/<name>`, and a copy of the workflow that will run it. From there the CLI is the record: a
-step starts and finishes, a gate opens and is answered, a decision is filed with its confidence.
-The mission folder holds the intent, the spec, the contract, every sub-agent's handoff and the
-retro — and it is git-ignored, because a run's record belongs to the machine that ran it.
+`mission/<name>`, and a copy of the workflow that will run it. Orchestrator agent runs a mission
+through engineered graph of steps from intent capture towards completion. Mission folder holds
+the intent, the spec, the contract, every sub-agent's handoff and the retro session.
 
-**Mission Control.** `factory` with no arguments. Every project, mission and live session in the
-left column; the selected one's graph, parts or intent form on the right; every open gate and
-waiting decision in one inbox, each naming the command that answers it. It reads the files the CLI
-writes and writes through the CLI's own functions, so the screen and the terminal can never
-disagree.
+**Mission Control.** `factory` with no arguments launches a TUI. Every project, mission and live
+session in the left column; the selected one's graph, parts or intent form on the right; every
+open gate and waiting decision in one inbox, each naming the command that answers it.
+
+**Decisions.** Sub-agents log decisions made during development in the handoff documents, surfaced
+through orchestrator and the TUI for review. Less surprises from sub-agent black boxes.
 
 ![Factory status view](docs/factory-screenshot.png)
 
@@ -51,20 +49,21 @@ disagree.
 
 ## Requirements
 
-| What                | Needed for                                        | Note                                                            |
-|---------------------|---------------------------------------------------|-----------------------------------------------------------------|
-| Bun, recent         | everything: the CLI, Mission Control, every hook   | also on `PATH` in each target project — hooks run under it     |
-| git                 | branches, worktrees, the merge on close           |                                                                 |
-| Claude Code         | the sessions the Factory drives                   | pinned to its hooks, session ids and transcript layout          |
-| macOS               | `caffeinate`, `afplay`, `open`                    | elsewhere these throw and the hook swallows it; the rest works  |
-| Warp                | `mission open` tabs, desktop notifications        | without it the command prints the line to run yourself          |
-| Node                | the `codegraph` MCP, through `npx`                | opt-in part only                                                |
-| `XAI_API_KEY`       | `/research`                                       | opt-in part only, from https://console.x.ai                     |
-| `agent-browser`     | `/browse`                                         | opt-in part only, plus Chrome/Brave/Edge 144+                   |
+Factory is made for Claude Code, Bun, Warp and macOS. It is free to be picked apart and ported to
+your environment. 
+
+| What                | Needed for                                       | Note                             |
+|---------------------|--------------------------------------------------|----------------------------------|
+| Bun, recent         | everything: the CLI, Mission Control, every hook |                                  |
+| git                 | branches, worktrees, the merge on close          |                                  |
+| Claude Code         | the sessions the Factory drives                  | pinned to its hooks              |
+| macOS               | `caffeinate`, `afplay`, `open`                   | elsewhere these throw            |
+| Warp                | `mission open` tabs, desktop notifications       | designed to launch Warp sessions |
+| Node                | the `codegraph` MCP, through `npx`. opt-in       | opt-in part only                 |
+| `XAI_API_KEY`       | `/research`                                      | opt-in part only                 |
+| `agent-browser`     | `/browse`                                        | opt-in part only                 |
 
 Linux runs the CLI, the missions and Mission Control; only the macOS calls above are missing.
-Windows does not — sockets, `ps` and the tty rendering all assume POSIX, so use WSL.
-`docs/environment.md` maps what breaks where.
 
 ## Setup
 
@@ -96,16 +95,16 @@ Without `bun link`, every command here is `bun src/cli.ts <command>`, and `bun s
 ```
 
 Every mission starts unshaped: one gated `intent` step and nothing behind it. You write the goal,
-the Orchestrator grills it until the why is sharp, and once you answer the gate `factory mission
+the Orchestrator grills it until the Why is sharp, and once you answer the gate `factory mission
 shape <preset>` appends the rest of the graph.
 
-| Preset     | Steps after `intent`                                                            | Fits                              |
-|------------|---------------------------------------------------------------------------------|-----------------------------------|
-| `story`    | research → spec → implement → review (verify ∥ validate, back to implement, max 3) → merge | a feature, anything with a contract |
-| `chore`    | implement → merge; `--verify` adds a verify loop (max 2)                        | mechanical work, a known bug      |
-| `research` | investigate (sources ∥ transcripts) → report                                    | a question, no code               |
-| `train`    | plan → implement → check (the Orchestrator's own review, max 8) → merge         | a large task cut into legs        |
-| `--quick`  | one `work` step, no intent gate                                                 | a job you have already decided    |
+| Preset     | Steps after `intent`                                                                       |
+|------------|--------------------------------------------------------------------------------------------|
+| `story`    | research → spec → implement → review (verify ∥ validate, back to implement, max 3) → merge |
+| `research` | investigate (sources ∥ transcripts) → report                                               |
+| `train`    | plan → implement → check (the Orchestrator's own review, max 8) → merge                    |
+| `chore`    | implement → merge; `--verify` adds a verify loop (max 2)                                   |
+| `--quick`  | one `work` step, no intent gate                                                            |
 
 The autonomy dial says which decisions stop for you. Gates reach you in every mode.
 
@@ -115,17 +114,6 @@ The autonomy dial says which decisions stop for you. Gates reach you in every mo
 | `partial` | `LOW` confidence   | `MEDIUM` and `HIGH`                  |
 | `none`    | every decision     | nothing                              |
 
-The roles that do the work, each spawned with its model named explicitly:
-
-| Role         | Model  | Does                                                                       |
-|--------------|--------|-----------------------------------------------------------------------------|
-| Orchestrator | fable  | the interactive session bound to the mission: plans, delegates, triages, records |
-| Worker       | opus   | implements one step with clean context, one at a time                       |
-| Verifier     | opus   | reads the diff against the contract, runs the `verify` recipe               |
-| Validator    | opus   | drives the running system as a user, runs the `e2e` recipe                  |
-| Investigator | sonnet | read-only search, codegraph, web and transcript research, in parallel       |
-| Summarizer   | sonnet | condenses the whole mission, writes `retro.md`, proposes memories           |
-
 `factory mission close` refuses while a gate is open or a step is unfinished, merges the branch
 `--no-ff` — the only merge path — marks the mission closed, clears the claim, drops the worktree
 and deletes the branch. It commits nothing: the mission folder is ignored, and `status: closed` in
@@ -133,18 +121,18 @@ its own `state.json` is the record.
 
 ## Words
 
-| Term       | Means                                                                                       |
-|------------|----------------------------------------------------------------------------------------------|
-| Project    | a git repo registered with the Factory; owns `.factory/` and an optional `factory.yaml`      |
-| Part       | one installable unit — skill, tool, fixture or mcp — copied in and tracked in a manifest     |
-| Mission    | one unit of tracked work: a folder, a workflow, a branch, a session                          |
-| Stub       | a mission with an intent and no branch yet; `mission open` promotes it                       |
-| Workflow   | the ordered list of steps that runs a mission                                                |
-| Step       | one node in a workflow, with a role, an optional parallel group, gate or loop                |
-| Gate       | a step that blocks until it is answered                                                      |
-| Decision   | one fork an agent took, with a confidence and a reason, in `decisions.md`                    |
-| Recipe     | a project command list in `factory.yaml`: `verify`, `e2e`                                    |
-| Claim      | `.factory/claim`, naming the mission that owns the main checkout; others get a worktree      |
+| Term       | Means                                                                                     |
+|------------|-------------------------------------------------------------------------------------------|
+| Project    | a git repo registered with the Factory; owns `.factory/` and an optional `factory.yaml`   |
+| Part       | one installable unit — skill, tool, fixture or mcp — copied in and tracked in a manifest  |
+| Mission    | one unit of tracked work: a folder, a workflow, a branch, a session                       |
+| Stub       | a mission with an intent and no branch yet; `mission open` promotes it                    |
+| Workflow   | the ordered list of steps that runs a mission                                             |
+| Step       | one node in a workflow, with a role, an optional parallel group, gate or loop             |
+| Gate       | a step that blocks until it is answered                                                   |
+| Decision   | one fork an agent took, with a confidence and a reason, in `decisions.md`                 |
+| Recipe     | a project command list in `factory.yaml`: `verify`, `e2e`                                 |
+| Claim      | `.factory/claim`, naming the mission that owns the main checkout; others get a worktree   |
 
 The full list, and the rule behind each name, is `docs/terminology.md`. Two docs about one thing
 use one word; there are no synonyms anywhere in this repo on purpose.
@@ -154,32 +142,32 @@ use one word; there are no synonyms anywhere in this repo on purpose.
 `install | uninstall | status | update` act on a project: the argument, else the current directory
 when it is registered, else a picker. `--global` stands where the project path would.
 
-| Command                                       | Does                                                                    |
-|-----------------------------------------------|--------------------------------------------------------------------------|
-| `factory` · `factory menu`                    | Mission Control · the interactive command-then-project picker           |
-| `install [project]`                           | pick parts and copy them in; `--parts a,b` or `--yes` skip the menu     |
-| `uninstall [project]`                         | take the copies, hooks and settings back out; `--yes` skips the menu    |
-| `status [project]`                            | installed, modified, in conflict or skipped, plus open missions         |
-| `update [project]`                            | rewrite the copies, add new defaults, drop retired parts; `--skip a,b`  |
-| `update --all`                                | every registered project, then `~/.claude/`, one run                    |
+| Command                                       | Does                                                                      |
+|-----------------------------------------------|---------------------------------------------------------------------------|
+| `factory` · `factory menu`                    | Mission Control · the interactive command-then-project picker             |
+| `install [project]`                           | pick parts and copy them in; `--parts a,b` or `--yes` skip the menu       |
+| `uninstall [project]`                         | take the copies, hooks and settings back out; `--yes` skips the menu      |
+| `status [project]`                            | installed, modified, in conflict or skipped, plus open missions           |
+| `update [project]`                            | rewrite the copies, add new defaults, drop retired parts; `--skip a,b`    |
+| `update --all`                                | every registered project, then `~/.claude/`, one run                      |
 
 `mission | step | gate | decision | handoff` act on the checkout you are standing in, never prompt,
 and exit 1 with a one-line `✗ …` on a refusal.
 
-| Command                                       | Does                                                                    |
-|-----------------------------------------------|--------------------------------------------------------------------------|
-| `mission new <name>`                          | folder, workflow copy, branch, claim, tab. `--stub --quick --workflow W --verify --autonomy L --worktree --no-open` |
-| `mission shape <preset>`                      | append a preset's steps behind `intent`, once. `--verify --autonomy L`  |
-| `mission open [name]`                         | spawn the session in a Warp tab. `--preset P --dry-run`                 |
-| `mission list [--all]` · `status` · `resume`  | every mission across projects · the graph one step per row · check out again |
-| `mission autonomy L` · `adopt <name> --session <id>` | move the dial, with a recorded deviation · bind a running session |
-| `mission close [name] [--keep-branch]`        | merge, close, unclaim, delete the branch                                |
-| `mission archive \| unarchive <name>`         | move a closed mission's folder into `.factory/archive/`, or back        |
-| `step start\|done\|skip\|loop <step>`         | move a step, or count a round and return to the loop target             |
-| `step add <step> --after X --reason R`        | insert a step the workflow does not have                                |
-| `gate open <step> --file F` · `answer` · `list` | put a gate up · answer it once · every open gate across projects       |
-| `decision add "<s>" --confidence L` · `answer` · `list` | file a fork · accept or overrule it once · list, `--waiting`   |
-| `handoff save <step>`                         | write the handoff on stdin into the mission folder                      |
+| Command                                          | Does                                                                         |
+|--------------------------------------------------|------------------------------------------------------------------------------|
+| `mission new <name>`                             | folder, workflow copy, branch, claim, tab.                                   |
+| `mission shape <preset>`                         | append a preset's steps behind `intent`, once. `--verify --autonomy L`       |
+| `mission open [name]`                            | spawn the session in a Warp tab. `--preset P --dry-run`                      |
+| `mission list [--all]` · `status` · `resume`     | every mission across projects · the graph one step per row · check out again |
+| `mission autonomy L` · `adopt <name>`            | move the dial, with a recorded deviation · bind a running session            |
+| `mission close [name] [--keep-branch]`           | merge, close, unclaim, delete the branch                                     |
+| `mission archive \| unarchive <name>`            | move a closed mission's folder into `.factory/archive/`, or back             |
+| `step start\|done\|skip\|loop <step>`            | move a step, or count a round and return to the loop target                  |
+| `step add <step> --after X --reason R`           | insert a step the workflow does not have                                     |
+| `gate open <step> --file F` · `answer`           | put a gate up · answer it once · every open gate across projects             |
+| `decision add "<s>" --confidence L` · `answer`   | file a fork · accept or overrule it once · list, `--waiting`                 |
+| `handoff save <step>`                            | write the handoff on stdin into the mission folder                           |
 
 **Mission Control keys.** `↑↓` select, `⇧↑↓` reorder, `→` right pane (in MISSION it turns the
 autonomy dial), `←` back, `↵` write to the row's session or open the selection, `Esc` back.
@@ -192,25 +180,25 @@ shows the command and records nothing itself.
 
 ## Parts
 
-| Part             | Type    | Model  | Scope   | What it is                                                    |
-|------------------|---------|--------|---------|----------------------------------------------------------------|
-| `/mission`       | skill   | fable  | project | run a mission through its workflow, gates and triage           |
-| `/verify`        | skill   | opus   | project | verifier gatekeeper over the diff and the contract             |
-| `/validate`      | skill   | opus   | project | validator gatekeeper driving the running system                |
-| `/retro`         | skill   | opus   | project | sweep closed missions' `retro.md` into one table you answer    |
-| `/commit`        | skill   | sonnet | global  | structured git commits                                         |
-| `/explain`       | skill   | sonnet | global  | visual code explanations and flow diagrams                     |
-| `/research`      | tool    | sonnet | global  | web research via Grok, cited                                   |
+| Part             | Type    | Model  | Scope   | What it is                                                        |
+|------------------|---------|--------|---------|-------------------------------------------------------------------|
+| `/mission`       | skill   | fable  | project | run a mission through its workflow, gates and triage              |
+| `/verify`        | skill   | opus   | project | verifier gatekeeper over the diff and the contract                |
+| `/validate`      | skill   | opus   | project | validator gatekeeper driving the running system                   |
+| `/retro`         | skill   | opus   | project | sweep closed missions' `retro.md` into one table you answer       |
+| `/commit`        | skill   | sonnet | global  | structured git commits                                            |
+| `/explain`       | skill   | sonnet | global  | visual code explanations and flow diagrams                        |
+| `/research`      | tool    | sonnet | global  | web research via Grok, cited                                      |
 | `/browse`        | tool    | sonnet | project | drive a real or headless browser through `agent-browser` (opt-in) |
-| `/archify`       | skill   | —      | project | architecture diagrams, cloned per project (opt-in)             |
-| `code-format`    | fixture | —      | project | how code is written                                            |
-| `docs-format`    | fixture | —      | project | how agent-facing docs are written                              |
-| `terminology`    | fixture | —      | project | template `docs/terminology.md`, seeded only when absent        |
-| `roadmap`        | fixture | —      | project | template `docs/roadmap.md`, seeded only when absent            |
-| `permissions`    | fixture | —      | global  | baseline tool allow list merged into `settings.json`           |
-| `hook-factory`   | fixture | —      | project | session events, decisions filed, rings when a session waits    |
-| `hook-safe-bash` | fixture | —      | global  | blocks destructive bash commands                               |
-| `codegraph`      | mcp     | —      | project | code graph MCP plus prompt hook, per project index (opt-in)    |
+| `/archify`       | skill   | —      | project | architecture diagrams, cloned per project (opt-in)                |
+| `code-format`    | fixture | —      | project | how code is written                                               |
+| `docs-format`    | fixture | —      | project | how agent-facing docs are written                                 |
+| `terminology`    | fixture | —      | project | template `docs/terminology.md`, seeded only when absent           |
+| `roadmap`        | fixture | —      | project | template `docs/roadmap.md`, seeded only when absent               |
+| `permissions`    | fixture | —      | global  | baseline tool allow list merged into `settings.json`              |
+| `hook-factory`   | fixture | —      | project | session events, decisions filed, rings when a session waits       |
+| `hook-safe-bash` | fixture | —      | global  | blocks destructive bash commands                                  |
+| `codegraph`      | mcp     | —      | project | code graph MCP plus prompt hook, per project index (opt-in)       |
 
 A **skill** is a prompt with a model directive, invoked as `/name` in Claude Code; a **tool** is a
 skill with scripts or a runtime behind it; a **fixture** is project configuration — hooks, formats,

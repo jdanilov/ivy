@@ -31,69 +31,69 @@ const refitSteps = steps([
   ['verify', 'pending'], ['validate', 'pending'], ['merge', 'pending', undefined, { gate: 'human' }],
 ]);
 
-/** `minutes back|verb|text`, oldest first — the shape wiring will read out of the transcript. */
+/** `minutes back|verb|text[|status]`, oldest first — the shape wiring will read out of the transcript. */
 function log(session: string, spec: string): Activity[] {
   return spec.trim().split('\n').map((row) => {
-    const [back, verb, text] = row.split('|') as [string, Activity['verb'], string];
-    return { at: now - Math.round(Number(back) * M), session, verb, text };
+    const [back, verb, text, status] = row.split('|') as [string, Activity['verb'], string, Activity['status']?];
+    return { at: now - Math.round(Number(back) * M), session, verb, text, ...(status ? { status } : {}) };
   });
 }
 
 const refitLog = log('75cb46e1', `
-30.2|You|Round 2: fix the three Verifier findings, skip nothing without a reason.
-30.0|Text|Round 2 opens. Three findings from the Verifier, all in the render path.
-29.5|Read|.factory/missions/2026-09-06-refit/findings.md
-28.6|Bash|rg -n "destroyRecursively" src
-28.0|Text|Triage: fix F1 and F2, skip F3 — the divider is cosmetic and out of the contract.
-27.4|Agent|Worker implement round 2
-26.3|Read|src/ui/format.ts
-25.7|Edit|src/tui/screen.ts destroy the old row tree instead of removing it
-24.4|Edit|src/tui/format.ts spread() pads to the pane width
-23.1|Bash|bun scripts/test.ts
-22.4|Text|Two cases fail: the status bar no longer fits its metrics at 100 columns.
-21.1|Edit|src/tui/screen.ts cap the progress bar at a third of the line
-20.3|Bash|bun scripts/test.ts
-18.9|Stop|Worker handed off: 4 files, 2 fixes, F3 skipped with a reason
-18.1|Text|Handoff reads clean. Verify before the accept gate.
-17.4|Agent|Verifier round 2
-16.8|Read|.factory/missions/2026-09-06-refit/acceptance.md
-15.3|Read|src/tui/screen.ts
-14.6|Text|A2 pass, A5 pass, A9 unchecked — nothing drives the 100-column case.
-13.8|Stop|Verifier findings written
-13.0|Agent|Worker implement round 2
-12.3|Edit|scripts/test.ts a 100x24 render case
-11.6|Bash|bun scripts/test.ts
-10.0|Stop|Worker handed off: A9 now checked
-9.2|Text|All nine assertions pass, so the accept gate is the next thing.
-8.4|Ask|Accept round 2 and move on to validate?
-7.1|Read|.factory/missions/2026-09-06-refit/state.json
-6.2|Bash|bun src/cli.ts step done implement
-5.4|Agent|Validator drive the screen at three sizes
-4.1|Bash|bun scripts/tui-snapshot.ts
-2.9|Read|.factory/missions/2026-09-06-refit/prototype/messages.txt
-1.6|Text|Frames read right at 140x42, the key bar sits on the last row.
-0.4|Ask|Round 2 accepted?`);
+30.2|user|Round 2: fix the three Verifier findings, skip nothing without a reason.
+30.0|agent|Round 2 opens. Three findings from the Verifier, all in the render path.
+29.5|read|.factory/missions/2026-09-06-refit/findings.md
+28.6|bash|rg -n "destroyRecursively" src|ok
+28.0|agent|Triage: fix F1 and F2, skip F3 — the divider is cosmetic and out of the contract.
+27.4|sub|→ Worker · implement round 2|ok
+26.3|read|src/ui/format.ts
+25.7|edit|src/tui/screen.ts destroy the old row tree instead of removing it
+24.4|edit|src/tui/format.ts spread() pads to the pane width
+23.1|bash|bun scripts/test.ts|failed
+22.4|agent|Two cases fail: the status bar no longer fits its metrics at 100 columns.
+21.1|edit|src/tui/screen.ts cap the progress bar at a third of the line
+20.3|bash|bun scripts/test.ts|ok
+18.9|stop|turn 11m 18s · 9 tools
+18.1|agent|Handoff reads clean. Verify before the accept gate.
+17.4|sub|→ Verifier · round 2|ok
+16.8|read|.factory/missions/2026-09-06-refit/acceptance.md
+15.3|read|src/tui/screen.ts
+14.6|agent|A2 pass, A5 pass, A9 unchecked — nothing drives the 100-column case.
+13.8|stop|turn 4m 20s · 3 tools
+13.0|sub|→ Worker · implement round 2|ok
+12.3|edit|scripts/test.ts a 100x24 render case
+11.6|bash|bun scripts/test.ts|ok
+10.0|stop|turn 3m 2s · 2 tools
+9.2|agent|All nine assertions pass, so the accept gate is the next thing.
+8.4|ask|Accept round 2 and move on to validate?
+7.1|read|.factory/missions/2026-09-06-refit/state.json
+6.2|bash|bun src/cli.ts step done implement|ok
+5.4|sub|→ Validator · drive the screen at three sizes|running
+4.1|bash|bun scripts/tui-snapshot.ts|ok
+2.9|read|.factory/missions/2026-09-06-refit/prototype/messages.txt
+1.6|agent|Frames read right at 140x42, the key bar sits on the last row.
+0.4|ask|Round 2 accepted?`);
 
 const authLog = log('8a9e6b42', `
-70|Text|Fix mission opens: the session cookie survives logout.
-66|Read|src/auth/session.ts
-61|Agent|Worker implement
-55|Edit|src/auth/session.ts clear the cookie on logout
-48|Bash|bun test auth
-41|Edit|src/auth/refresh.ts rotate the refresh token on reuse
-35|Bash|bun test auth
-28|Stop|Worker handed off: 3 fixes, 2 skipped
-21|Agent|Verifier round 2
-14|Bash|git diff --stat main...mission/auth
-7|Text|The contract is green. Opening the merge gate on retro.md.
-3|Ask|Merge auth into main?`);
+70|agent|Fix mission opens: the session cookie survives logout.
+66|read|src/auth/session.ts
+61|sub|→ Worker · implement|ok
+55|edit|src/auth/session.ts clear the cookie on logout
+48|bash|bun test auth|failed
+41|edit|src/auth/refresh.ts rotate the refresh token on reuse
+35|bash|bun test auth|ok
+28|stop|turn 42m · 6 tools
+21|sub|→ Verifier · round 2|ok
+14|bash|git diff --stat main...mission/auth|ok
+7|agent|The contract is green. Opening the merge gate on retro.md.
+3|ask|Merge auth into main?`);
 
 const quickLog = log('b3f21c07', `
-26|Text|Looking at how recall should be indexed before writing anything.
-22|Read|docs/terminology.md
-18|Bash|rg -n "Recall" docs
-15|Text|Embeddings need a model on the box; a grep index is instant and dumb.
-12|Ask|Which recall strategy for v1, embeddings or a grep index?`);
+26|agent|Looking at how recall should be indexed before writing anything.
+22|read|docs/terminology.md
+18|bash|rg -n "Recall" docs|ok
+15|agent|Embeddings need a model on the box; a grep index is instant and dumb.
+12|ask|Which recall strategy for v1, embeddings or a grep index?`);
 
 const authSteps = steps([
   ['intent', 'done', 4 * M, { gate: 'human' }], ['implement', 'done', 71 * M, { role: 'worker' }],
@@ -196,7 +196,7 @@ const projects: Project[] = [
     sessions: [
       {
         id: 'b3f21c07', name: 'recall', busy: false, preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
-        said: 'Two recall strategies fit here, embeddings or a grep index. Which do you want for v1?',
+        turn: { at: now - 26 * M, tools: 3, wall: 14 * M }, tokens: { input: 48_200, output: 3_900 }, context: 61_400,
       },
     ],
     missions: [

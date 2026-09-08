@@ -71,16 +71,23 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   for (const d of m.deviations) for (const l of wrap(d, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.dim]]);
 }
 
+/** The session's own facts, narrower than a mission's: `session`, `cwd`, `now`, `turn`, `spend`. */
+const SESSION_LABEL = 9;
+const sfact = (p: Pane, label: string, cells: Cell[]): void => p.row([[label.padEnd(SESSION_LABEL), C.dim], ...cells]);
+
+/** What ACTIVITY cannot say at a glance: the tool still out, the turn so far, and how full the
+ *  window is. Its last word is the log's last row, so it is not repeated here. */
 export function sessionPane(p: Pane, s: Session): void {
   p.row([['SESSION', C.bright], [`  ${s.name ?? id(s.id)}`, C.dim], [' · ', C.rule], [s.preset, C.dim]]);
   p.rule();
-  p.row([['session ', C.dim], [id(s.id), C.bright], DOT,
+  sfact(p, 'session', [[id(s.id), C.bright], DOT,
     ...(s.busy ? ([['working', C.bright], ...(s.agent ? [DOT, [s.agent, C.dim]] : [])] as Cell[])
       : ([['idle ', C.dim], [dur(Date.now() - s.idleSince), C.bright]] as Cell[]))]);
-  p.row([['cwd ', C.dim], [s.cwd, C.bright]]);
-  // Its last word, whole: a statement as often as a question, so the label claims neither.
-  if (!s.said) return;
-  p.rule();
-  p.row([['said', C.dim]]);
-  for (const l of wrap(s.said, p.width, 6)) p.row([[l, C.bright]]);
+  sfact(p, 'cwd', [[s.cwd, C.bright]]);
+  if (s.now) sfact(p, 'now', [['○ ', C.dim], [s.now.verb, s.now.verb === 'sub' ? C.agent : C.dim], [` ${s.now.text}`, C.bright], DOT, [dur(Date.now() - s.now.at), C.dim]]);
+  if (s.turn) {
+    const tools = `${s.turn.tools} tool${s.turn.tools === 1 ? '' : 's'}`;
+    sfact(p, 'turn', [[tools, C.bright], DOT, [dur(s.turn.wall ?? Date.now() - s.turn.at), C.dim], ...(s.turn.wall === undefined ? ([[' so far', C.dim]] as Cell[]) : [])]);
+  }
+  sfact(p, 'spend', [[`${tokens(s.tokens.input)} in`, C.bright], DOT, [`${tokens(s.tokens.output)} out`, C.bright], DOT, ['context ', C.dim], [tokens(s.context), C.bright]]);
 }

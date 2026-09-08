@@ -35,6 +35,8 @@ export interface Tail {
   /** Sub-agents launched in the background whose task notification has not come back: while one
    *  is out, the turn that ended is not the session asking anything. */
   running: Set<string>;
+  /** Tool_use id → its `bash` or `sub` row, until a result or a task notification settles it. */
+  pending: Map<string, Activity>;
   /** What `--name` or `/rename` called the session, from Claude Code's own `custom-title` record. */
   title: string;
 }
@@ -47,30 +49,41 @@ const tails = new Map<string, Tail>();
 
 interface Block {
   type?: string; id?: string; text?: string; name?: string; input?: Record<string, unknown>;
-  tool_use_id?: string; content?: string | { text?: string }[];
+  tool_use_id?: string; content?: string | { text?: string }[]; is_error?: boolean;
 }
 
 interface Line {
   type?: string; timestamp?: string; isSidechain?: boolean; agentId?: string; customTitle?: string;
   message?: { id?: string; content?: Block[] | string; usage?: Record<string, number> };
+  /** Claude Code's own record of a result: a command sent to the background names its task, an
+   *  agent launched there is `isAsync`. Either way the row is still out. */
+  toolUseResult?: { backgroundTaskId?: string; isAsync?: boolean };
 }
 
 const VERB: Record<string, Activity['verb']> = {
-  Bash: 'Bash', Edit: 'Edit', Write: 'Edit', Read: 'Read', Glob: 'Read', Grep: 'Read',
-  Agent: 'Agent', AskUserQuestion: 'Ask',
+  Bash: 'bash', Edit: 'edit', Write: 'edit', Read: 'read', Glob: 'read', Grep: 'read',
+  Agent: 'sub', AskUserQuestion: 'ask',
 };
+
+/** The rows that have a result to wait for: a command's exit, a sub-agent's report. */
+const TRACKED = new Set<Activity['verb']>(['bash', 'sub']);
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-/** What a `Text` row holds: two lines of a wide pane, since the foot wraps a row to two. */
-const SENTENCE_MAX = 320;
+/** What an `agent` row holds: two lines of a wide pane, since the foot wraps a row to two. */
+const TEXT_MAX = 320;
 
-/** One sentence of prose: the log has one row per block, not a paragraph. */
+/** Prose on one line, cut where the foot would stop wrapping it anyway. */
+function flat(raw: string): string {
+  const one = raw.trim().replace(/\s+/g, ' ');
+  return one.length > TEXT_MAX ? `${one.slice(0, TEXT_MAX - 1)}…` : one;
+}
+
+/** One sentence of prose: a question row is the question, not its preamble. */
 function sentence(raw: string): string {
-  const flat = raw.trim().replace(/\s+/g, ' ');
-  const end = flat.search(/[.?!](\s|$)/);
-  const cut = end === -1 ? flat : flat.slice(0, end + 1);
-  return cut.length > SENTENCE_MAX ? `${cut.slice(0, SENTENCE_MAX - 1)}…` : cut;
+  const one = flat(raw);
+  const end = one.search(/[.?!](\s|$)/);
+  return end === -1 ? one : one.slice(0, end + 1);
 }
 
 /** The activity table from spec.md: what the tool was, in the words the human would use. */
@@ -82,7 +95,7 @@ function detail(block: Block, cwd: string): string {
     case 'Bash': return text(input.description) || (text(input.command).split('\n')[0] ?? '');
     case 'Edit': case 'Write': return file.startsWith(cwd) ? path.relative(cwd, file) : file;
     case 'Read': case 'Glob': case 'Grep': return file || text(input.pattern);
-    case 'Agent': return [text(input.subagent_type), text(input.description)].filter((s) => s !== '').join(' · ');
+    case 'Agent': return `→ ${[text(input.subagent_type), text(input.description)].filter((s) => s !== '').join(' · ')}`;
     case 'AskUserQuestion': {
       const first = Array.isArray(input.questions) ? (input.questions[0] as { question?: string }) : undefined;
       return sentence(text(first?.question));
@@ -100,8 +113,19 @@ function parse(line: string): Line | null {
 }
 
 const fresh = (): Tail => ({
-  activity: [], usage: [], text: '', offset: 0, seen: new Map(), agents: new Map(), spawns: new Map(), running: new Set(), title: '',
+  activity: [], usage: [], text: '', offset: 0, seen: new Map(), agents: new Map(), spawns: new Map(), running: new Set(),
+  pending: new Map(), title: '',
 });
+
+/** A result settles the row that asked for it — unless it only says the work went to the
+ *  background, in which case the task notification that ends it does. */
+function settle(tail: Tail, id: string, failed: boolean, background = false): void {
+  const row = tail.pending.get(id);
+  if (!row) return;
+  if (!failed && background) return;
+  row.status = failed ? 'failed' : 'ok';
+  tail.pending.delete(id);
+}
 
 /** The text of a tool result, whichever shape Claude Code wrote it in. */
 const resultText = (block: Block): string =>
@@ -144,7 +168,10 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
     const line = raw === '' ? null : parse(raw);
     if (!line) continue;
     // A background sub-agent reports back as a task notification, written as an attachment line.
-    if (line.type !== 'assistant') for (const [, done] of raw.matchAll(/<task-id>([a-z0-9]+)<\/task-id>/g)) tail.running.delete(done!);
+    if (line.type !== 'assistant') {
+      for (const [, done] of raw.matchAll(/<task-id>([a-z0-9]+)<\/task-id>/g)) tail.running.delete(done!);
+      for (const [, id, status] of raw.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>[\s\S]*?<status>(\w+)<\/status>/g)) settle(tail, id!, status !== 'completed');
+    }
     if (line.type === 'custom-title') {
       tail.title = text(line.customTitle);
       continue;
@@ -153,8 +180,10 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
     // An Agent result comes back as a user line naming the id its file is written under.
     if (line.type === 'user') {
       for (const block of blocks) {
-        const role = block.type === 'tool_result' && block.tool_use_id ? tail.spawns.get(block.tool_use_id) : undefined;
-        const body = role ? resultText(block) : '';
+        if (block.type !== 'tool_result' || !block.tool_use_id) continue;
+        const body = resultText(block);
+        settle(tail, block.tool_use_id, block.is_error === true, line.toolUseResult?.backgroundTaskId !== undefined || line.toolUseResult?.isAsync === true);
+        const role = tail.spawns.get(block.tool_use_id);
         const agent = /agentId: ([a-z0-9]+)/.exec(body)?.[1];
         if (role && agent) {
           tail.agents.set(agent, role);
@@ -195,9 +224,14 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
         const body = text(block.text).trim();
         if (body === '') continue;
         tail.text = body.slice(0, 1000);
-        tail.activity.push({ at, session, verb: 'Text', text: sentence(body) });
+        tail.activity.push({ at, session, verb: 'agent', text: flat(body) });
       } else if (block.type === 'tool_use') {
-        tail.activity.push({ at, session, verb: VERB[block.name ?? ''] ?? 'Tool', text: detail(block, cwd) });
+        const row: Activity = { at, session, verb: VERB[block.name ?? ''] ?? 'tool', text: detail(block, cwd) };
+        if (TRACKED.has(row.verb) && block.id) {
+          row.status = 'running';
+          tail.pending.set(block.id, row);
+        }
+        tail.activity.push(row);
       }
     }
   }

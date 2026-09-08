@@ -47,8 +47,10 @@ export interface StepRow {
 export interface Activity {
   at: number;
   session: string;
-  verb: 'You' | 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Tool' | 'Stop';
+  verb: 'user' | 'bash' | 'edit' | 'read' | 'sub' | 'agent' | 'ask' | 'tool' | 'stop';
   text: string;
+  /** A `bash` or `sub` row: out until its result lands, then what the result said. */
+  status?: 'running' | 'ok' | 'failed';
 }
 
 /** How much of what this mission decides waits on the human. */
@@ -97,8 +99,13 @@ export interface Session {
   cwd: string;
   /** When its last turn ended. Meaningless while busy. */
   idleSince: number;
-  /** The final message of its last turn, a statement or a question alike. */
-  said?: string;
+  /** The `bash` or `sub` row still out, if one is. */
+  now?: Activity;
+  /** The open turn, or the last one: when it began, its tool count, and its length once it ended. */
+  turn?: { at: number; tools: number; wall?: number };
+  tokens: { input: number; output: number };
+  /** What the last turn re-sent: how full the window is. */
+  context: number;
 }
 
 export interface PartRow {

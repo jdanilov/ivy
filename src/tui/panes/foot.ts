@@ -1,26 +1,51 @@
 import { C } from '../theme.js';
-import { clock, len, spread, wrap, type Cell } from '../format.js';
-import type { LeftItem, Pane, Ui } from './pane.js';
+import { clock, dur, len, spread, wrap, type Cell } from '../format.js';
+import { itemKey, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { Activity, Decision, Mission, Project, Snapshot } from '../model.js';
 
 /** The pane along the foot: the decisions of whatever is selected, or its sessions' activity. */
 
 const VERB: Record<Activity['verb'], string> = {
-  You: C.accent, Bash: C.bright, Edit: C.success, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
-  Tool: C.dim, Stop: C.success,
+  user: C.error, bash: C.dim, edit: C.success, read: C.dim, sub: C.agent, agent: C.bright, ask: C.warning,
+  tool: C.dim, stop: C.dim,
 };
 
 /** What of a row is the human's or the model's own words, drawn bright; the rest is tooling, dim. */
-const SAID = new Set<Activity['verb']>(['You', 'Text', 'Ask']);
+const SAID = new Set<Activity['verb']>(['user', 'agent', 'ask']);
+
+/** Where a `bash` or `sub` row stands, drawn before its verb: out, back, or back with an error. */
+const STATUS: Record<NonNullable<Activity['status']>, [glyph: string, color: string]> = {
+  running: ['○', C.dim], ok: ['●', C.success], failed: ['●', C.error],
+};
 
 /** A row wraps under its text column to this many lines; a longer command is a paragraph nobody reads here. */
 const ACTIVITY_ROWS = 2;
 
-/** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch. */
-const tabs = (ui: Ui): Cell[] => [
-  ['DECISIONS', ui.foot === 'decisions' ? C.bright : C.dim], ['  ', C.dim],
-  ['ACTIVITY', ui.foot === 'activity' ? C.bright : C.dim],
-];
+/** `12:25:28` on the words, `+1m 4s` since the last of them on the tooling between: a turn reads
+ *  as one clock time and the gaps under it, and a stop shares its agent's second, so it has none. */
+const TIME_COL = 8;
+const VERB_COL = 5;
+
+/** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch.
+ *  Each carries what came in since it was last open, so the hidden one says whether to look. */
+function tabs(ui: Ui, counts: Record<Ui['foot'], number>): Cell[] {
+  const tab = (name: Ui['foot']): Cell[] => {
+    const fresh = counts[name] - ui.seen[name];
+    return [[name.toUpperCase(), ui.foot === name ? C.bright : C.dim], ...(fresh > 0 ? ([[` +${fresh}`, C.warning]] as Cell[]) : [])];
+  };
+  return [...tab('decisions'), ['  ', C.dim], ...tab('activity')];
+}
+
+/** The counts a tab's `+N` is measured from: both reset when the selection changes, since the rows
+ *  no longer compare; the pane being left and the one being opened both start from now. */
+function markSeen(ui: Ui, here: LeftItem, counts: Record<Ui['foot'], number>): void {
+  const at = itemKey(here);
+  if (ui.seen.at !== at) ui.seen = { at, foot: null, ...counts };
+  if (ui.seen.foot === ui.foot) return;
+  if (ui.seen.foot) ui.seen[ui.seen.foot] = counts[ui.seen.foot];
+  ui.seen[ui.foot] = counts[ui.foot];
+  ui.seen.foot = ui.foot;
+}
 
 /** Newest last, oldest scrolled off: both foot panes read the way they were written, and `↑↓`
  *  walk back through them while the foot is full. The clamp lives here because only this knows
@@ -77,15 +102,18 @@ function decisionLines(mission: string | null, d: Decision, width: number): Cell
     : [[' '.repeat(indent), C.dim], [text, auto ? C.dim : C.bright]]);
 }
 
-function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui): void {
-  const missions = missionsOf(snap, here);
-  const rows = missions.flatMap((m) => m.decisions.map((d): [string, Decision] => [m.name, d]));
-  const waiting = rows.filter(([, d]) => d.status === 'waiting').length;
+const decisionRows = (snap: Snapshot, here: LeftItem): [string, Decision][] =>
+  missionsOf(snap, here).flatMap((m) => m.decisions.map((d): [string, Decision] => [m.name, d]));
 
-  p.row(spread(tabs(ui), [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
+function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui, counts: Record<Ui['foot'], number>): void {
+  const rows = decisionRows(snap, here);
+  const waiting = rows.filter(([, d]) => d.status === 'waiting').length;
+  const many = missionsOf(snap, here).length > 1;
+
+  p.row(spread(tabs(ui, counts), [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
   p.rule();
   // A wrapped row is more lines than rows, so the scroll and the room are counted in lines.
-  const lines = rows.flatMap(([name, d]) => decisionLines(missions.length > 1 ? name : null, d, p.width));
+  const lines = rows.flatMap(([name, d]) => decisionLines(many ? name : null, d, p.width));
   const shown = visible(lines, room, ui);
   for (const cells of shown) p.row(cells);
   if (rows.length === 0) p.row([['no decisions filed yet', C.dim]]);
@@ -106,23 +134,41 @@ function sessionsOf(snap: Snapshot, here: LeftItem): Map<string, string> {
   return map;
 }
 
-function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui): void {
-  const owners = sessionsOf(snap, here);
-  const rows = snap.activity.filter((a) => owners.has(a.session)).sort((a, b) => a.at - b.at);
-  const merged = owners.size > 1;
+const activityRows = (snap: Snapshot, owners: Map<string, string>): Activity[] =>
+  snap.activity.filter((a) => owners.has(a.session)).sort((a, b) => a.at - b.at);
 
-  p.row(spread(tabs(ui), [[`${rows.length}`, C.dim]], p.width));
+/** The lines of one row: the time or the gap, the status dot, the verb, then the text wrapped
+ *  under its own column. A stop closes its turn with one blank line, so turns read as paragraphs. */
+function activityLines(a: Activity, since: number | undefined, owner: string | undefined, width: number): Cell[][] {
+  const clocked = a.verb === 'user' || a.verb === 'agent';
+  const when = clocked || since === undefined ? clock(a.at) : a.verb === 'stop' ? '' : `+${dur(a.at - since)}`;
+  const [glyph, color] = a.status ? STATUS[a.status] : [' ', C.dim];
+  const head: Cell[] = [
+    [`${when.padStart(TIME_COL)}  `, C.dim], ...(owner === undefined ? [] : ([[owner.padEnd(9), C.dim]] as Cell[])),
+    [`${glyph} `, color], [`${a.verb.padEnd(VERB_COL)}  `, VERB[a.verb]],
+  ];
+  const indent = len(head);
+  const tone = SAID.has(a.verb) ? C.bright : C.dim;
+  const lines = wrap(a.text, Math.max(20, width - indent), ACTIVITY_ROWS)
+    .map((text, i): Cell[] => (i === 0 ? [...head, [text, tone]] : [[' '.repeat(indent), C.dim], [text, tone]]));
+  return a.verb === 'stop' ? [...lines, []] : lines;
+}
+
+function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui: Ui, counts: Record<Ui['foot'], number>): void {
+  const owners = sessionsOf(snap, here);
+  const rows = activityRows(snap, owners);
+
+  p.row(spread(tabs(ui, counts), [[`${rows.length}`, C.dim]], p.width));
   p.rule();
-  // The scroll walks lines, not rows: a wrapped row is two of them.
+  // The scroll walks lines, not rows: a wrapped row is two of them. The gap on a tooling row is
+  // measured from the last word of its own session, so merged logs do not time each other, and
+  // a stop clears it: whatever opens the next turn, a report back as often as a prompt, is clocked.
+  const since = new Map<string, number>();
   const lines = rows.flatMap((a): Cell[][] => {
-    const head: Cell[] = [
-      [`${clock(a.at)}  `, C.dim], ...(merged ? ([[(owners.get(a.session) ?? '').padEnd(9), C.dim]] as Cell[]) : []),
-      [a.verb.padEnd(7), VERB[a.verb]],
-    ];
-    const indent = len(head);
-    const color = SAID.has(a.verb) ? C.bright : C.dim;
-    return wrap(a.text, Math.max(20, p.width - indent), ACTIVITY_ROWS)
-      .map((text, i): Cell[] => (i === 0 ? [...head, [text, color]] : [[' '.repeat(indent), C.dim], [text, color]]));
+    const out = activityLines(a, since.get(a.session), owners.size > 1 ? owners.get(a.session) : undefined, p.width);
+    if (a.verb === 'stop') since.delete(a.session);
+    else if (a.verb === 'user' || a.verb === 'agent') since.set(a.session, a.at);
+    return out;
   });
   const shown = visible(lines, room, ui);
   for (const line of shown) p.row(line);
@@ -133,6 +179,8 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
 export function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
   if (sep) p.rule();
   const room = Math.max(0, h - (sep ? 3 : 2));
-  if (ui.foot === 'activity') return activityPane(p, snap, here, room, ui);
-  decisionsPane(p, snap, here, room, ui);
+  const counts = { decisions: decisionRows(snap, here).length, activity: activityRows(snap, sessionsOf(snap, here)).length };
+  markSeen(ui, here, counts);
+  if (ui.foot === 'activity') return activityPane(p, snap, here, room, ui, counts);
+  decisionsPane(p, snap, here, room, ui, counts);
 }

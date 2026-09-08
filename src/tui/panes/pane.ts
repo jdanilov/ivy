@@ -23,6 +23,9 @@ export interface Ui {
   help: boolean;
   /** Which pane the foot draws. Decisions is what a mission is waiting to be read for. */
   foot: 'decisions' | 'activity';
+  /** How many rows each foot pane had when it was last opened or left, for the selection `at`:
+   *  the `+N` on a tab is what came in since. `foot` is the pane the last frame drew. */
+  seen: { at: string; foot: Ui['foot'] | null; decisions: number; activity: number };
   showArchived: boolean;
   toast: string | null;
   /** A line being typed on the status bar; `done` gets it on ↵, empty when nothing was typed. */
@@ -32,7 +35,8 @@ export interface Ui {
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
-    scroll: 0, help: false, foot: 'decisions', showArchived: false, toast: null, input: null,
+    scroll: 0, help: false, foot: 'decisions', seen: { at: '', foot: null, decisions: 0, activity: 0 },
+    showArchived: false, toast: null, input: null,
   };
 }
 

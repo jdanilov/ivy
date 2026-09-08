@@ -403,6 +403,27 @@ await check('the transcript tail parses each line once', async () => {
   ok(tail.offset === Bun.file(file).size && tail.usage.length === 3, 'offset and usage follow the file');
 });
 
+await check('a bash or sub row is out until its result lands, and reads how it went', async () => {
+  const { readTranscript } = await import('../src/tui/transcript.js');
+  const file = path.join(TMP, 'status.jsonl');
+  const at = (n: number): string => new Date(1e12 + n * 1000).toISOString();
+  const call = (n: number, id: string, name: string, input: Record<string, unknown>): string =>
+    `${JSON.stringify({ type: 'assistant', timestamp: at(n), message: { id: `m${n}`, content: [{ type: 'tool_use', id, name, input }] } })}\n`;
+  const result = (id: string, content: string, is_error = false, toolUseResult?: object): string =>
+    `${JSON.stringify({ type: 'user', toolUseResult, message: { content: [{ type: 'tool_result', tool_use_id: id, content, is_error }] } })}\n`;
+  await writeFile(file, call(1, 't1', 'Bash', { description: 'run tests' }) + result('t1', 'ok')
+    + call(2, 't2', 'Bash', { description: 'typecheck' }) + result('t2', 'Exit code 2', true)
+    + call(3, 't3', 'Agent', { subagent_type: 'Commit', description: 'commit it' })
+    + result('t3', 'Async agent launched successfully. agentId: abc123', false, { isAsync: true })
+    + call(4, 't4', 'Bash', { description: 'still running' }));
+  const rows = (await readTranscript(file, 's', TMP)).activity;
+  ok(rows.map((a) => `${a.verb} ${a.status}`).join() === 'bash ok,bash failed,sub running,bash running', `read ${rows.map((a) => `${a.verb} ${a.status}`).join()}`);
+  ok(rows[2]!.text === '→ Commit · commit it', `a launch row reads ${rows[2]!.text}`);
+  await writeFile(file, `${JSON.stringify({ type: 'user', message: { content: '<task-notification><task-id>abc123</task-id><tool-use-id>t3</tool-use-id><status>completed</status></task-notification>' } })}\n`, { flag: 'a' });
+  const later = (await readTranscript(file, 's', TMP)).activity;
+  ok(later[2]!.status === 'ok' && later[3]!.status === 'running', 'the task notification did not settle the sub, or settled the wrong row');
+});
+
 await check('a session asks with its last Stop, and only a prompt clears it', async () => {
   const { transcriptPath } = await import('../src/tui/transcript.js');
   const { buildSnapshot } = await import('../src/tui/live.js');

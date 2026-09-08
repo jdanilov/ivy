@@ -130,7 +130,7 @@ function asking(ev: Ev | undefined, tail: Tail | null): string {
   const text = said(ev, tail);
   const lastLine = text.trim().split('\n').filter((l) => l.trim() !== '').at(-1) ?? '';
   const since = turnStart(ev, Infinity) ?? 0;
-  const askedTool = tail?.activity.some((a) => a.verb === 'Ask' && a.at > since) ?? false;
+  const askedTool = tail?.activity.some((a) => a.verb === 'ask' && a.at > since) ?? false;
   return /\?\s*$/.test(lastLine) || askedTool ? text : '';
 }
 
@@ -247,7 +247,7 @@ export async function settle(): Promise<void> {
 interface Ctx { activity: Activity[]; inbox: InboxItem[]; logged: Set<string> }
 
 /** The tool calls a turn made: everything in the log between a prompt and its Stop that is not prose. */
-const TOOLS = new Set<Activity['verb']>(['Bash', 'Edit', 'Read', 'Agent', 'Ask', 'Tool']);
+const TOOLS = new Set<Activity['verb']>(['bash', 'edit', 'read', 'sub', 'ask', 'tool']);
 
 /** When the turn that ended at `at` began: the last prompt or sub-agent report before it. */
 const turnStart = (ev: Ev, at: number): number | undefined =>
@@ -259,14 +259,25 @@ function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: strin
   if (session === '' || ctx.logged.has(session)) return;
   ctx.logged.add(session);
   if (tail) ctx.activity.push(...tail.activity);
-  for (const { at, text } of ev?.prompts ?? []) ctx.activity.push({ at, session, verb: 'You', text });
-  for (const { at, text } of ev?.reports ?? []) ctx.activity.push({ at, session, verb: 'Agent', text: `↩ ${text}` });
+  for (const { at, text } of ev?.prompts ?? []) ctx.activity.push({ at, session, verb: 'user', text });
+  for (const { at, text } of ev?.reports ?? []) ctx.activity.push({ at, session, verb: 'sub', text: `← ${text}` });
   for (const at of ev?.stops ?? []) {
     const from = turnStart(ev!, at);
-    const tools = tail?.activity.filter((a) => TOOLS.has(a.verb) && a.at > (from ?? 0) && a.at <= at).length ?? 0;
+    const tools = toolCount(tail, from, at);
     const text = from === undefined ? '' : `turn ${dur(at - from)} · ${tools} tool${tools === 1 ? '' : 's'}`;
-    ctx.activity.push({ at, session, verb: 'Stop', text });
+    ctx.activity.push({ at, session, verb: 'stop', text });
   }
+}
+
+const toolCount = (tail: Tail | null, from: number | undefined, to: number): number =>
+  tail?.activity.filter((a) => TOOLS.has(a.verb) && a.at > (from ?? 0) && a.at <= to).length ?? 0;
+
+/** The open turn, or the last one that ended: what the SESSION pane sums under `turn`. */
+function turnOf(ev: Ev, tail: Tail | null): Session['turn'] {
+  const at = turnStart(ev, Infinity);
+  if (at === undefined) return undefined;
+  const end = ev.stops.filter((t) => t >= at).at(-1);
+  return { at, tools: toolCount(tail, at, end ?? Infinity), ...(end === undefined ? {} : { wall: end - at }) };
 }
 
 /** A stub's own words: the first paragraph under `## Why`, joined onto one line. */
@@ -332,6 +343,9 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
   const agent = working(tail);
+  const now = tail.activity.filter((a) => a.status === 'running').at(-1);
+  const turn = turnOf(ev, tail);
+  const spend = sumUsage(tail.usage);
   // The screen's own name outranks Claude Code's: it is the later word, given on this screen.
   const name = ev.name || tail.title;
   return {
@@ -343,7 +357,11 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
     preset: ev.preset,
     cwd: ev.cwd,
     idleSince: ev.stops.at(-1) ?? ev.at,
-    ...(said(ev, tail) ? { said: said(ev, tail) } : {}),
+    ...(now ? { now } : {}),
+    ...(turn ? { turn } : {}),
+    tokens: { input: spend.input, output: spend.output },
+    // Sub-agents spend in their own windows: only the session's own last turn says how full its is.
+    context: (({ input, cached }) => input + cached)(tail.usage.filter((u) => !u.agent).at(-1) ?? { input: 0, cached: 0 }),
   };
 }
 

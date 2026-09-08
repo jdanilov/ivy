@@ -107,6 +107,12 @@ in its `intent.md` where the steps would be: two stubs differ by what they are f
 Any mission whose title is not its name carries it under the pane's rule, wrapped to two lines:
 the title is what the mission is for, and a header's tail is where a line gets cut.
 
+The SESSION pane says what ACTIVITY cannot at a glance: `now`, the `bash` or `sub` row still out
+and how long it has been; `turn`, the open turn's tool count and length so far, or the last
+turn's; `spend`, the session's own tokens in and out and `context`, what its last turn re-sent,
+the one figure that says how full the window is. Its last word is the log's last row, and the
+pane does not repeat it.
+
 The bar is also the one line the screen takes typing on. `N` and `M` ask for a name or a title
 there — the label, what has been typed, a cursor — and while the line is open every key is a
 character but `↵`, `esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
@@ -129,15 +135,22 @@ missions, or every open mission on the Inbox row — newest last, the mission co
 when more than one is in scope. A closed mission's decisions are its record: select it to read
 them. A decision is a fork an agent took; the screen never answers one.
 
-ACTIVITY is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`,
-`Tool` — plus the hook's own two rows, `You` for each prompt and `Stop` for each turn's end,
+ACTIVITY is read from Claude Code's transcripts — `bash`, `edit`, `read`, `sub`, `ask`, `agent`,
+`tool` — plus the hook's own two rows, `user` for each prompt and `stop` for each turn's end,
 newest last. A background sub-agent reporting back arrives as a prompt nobody typed; the hook logs
-it as `SubagentReport` and the row reads `Agent ↩ <what it was asked>`, never as `You`. A turn
-then reads as it happened: prompt, tools, the model's words, stop. A `Bash`
-row is the tool's description, what the model said it was doing, and only falls back to the
-command; an `Agent` row is `<type> · <description>`; a `Stop` row sums its turn, `turn 2m 38s ·
-5 tools`. Words — `You`, `Text`, `Ask` — are bright, tooling dim, `Edit` green as a change. A row
-wraps under its text column to two lines and no more.
+it as `SubagentReport` and the row reads `sub ← <what it was asked>`, never as `user`. A turn then
+reads as it happened: prompt, tools, the model's words, stop, and a blank line under the stop so
+turns read as paragraphs. A `bash` row is the tool's description, what the model said it was
+doing, and only falls back to the command; a `sub` row is `→ <type> · <description>`; a `stop` row
+sums its turn, `turn 2m 38s · 5 tools`. The time column is a clock on `user`, `agent` and whatever
+opens a turn, and `+1m 4s` since the last of those on the tooling between them: a turn is one time
+and the gaps under it. A `bash` or `sub` row carries its outcome before the verb, `○` while out,
+`●` green once its result landed, `●` red when the result was an error or a background task ended
+`failed`: the transcript pairs each result to its call by id, and a task notification names the
+call it ends. Words are bright — `user` red, `agent` bright, `ask` yellow — tooling dim, `sub` blue,
+`edit` green as a change. A row wraps under its text column to two lines and no more; the hook
+clips a prompt at those two lines. Each tab carries `+N`, what came in since it was last open or
+left, so the hidden one says whether to look; both reset when the selection changes.
 
 A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
 filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict

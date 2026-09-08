@@ -45,7 +45,8 @@ interface Bound {
   gates: Record<string, { status?: string; file?: string }>;
 }
 
-const clip = (text: unknown, max = 160): string | null => {
+// Two lines of a wide ACTIVITY row: what the foot wraps a prompt to before it cuts.
+const clip = (text: unknown, max = 320): string | null => {
   const line = String(text ?? '').replace(/\s+/g, ' ').trim();
   return line === '' ? null : line.length > max ? `${line.slice(0, max)}…` : line;
 };

@@ -1,13 +1,15 @@
 import path from 'node:path';
 import { readdir, readFile, unlink } from 'node:fs/promises';
 import { install } from '../commands/install.js';
+import { update } from '../commands/update.js';
 import { removeParts } from '../core/parts.js';
-import { archiveMission, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { readManifest } from '../core/manifest.js';
+import { archiveMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { loadPreset, openSession } from '../core/spawn.js';
-import { writeCaffeinate, type Caffeinate } from '../core/config.js';
-import { factoryHome } from '../core/projects.js';
+import { resetConfig, writeCaffeinate, writePartScope, type Caffeinate } from '../core/config.js';
+import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { id } from './format.js';
-import type { Autonomy } from './model.js';
+import type { Autonomy, ScopeChoice } from './model.js';
 
 /**
  * What a key actually does. Every action goes through the same functions the CLI runs —
@@ -33,10 +35,15 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
 /** The preset `mission open` uses with no flag: a mission's session is the Orchestrator's. */
 const PRESET = 'orchestrator';
 
-/** A mission whose tab is still live is not reopened; one whose session died gets a new tab. */
+/**
+ * A mission whose tab is still live is not reopened; one whose session died gets a new tab. A
+ * stub is promoted first, as the CLI's `open` does: the tab's session must find a mission, not a
+ * stub, or its own `open` refuses itself as live.
+ */
 export async function openTab(project: string, name: string): Promise<string> {
   const mission = await resolveMission(project, name);
   if (await sessionLive(mission.state.session)) return `factory-${name} is already open — switch to that tab`;
+  await readyToOpen(project, mission);
 
   const spawn = await openSession(project, mission, await loadPreset(PRESET), false);
   return spawn.warp ? `opened tab factory-${name}` : `no warp — run it from ${spawn.configPath}`;
@@ -82,6 +89,36 @@ export async function applyParts(project: string, add: string[], drop: string[])
   if (add.length > 0) await quiet(() => install(project, false, add));
   if (drop.length > 0) await removeParts(project, drop);
   const said = [add.length > 0 ? `installed ${add.join(', ')}` : '', drop.length > 0 ? `removed ${drop.join(', ')}` : ''];
+  return said.filter((s) => s !== '').join(' · ');
+}
+
+/**
+ * A scope change is a move, and a move is only done once both ends have run: the choices land in
+ * `~/.factory/config.yaml`, then `update` on every project whose manifest still lists one of them
+ * — that is what drops a part that left the project — and last the home dir, refreshed for what
+ * left it and installed for what became global.
+ */
+export async function applyScopes(changes: { name: string; choice: ScopeChoice }[]): Promise<string> {
+  for (const { name, choice } of changes) await writePartScope(name, choice);
+  resetConfig();
+
+  const names = changes.map((c) => c.name);
+  const updated: string[] = [];
+  for (const project of await existingProjects()) {
+    const manifest = await readManifest(project);
+    if (!names.some((name) => manifest?.parts[name])) continue;
+    await quiet(() => update(project));
+    updated.push(path.basename(project));
+  }
+
+  const global = changes.filter((c) => c.choice === 'global').map((c) => c.name);
+  if (global.length < changes.length) await quiet(() => update(home()));
+  if (global.length > 0) await quiet(() => install(home(), false, global));
+
+  const said = [
+    updated.length > 0 ? `updated ${updated.join(', ')}` : '',
+    global.length > 0 ? `installed ${global.join(', ')} in ~/.claude` : 'refreshed ~/.claude',
+  ];
   return said.filter((s) => s !== '').join(' · ');
 }
 

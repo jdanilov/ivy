@@ -6,8 +6,9 @@ import { readDecisions, type Decision } from '../core/decision.js';
 import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { scanProject } from '../core/scanner.js';
+import { allParts, loadParts, projectOnly } from '../core/registry.js';
 import { readTranscript, sumUsage, transcriptPath, type Tail } from './transcript.js';
-import { id } from './format.js';
+import { dur, id } from './format.js';
 import type { Mission as CoreMission, WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
 import type {
@@ -41,8 +42,14 @@ interface Ev {
   preset: string;
   /** Every Stop the session has logged: the one activity row the transcript does not carry. */
   stops: number[];
+  /** Every prompt the human sent, the other row the transcript does not carry as its own. */
+  prompts: { at: number; text: string }[];
+  /** Every background sub-agent that reported back: a turn starts there too, with nobody typing. */
+  reports: { at: number; text: string }[];
   /** The final message of a Stop nobody has answered yet; `null` when nothing is waiting. */
   asks: string | null;
+  /** The final message of the last Stop, answered or not. */
+  said: string;
 }
 
 interface EventLine { at?: string; event?: string; cwd?: string; detail?: string | null }
@@ -72,6 +79,9 @@ async function readEvents(): Promise<Map<string, Ev>> {
     if (!last || Number.isNaN(at) || Date.now() - at > DAY) continue;
 
     const stops: number[] = [];
+    const prompts: Ev['prompts'] = [];
+    const reports: Ev['reports'] = [];
+    let said = '';
     let preset = 'quick';
     // What the session is waiting on the human with is the end of a turn, and only a prompt
     // answers it: an idle Notification after a Stop is the same question asked again, and one
@@ -82,24 +92,49 @@ async function readEvents(): Promise<Map<string, Ev>> {
       if (!line) continue;
       if (line.event === 'Stop') {
         stops.push(Date.parse(line.at ?? ''));
-        asks = line.detail ?? '';
+        asks = said = line.detail ?? '';
       }
-      if (line.event === 'UserPromptSubmit') asks = null;
+      if (line.event === 'UserPromptSubmit' || line.event === 'SubagentReport') {
+        asks = null;
+        // Lines from before the hook told the two apart: a notification's tag is its first word.
+        const report = line.event === 'SubagentReport' || (line.detail ?? '').startsWith('<task-notification>');
+        const text = report && line.event !== 'SubagentReport' ? 'a sub-agent reported back' : line.detail ?? '';
+        (report ? reports : prompts).push({ at: Date.parse(line.at ?? ''), text });
+      }
       if (line.event === 'SessionStart' && PRESETS.includes(line.detail ?? '')) preset = line.detail!;
     }
     const cwd = last.cwd ?? '';
     out.set(name.slice(0, -6), {
       session: name.slice(0, -6), cwd, real: await realpath(cwd).catch(() => cwd), at, event: last.event ?? '',
-      detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)), asks,
+      detail: last.detail ?? '', preset, stops: stops.filter((s) => !Number.isNaN(s)),
+      prompts: prompts.filter((p) => !Number.isNaN(p.at)), reports: reports.filter((r) => !Number.isNaN(r.at)), asks, said,
     });
   }
   return out;
 }
 
-/** What a session is asking the human, from the hook's own record of the turn that ended: the Stop
- *  carries the exact final message, where the tail carries the last text it happened to have read. */
-const asking = (ev: Ev | undefined, tail: Tail | null): string =>
-  ev?.asks == null ? '' : ev.asks || tail?.text || '';
+/** The final message of the turn that ended: the tail has it whole, the hook's Stop has it clipped. */
+const said = (ev: Ev | undefined, tail: Tail | null): string => tail?.text || ev?.said || '';
+
+/**
+ * What a session is asking the human. A turn that ended is not a question by itself, most final
+ * messages are statements: it asks when its last line ends in `?`, or when the turn put an
+ * AskUserQuestion to the human. Nothing while a sub-agent is still out.
+ */
+function asking(ev: Ev | undefined, tail: Tail | null): string {
+  if (ev?.asks == null || working(tail)) return '';
+  const text = said(ev, tail);
+  const lastLine = text.trim().split('\n').filter((l) => l.trim() !== '').at(-1) ?? '';
+  const since = turnStart(ev, Infinity) ?? 0;
+  const askedTool = tail?.activity.some((a) => a.verb === 'Ask' && a.at > since) ?? false;
+  return /\?\s*$/.test(lastLine) || askedTool ? text : '';
+}
+
+/** The role of a sub-agent the session still has out in the background, if any. */
+function working(tail: Tail | null): string | undefined {
+  const [agent] = tail?.running ?? [];
+  return agent === undefined ? undefined : tail?.agents.get(agent) ?? 'agent';
+}
 
 // ── steps ────────────────────────────────────────────────────────────────────
 
@@ -124,7 +159,7 @@ function stepRows(m: CoreMission, steps: WorkflowStep[], tail: Tail | null): Ste
         role,
         ...(state?.runs ? { runs: state.runs } : {}),
         ...(from ? { wall: to - from } : {}),
-        ...(from && tail ? { tokens: sumUsage(tail.usage, from, to) } : {}),
+        ...(from && tail ? { tokens: sumUsage(tail.usage, from, to, role, tail.agents) } : {}),
         ...(gateOpen ? { gateOpen } : {}),
       };
     });
@@ -207,12 +242,27 @@ export async function settle(): Promise<void> {
 /** `logged` is per session: two missions can name one — a closed one and its successor. */
 interface Ctx { activity: Activity[]; inbox: InboxItem[]; logged: Set<string> }
 
-/** Rows the log shows for one session: its transcript blocks plus the hook's Stop lines. */
+/** The tool calls a turn made: everything in the log between a prompt and its Stop that is not prose. */
+const TOOLS = new Set<Activity['verb']>(['Bash', 'Edit', 'Read', 'Agent', 'Ask', 'Tool']);
+
+/** When the turn that ended at `at` began: the last prompt or sub-agent report before it. */
+const turnStart = (ev: Ev, at: number): number | undefined =>
+  [...ev.prompts, ...ev.reports].map((t) => t.at).filter((t) => t <= at).sort((a, b) => a - b).at(-1);
+
+/** Rows the log shows for one session: its transcript blocks plus the hook's prompt and Stop lines.
+ *  A Stop row sums its turn — how long, how many tools — from the prompt that opened it. */
 function logRows(ctx: Ctx, tail: Tail | null, ev: Ev | undefined, session: string): void {
   if (session === '' || ctx.logged.has(session)) return;
   ctx.logged.add(session);
   if (tail) ctx.activity.push(...tail.activity);
-  for (const at of ev?.stops ?? []) ctx.activity.push({ at, session, verb: 'Stop', text: '' });
+  for (const { at, text } of ev?.prompts ?? []) ctx.activity.push({ at, session, verb: 'You', text });
+  for (const { at, text } of ev?.reports ?? []) ctx.activity.push({ at, session, verb: 'Agent', text: `↩ ${text}` });
+  for (const at of ev?.stops ?? []) {
+    const from = turnStart(ev!, at);
+    const tools = tail?.activity.filter((a) => TOOLS.has(a.verb) && a.at > (from ?? 0) && a.at <= at).length ?? 0;
+    const text = from === undefined ? '' : `turn ${dur(at - from)} · ${tools} tool${tools === 1 ? '' : 's'}`;
+    ctx.activity.push({ at, session, verb: 'Stop', text });
+  }
 }
 
 /** A stub's own words: the first paragraph under `## Why`, joined onto one line. */
@@ -233,10 +283,13 @@ async function missionRow(ctx: Ctx, project: string, dir: string, m: CoreMission
 
   const decisions = await readDecisions(m.dir);
 
-  logRows(ctx, tail, ev, state.session ?? '');
-  ctx.inbox.push(...(await waitItems(project, m, decisions)));
-  const asks = asking(ev, tail);
-  if (asks) ctx.inbox.push(question(project, state.name, `factory-${state.name}`, asks, ev!.at));
+  // A closed mission's session is history: what it asks now is its own row's, or the next mission's.
+  if (state.status !== 'closed') {
+    logRows(ctx, tail, ev, state.session ?? '');
+    ctx.inbox.push(...(await waitItems(project, m, decisions)));
+    const asks = asking(ev, tail);
+    if (asks) ctx.inbox.push(question(project, state.name, `factory-${state.name}`, asks, ev!.at));
+  }
 
   // A worktree mission's diff is counted where that mission's commits are.
   const diff = state.status === 'open' && state.branch ? diffCount(state.worktree || dir, state.branch) : undefined;
@@ -274,13 +327,17 @@ async function sessionRow(ctx: Ctx, project: string, ev: Ev): Promise<Session> {
   const asks = asking(ev, tail);
   if (asks) ctx.inbox.push(question(project, id(ev.session), ev.preset, asks, ev.at));
 
+  const agent = working(tail);
   return {
     id: ev.session,
+    ...(tail.title ? { name: tail.title } : {}),
+    // No hook fires between a prompt and its Stop: a prompt after the last Stop is a turn in flight.
+    busy: ev.asks === null || agent !== undefined,
+    ...(agent ? { agent } : {}),
     preset: ev.preset,
     cwd: ev.cwd,
-    idleSince: ev.at,
-    last: { at: ev.at, verb: ev.event, detail: ev.detail },
-    ...(asks ? { question: asks } : {}),
+    idleSince: ev.stops.at(-1) ?? ev.at,
+    ...(said(ev, tail) ? { said: said(ev, tail) } : {}),
   };
 }
 
@@ -290,8 +347,27 @@ const parts = async (dir: string): Promise<PartRow[]> =>
   (await scanProject(dir)).map((s) => ({
     name: s.part.name, type: s.part.type, description: s.part.description,
     status: s.status === 'installed' || s.status === 'modified' ? s.status : 'not-installed',
+    scope: s.part.scope, recommended: s.part.recommended,
     files: s.part.files.map((f) => f.target),
   }));
+
+/**
+ * The global row lists every part the Factory ships, the ones config turned `off` included: scope
+ * is chosen there, and a part nobody can see is a part nobody can turn back on. Only what resolves
+ * global has a status to read — the rest is somebody else's `.claude/`.
+ */
+async function globalParts(): Promise<PartRow[]> {
+  const scanned = new Map((await parts(home())).map((row) => [row.name, row]));
+  const inPlay = new Map((await loadParts()).map((p) => [p.name, p]));
+  return (await allParts()).map((part): PartRow => ({
+    name: part.name, type: part.type, description: part.description,
+    status: scanned.get(part.name)?.status ?? 'not-installed',
+    scope: inPlay.get(part.name)?.scope ?? 'off',
+    recommended: part.recommended,
+    ...(projectOnly(part) ? { projectOnly: true } : {}),
+    files: part.files.map((f) => f.target),
+  }));
+}
 
 interface Dir { dir: string; real: string }
 
@@ -327,8 +403,10 @@ export async function buildSnapshot(): Promise<Snapshot> {
     found.set(dir, [...live.map((m): [CoreMission, boolean] => [m, false]), ...archived.map((m): [CoreMission, boolean] => [m, true])]);
   }
 
-  // A session bound to any mission is that mission's row, never an unbound one of its own.
-  const bound = new Set([...found.values()].flatMap((ms) => ms.map(([m]) => m.state.session).filter((s) => s !== null)));
+  // A session bound to an open mission is that mission's row, never an unbound one of its own.
+  // A closed mission keeps its session id as a record; the session, if it lives on, is free.
+  const bound = new Set([...found.values()].flatMap((ms) =>
+    ms.filter(([m]) => m.state.status !== 'closed').map(([m]) => m.state.session).filter((s) => s !== null)));
   const ctx: Ctx = { activity: [], inbox: [], logged: new Set() };
   const projects: Project[] = [];
 
@@ -336,7 +414,8 @@ export async function buildSnapshot(): Promise<Snapshot> {
     const name = path.basename(dir);
     const missions: Mission[] = [];
     for (const [m, archived] of found.get(dir) ?? []) {
-      missions.push(await missionRow(ctx, name, real, m, m.state.session ? events.get(m.state.session) : undefined, archived));
+      const ev = m.state.session && m.state.status !== 'closed' ? events.get(m.state.session) : undefined;
+      missions.push(await missionRow(ctx, name, real, m, ev, archived));
     }
     const sessions: Session[] = [];
     for (const ev of events.values()) {
@@ -350,5 +429,5 @@ export async function buildSnapshot(): Promise<Snapshot> {
 
   ctx.inbox.sort((a, b) => a.at - b.at);
   ctx.activity.sort((a, b) => a.at - b.at);
-  return { projects, global: await parts(home()), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
+  return { projects, global: await globalParts(), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate() };
 }

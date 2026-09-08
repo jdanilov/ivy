@@ -61,14 +61,20 @@ export type PartType = 'skill' | 'tool' | 'fixture' | 'mcp';
 /** Where a part installs: into a project's `.claude/`, or into the user's own `~/.claude/`. */
 export type Scope = 'project' | 'global';
 
+/** What the machine's owner may choose per part in `~/.factory/config.yaml`: a scope, or nowhere. */
+export type ScopeChoice = Scope | 'off';
+
 /** A fragment merged into `.claude/settings.json`: string lists union, scalars overwrite. */
 export type Settings = Record<string, unknown>;
 
 export interface Part {
   name: string;
   type: PartType;
-  /** `global` parts belong to the user, not a project: no snippet, no recipes, no project root. */
+  /** Where it installs: the config's choice, else what `part.yaml` recommends.
+   *  `global` parts belong to the user, not a project: no snippet, no recipes, no project root. */
   scope: Scope;
+  /** What `part.yaml` says, the author's recommendation — the config overrides it, per machine. */
+  recommended: Scope;
   description: string;
   default: boolean;        // enabled by default in install menu
   files: PartFile[];
@@ -89,7 +95,7 @@ export type PartStatus = 'installed' | 'modified' | 'not-installed' | 'conflict'
 export interface PartState {
   part: Part;
   status: PartStatus;
-  files: Record<string, { exists: boolean; isSymlink: boolean; hashMatch: boolean }>;
+  files: Record<string, { exists: boolean; hashMatch: boolean }>;
 }
 
 export interface Manifest {
@@ -105,8 +111,8 @@ export interface Manifest {
 export interface ManifestPart {
   files: string[];
   hashes: Record<string, string>;
-  /** target -> source under the Factory root: what makes a file ours without asking the symlink.
-   *  Absent in manifests written before it existed, and those fall back to `readlink`. */
+  /** target -> source under the Factory root: where the copy came from, so a file the source has
+   *  changed since is still ours to overwrite or remove. Absent in manifests written before it. */
   sources?: Record<string, string>;
   hooks?: HookConfig[];
   mcp?: { serverName: string; config: object };

@@ -2,19 +2,19 @@ import path from 'node:path';
 import { access } from 'node:fs/promises';
 import { scanProject } from '../core/scanner.js';
 import { readManifest, writeManifest } from '../core/manifest.js';
-import { linkPart, injectHooks, injectMcp, injectSettings, hooksFileName, writeSnippet } from '../core/linker.js';
+import { copyPart, injectHooks, injectMcp, injectSettings, hooksFileName, writeSnippet } from '../core/linker.js';
 import { resolvePart, runInit } from '../core/recipes.js';
-import { FACTORY_ROOT, loadParts, withRequires } from '../core/registry.js';
+import { allParts, FACTORY_ROOT, loadParts, withRequires } from '../core/registry.js';
 import { existingProjects, scopeOf } from '../core/projects.js';
 import { checkEnvVars } from '../core/env.js';
 import { Refusal } from '../core/mission.js';
 import { selectParts, confirmOverwrite, confirmModified } from '../ui/prompts.js';
 import { I, nameCol, colors, symbols, statusColor, statusSymbol, statusLabel, displayName, pluralize, typeLabel } from '../ui/theme.js';
-import { printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
+import { partRow, printPartResult, printHookInfo, printSnippetInfo, formatEnvWarnings } from '../ui/format.js';
 
 /**
- * A part cannot be a project's and the user's at once: the same file linked twice would load twice.
- * The migration is `update` on each project, which unlinks what has become global, then this.
+ * A part cannot be a project's and the user's at once: the same file in both places loads twice.
+ * The migration is `update` on each project, which drops what has become global, then this.
  */
 async function noProjectHolds(names: string[]): Promise<void> {
   for (const name of names) {
@@ -81,6 +81,9 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     // A name the other scope owns is a wrong-command mistake, not a typo: say which command it is.
     const elsewhere = (await loadParts()).find((p) => unknown.includes(p.name));
     if (elsewhere) throw new Refusal(`${elsewhere.name} is a ${elsewhere.scope} part — factory install ${elsewhere.scope === 'global' ? '--global' : '<project>'}`);
+    // Off is a choice, not a typo: the fix is the file that holds it, not another command.
+    const off = (await allParts()).find((p) => unknown.includes(p.name));
+    if (off) throw new Refusal(`${off.name} is off in ~/.factory/config.yaml`);
     throw new Refusal(`no such part: ${unknown.join(', ')}`);
   }
   const asked = only.length === 0 && !yes;
@@ -105,7 +108,7 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     const ps = states.find((s) => s.part.name === name);
     if (ps && ps.status === 'conflict') {
       const conflictFiles = ps.part.files
-        .filter((f) => ps.files[f.target]?.exists && !ps.files[f.target]?.isSymlink)
+        .filter((f) => ps.files[f.target]?.exists && !ps.files[f.target]?.hashMatch)
         .map((f) => f.target);
 
       for (const file of conflictFiles) {
@@ -160,7 +163,7 @@ export async function install(targetDir: string, yes = false, only: string[] = [
 
   let newCount = 0;
   let updateCount = 0;
-  // An init recipe that fails leaves the part linked and the manifest written, so `update` retries it.
+  // An init recipe that fails leaves the part in place and the manifest written, so `update` retries it.
   let failure: unknown = null;
 
   for (const name of filteredNames) {
@@ -169,8 +172,13 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     const wasInstalled = ps.status === 'installed' || ps.status === 'modified';
     const previous = manifest.parts[name];
 
-    // Link files (create symlinks)
-    const manifestPart = await linkPart(part, resolvedDir, FACTORY_ROOT);
+    // Copy the files in: the project stands on its own, the manifest is the only link back.
+    const { entry: manifestPart, restored } = await copyPart(part, resolvedDir, FACTORY_ROOT, previous);
+
+    // `--yes` and `--parts` ask nothing, so a copy the project had edited is named here the way
+    // `update` names it; the interactive path already asked with confirmModified.
+    const named = !asked && restored.length > 0;
+    if (named) for (const file of restored) partRow(symbols.check, colors.green, displayName(part), `restored ${file}`);
 
     // Inject hooks if part has them
     if (part.hooks) {
@@ -205,9 +213,9 @@ export async function install(targetDir: string, yes = false, only: string[] = [
       newCount++;
     }
 
-    // Print result
+    // Print result. A restored part already has its row, and said more on it than a file list would.
     const suffix = wasInstalled ? ` ${colors.dim}(updated)${colors.reset}` : '';
-    printPartResult(part, { suffix });
+    if (!named) printPartResult(part, { suffix });
 
     if (part.hooks) {
       printHookInfo(hooksFileName(resolvedDir));

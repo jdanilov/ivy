@@ -34,7 +34,6 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
     let allExist = true;
     let anyExists = false;
     let allHashMatch = true;
-    let allSymlinks = true;
     let inManifest = manifest?.parts[part.name] != null;
 
     for (const pf of part.files) {
@@ -42,24 +41,16 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
       const sourcePath = path.join(FACTORY_ROOT, pf.source);
 
       let exists = false;
-      let isSymlink = false;
       let hashMatch = false;
 
-      try {
-        const stat = await lstat(targetPath);
+      if (await lstat(targetPath).catch(() => null)) {
         exists = true;
-        isSymlink = stat.isSymbolicLink();
-
-        if (exists) {
-          const targetHash = await hashFile(targetPath);
-          const sourceHash = await hashFile(sourcePath);
-          hashMatch = targetHash !== '' && sourceHash !== '' && targetHash === sourceHash;
-        }
-      } catch {
-        // file doesn't exist
+        const targetHash = await hashFile(targetPath);
+        const sourceHash = await hashFile(sourcePath);
+        hashMatch = targetHash !== '' && sourceHash !== '' && targetHash === sourceHash;
       }
 
-      fileStates[pf.target] = { exists, isSymlink, hashMatch };
+      fileStates[pf.target] = { exists, hashMatch };
 
       // A seeded template belongs to the project once it is there: present is installed, whatever it holds.
       if (pf.skipIfExists) {
@@ -72,7 +63,6 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
       else allExist = false;
 
       if (!hashMatch) allHashMatch = false;
-      if (!isSymlink) allSymlinks = false;
     }
 
     // MCP parts with no files: check manifest only
@@ -87,7 +77,8 @@ export async function scanProject(targetDir: string): Promise<PartState[]> {
       status = 'not-installed';
     } else if (allExist && allHashMatch) {
       status = 'installed';
-    } else if (anyExists && !inManifest && !allSymlinks) {
+    } else if (!inManifest) {
+      // Something of the project's own sits where a part we never installed would go.
       status = 'conflict';
     } else {
       status = 'modified';

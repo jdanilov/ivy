@@ -150,8 +150,14 @@ type Mode = 'auto' | 'on' | 'off';
 
 async function caffeinateMode(): Promise<Mode> {
   const raw = await readFile(CONFIG, 'utf-8').catch(() => '');
-  const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
-  return value === 'on' || value === 'off' ? value : 'auto';
+  try {
+    const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
+    return value === 'on' || value === 'off' ? value : 'auto';
+  } catch {
+    // A hand-broken config is no config, as `loadConfig` reads it: a parse throw here is swallowed
+    // by main() and the machine silently stops being held awake.
+    return 'auto';
+  }
 }
 
 async function caffeinateStart(session: string): Promise<void> {
@@ -393,18 +399,22 @@ async function main(): Promise<void> {
   const cwd = input.cwd ?? process.cwd();
   const mission = await bind(cwd, session).catch(() => null);
 
+  // A background sub-agent reports back as a prompt nobody typed: the bus names it what it is,
+  // the agent's return, so the log never shows the human saying `<task-notification>`.
+  const report = event === 'UserPromptSubmit' ? /<summary>Agent "([^"]*)" finished<\/summary>/.exec(input.prompt ?? '')?.[1] : undefined;
+
   // PostToolUse fires on every Agent result: logging it would drown the bus for one line of context.
   if (event !== 'PostToolUse') {
     await mkdir(EVENTS, { recursive: true });
     const line = {
       at: new Date().toISOString(),
-      event,
+      event: report === undefined ? event : 'SubagentReport',
       session,
       pid: await claudePid(),
       cwd,
       mission: mission?.name ?? null,
       step: mission?.step ?? null,
-      detail: detailOf(event, input),
+      detail: report ?? detailOf(event, input),
     };
     await appendFile(path.join(EVENTS, `${session}.jsonl`), `${JSON.stringify(line)}\n`);
   }

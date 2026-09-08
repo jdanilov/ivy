@@ -3,8 +3,8 @@
 set -euo pipefail
 
 FACTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# macOS mktemp hands back /var/folders/..., a symlink to /private/var/...; the linker
-# builds relative symlink targets, so a logical path leaves every link dangling.
+# macOS mktemp hands back /var/folders/..., which resolves to /private/var/...; a project is
+# compared against the path it really has, so the logical one is no good here.
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 REPO="$TMP/repo"
 export HOME="$TMP/home"
@@ -31,10 +31,12 @@ mkdir -p "$HOME"
 repo "$REPO"
 
 f install "$REPO" --yes
-[ -L "$REPO/.claude/skills/mission/skill.md" ] || die 'install left no symlink'
-[ -e "$REPO/.claude/skills/mission/skill.md" ] || die 'install left a dangling symlink'
+[ -f "$REPO/.claude/skills/mission/skill.md" ] || die 'install left no file'
+[ ! -L "$REPO/.claude/skills/mission/skill.md" ] || die 'install left a link into the Factory'
 [ ! -e "$REPO/.claude/skills/commit" ] || die 'a global part landed in a project'
 grep -q 'Docs format: @.claude/docs-format.md' "$REPO/AGENTS.md" || die 'install wrote no snippet'
+# Plain untracked files: what a repo without the Factory on the machine would see committed.
+git -C "$REPO" status --porcelain | grep -q '^?? \.claude/' || die 'install left no plain untracked files'
 git -C "$REPO" add -A && git -C "$REPO" commit -qm 'install factory'
 
 # A mission only runs in a project ~/.factory/projects knows: that is what sandboxes a scratch HOME.
@@ -110,12 +112,15 @@ f uninstall "$REPO" --yes
 
 # The user's own parts: home dir, one settings.json for hooks and allow list, no project involved.
 fin "$TMP" install --global --yes
-[ -L "$HOME/.claude/skills/commit/skill.md" ] || die 'install --global left no symlink'
+[ -f "$HOME/.claude/skills/commit/skill.md" ] || die 'install --global left no file'
+[ ! -L "$HOME/.claude/skills/commit/skill.md" ] || die 'install --global left a link into the Factory'
 [ -e "$HOME/.claude/.factory-manifest.json" ] || die 'install --global wrote no manifest'
 grep -q '\$HOME/.claude/scripts/safe-bash.sh' "$HOME/.claude/settings.json" || die '${root} did not resolve to $HOME'
 [ ! -e "$HOME/.claude/settings.local.json" ] || die 'a settings.local.json at user level'
 ! grep -q "$HOME" "$HOME/.factory/projects" || die 'the home dir landed in the projects list'
 says "$TMP" status --global | grep -q '5 installed' || die 'status --global does not read the parts back'
+# One run over every registered project and then the home dir, with no positional and no picker.
+says "$TMP" update --all | grep -q 'All done' || die 'update --all did not walk the projects and the home dir'
 fin "$TMP" uninstall --global --yes
 [ ! -e "$HOME/.claude" ] || die 'uninstall --global left the home .claude behind'
 

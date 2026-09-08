@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
-import { applyParts, archive, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
+import { applyParts, applyScopes, archive, killSession, openTab, setAutonomy, setCaffeinate } from './actions.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import { clamp, itemKey, leftItems, select } from './panes/pane.js';
-import { changes, partStatus, pending } from './panes/parts.js';
+import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { act, draw, toast, type App } from './screen.js';
 import type { Autonomy, Caffeinate, Mission, Project } from './model.js';
 
@@ -46,16 +46,20 @@ function handleKey(app: App, key: KeyEvent): void {
   const { items, here } = select(snap, ui);
   const right = ui.focus === 'right';
   const inMessages = right && here.kind === 'inbox';
-  const inParts = right && (here.kind === 'project' || here.kind === 'global');
+  const inGlobal = here.kind === 'global';
+  const inParts = right && (here.kind === 'project' || inGlobal);
   const inMission = right && here.kind === 'mission';
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);
 
   if (inParts && ui.confirm) {
     if (key.name === 'y') {
+      const scopes = scopeChanges(here.project, ui);
       const { add, drop } = changes(here.project, ui);
+      const count = inGlobal ? scopes.length : add.length + drop.length;
       ui.toggles = {};
       ui.confirm = false;
-      return act(app, `applying ${add.length + drop.length} change(s)…`, () => applyParts(here.project.path, add, drop));
+      return act(app, `applying ${count} change(s)…`, () =>
+        inGlobal ? applyScopes(scopes) : applyParts(here.project.path, add, drop));
     }
     if (key.name === 'n' || key.name === 'escape') ui.confirm = false;
     return draw(app);
@@ -79,20 +83,21 @@ function handleKey(app: App, key: KeyEvent): void {
       break;
     case 'escape':
       // Esc is the way out of a set of toggles nobody applied; a second one leaves the pane.
-      if (inParts && pending(here.project, ui).length > 0) ui.toggles = {};
+      if (inParts && pending(here.project, ui, inGlobal).length > 0) ui.toggles = {};
       else ui.focus = 'left';
       break;
     case 'space':
       if (inParts) {
         const part = here.project.parts[ui.part];
-        if (part) ui.toggles[part.name] = partStatus(part.name, part.status, ui) !== 'installed';
+        // The global row picks where a part lives, a project row whether it is installed here.
+        if (part) ui.toggles[part.name] = inGlobal ? nextScope(part, ui) : partStatus(part.name, part.status, ui) !== 'installed';
       }
       break;
     case 'return': {
       // Every message is answered in the session that raised it; the row says which command.
       if (inMessages) return;
       if (inParts) {
-        if (!pending(here.project, ui).length) return;
+        if (!pending(here.project, ui, inGlobal).length) return;
         ui.confirm = true;
         break;
       }

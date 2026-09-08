@@ -39,6 +39,12 @@ undershoots these values on screen but the hierarchy holds.
 
 - Header row: brand glyph and product name pinned left, path or workflow name next, metrics
   right-aligned on the same line (`TIME 56m 54s · Input 324.0K · Cached 16.8M · Output 111.0K`).
+  `Input` is what the turns added, cache writes included; `Cached` is what they re-read. A graph
+  row's tokens are input plus output, so two steps compare and a late one is not heavier by
+  its history. A row counts its own runner's turns: the session's for an orchestrator step, the
+  sub-agent's for a worker or gatekeeper one, read from the `subagents/` files beside the
+  transcript and matched to a role through the Agent call that spawned it. The mission total
+  counts everyone.
   Thin separator rule directly below.
 - Status bar: state dot and word left (`● RUNNING`), a two-tone progress bar (olive fill, `#404040`
   track) filling the middle, fraction and queued count right (`3/17 [+6]`).
@@ -103,17 +109,28 @@ in its `intent.md` where the steps would be: two stubs differ by what they are f
 
 Every open gate, waiting decision and waiting question across all projects, keyed
 `project/origin/label`. Each names the session command that answers it; a question names the tab
-that owns it. A key the last snapshot did not have rings the terminal bell and Warp's own
+that owns it. A turn that ended is a question only when its final message's last line ends in
+`?` or the turn put an AskUserQuestion to the human: most final messages are statements, and a
+statement rings nobody. A closed mission raises nothing: its session id is a record, and the
+session, if it still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
 `777;notify`. Messages, the right pane over it, shows the selected item's body and that command.
 
 ### The foot: DECISIONS
 
-One row per decision of whatever the left column has selected — a mission, a project, or every
-project on the Inbox row — newest last, the mission column present only when more than one is in
-scope. A decision is a fork an agent took; the screen never answers one.
+One row per decision of whatever the left column has selected — a mission, a project's open
+missions, or every open mission on the Inbox row — newest last, the mission column present only
+when more than one is in scope. A closed mission's decisions are its record: select it to read
+them. A decision is a fork an agent took; the screen never answers one.
 
 ACTIVITY is read from Claude Code's transcripts — `Bash`, `Edit`, `Read`, `Agent`, `Ask`, `Text`,
-`Tool` — plus the hook's `Stop`, newest last.
+`Tool` — plus the hook's own two rows, `You` for each prompt and `Stop` for each turn's end,
+newest last. A background sub-agent reporting back arrives as a prompt nobody typed; the hook logs
+it as `SubagentReport` and the row reads `Agent ↩ <what it was asked>`, never as `You`. A turn
+then reads as it happened: prompt, tools, the model's words, stop. A `Bash`
+row is the tool's description, what the model said it was doing, and only falls back to the
+command; an `Agent` row is `<type> · <description>`; a `Stop` row sums its turn, `turn 2m 38s ·
+5 tools`. Words — `You`, `Text`, `Ask` — are bright, tooling dim, `Edit` green as a change. A row
+wraps under its text column to two lines and no more.
 
 A row is the verdict, the id and the decision itself. The step, the agent and the confidence that
 filed it are in `decisions.md`; on screen they cost the columns the summary needs, and the verdict
@@ -135,12 +152,25 @@ its own column, so a row copies whole into the session that answers it.
 | `overruled` | `✗`   | error red     | bright, the note follows the summary        |
 | `auto`      | `✓`   | dim label     | dim: settled by the dial, not by a human    |
 
-PARTS wraps its descriptions the same way, under the description column. A graph row in MISSION
-ends in two right-aligned columns, tokens then wall time, so the numbers read down the pane, and a
-step the mission looped back to carries a dim `×N` after its name. Under the facts, a DEVIATIONS
-sub-panel gives each entry its own wrapped line, and is absent at zero. A session under a project
-is named `session · <preset>`, never by its preset alone, and the `no missions` hint is absent
-while a session is standing there.
+PARTS wraps its descriptions the same way, under the description column. On the `Global` row the
+status column is the scope, because scope is chosen there and nowhere else: one word, `project`,
+`global` or `off`, `●` for a part that is going somewhere and `○` for one that is not, success
+while a global part is in `~/.claude`, warning while it is not there yet or its copy has drifted,
+dim for `project` and `off`. A status word beside it would say the same thing twice, so there is
+none and the description keeps the rest of the row; under the rule the selected part names its
+recommendation before its files. The rule and the lines under it keep the pane's bottom however
+long the list is, and the list is what a short terminal loses, clipped around the row the
+selection sits on: `↵` asks for a `Y` on the apply line, and an apply line drawn past the foot is
+one nobody can read. A graph row in MISSION ends in two right-aligned columns, tokens
+then wall time, so the numbers read down the pane, and a step the mission looped back to carries a
+dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each entry its own wrapped
+line, and is absent at zero. A session under a project is named by what `--name` or `/rename`
+called it, else by its id, then `· <preset>`, never by its preset alone: two quick sessions must
+not read the same. The `no missions` hint is absent while a session is standing there. A session
+is `● working` from its prompt to its Stop — no hook fires in between, so the last event's age
+says nothing — and `● working · <role>` while a sub-agent is out in the background; then the
+turn that ended is not a question, and the Inbox lists it only once the last sub-agent has
+reported back. `○ idle <since its last Stop>` otherwise.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.
@@ -182,7 +212,7 @@ keys do, and none of these three do the same thing.
 | `↵`     | any              | open the selection, or apply what Parts has pending              |
 | `←`     | right            | back to the left pane                                            |
 | `esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
-| `Space` | Parts            | toggle a part                                                    |
+| `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
 | `Y`     | Parts            | confirm the apply                                                |
 | `N`     | Parts            | cancel it                                                        |
 | `R`     | Parts            | reset the toggles                                                |

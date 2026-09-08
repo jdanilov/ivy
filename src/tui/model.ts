@@ -3,9 +3,9 @@
 import type { Caffeinate } from '../core/config.js';
 import { stepRole } from '../core/workflow.js';
 import type { Decision } from '../core/decision.js';
-import type { WorkflowStep } from '../types.js';
+import type { ScopeChoice, Scope, WorkflowStep } from '../types.js';
 
-export type { Caffeinate, Decision };
+export type { Caffeinate, Decision, Scope, ScopeChoice };
 
 export type RunState = 'pending' | 'running' | 'done' | 'blocked' | 'skipped';
 
@@ -43,17 +43,11 @@ export interface StepRow {
   gateOpen?: boolean;
 }
 
-export interface EventRow {
-  at: number;
-  verb: string;
-  detail: string;
-}
-
 /** One line of a session's progress log. Wiring reads these from Claude Code's transcript jsonl. */
 export interface Activity {
   at: number;
   session: string;
-  verb: 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Tool' | 'Stop';
+  verb: 'You' | 'Bash' | 'Edit' | 'Read' | 'Agent' | 'Text' | 'Ask' | 'Tool' | 'Stop';
   text: string;
 }
 
@@ -93,11 +87,18 @@ export interface Mission {
 /** A session known through hook events with no mission bound to it. */
 export interface Session {
   id: string;
+  /** What `--name` or `/rename` called it; absent, the row shows the id. */
+  name?: string;
+  /** A turn in progress: a prompt after the last Stop, or a sub-agent still out in the background. */
+  busy: boolean;
+  /** The role of the sub-agent out in the background, when that is what keeps it busy. */
+  agent?: string;
   preset: string;
   cwd: string;
+  /** When its last turn ended. Meaningless while busy. */
   idleSince: number;
-  last?: EventRow;
-  question?: string;
+  /** The final message of its last turn, a statement or a question alike. */
+  said?: string;
 }
 
 export interface PartRow {
@@ -105,6 +106,11 @@ export interface PartRow {
   type: string;
   description: string;
   status: 'installed' | 'not-installed' | 'modified';
+  /** Where the machine has it: the config's choice, else what the part recommends. */
+  scope: ScopeChoice;
+  recommended: Scope;
+  /** Global row only: a part with a snippet or recipes has no global choice to cycle to. */
+  projectOnly?: boolean;
   files: string[];
 }
 

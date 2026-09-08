@@ -14,7 +14,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', 'T', 'Autonomy full → partial → none'], ['', 'H', 'Archive a closed mission, or bring it back'],
   ['', 'Z', 'Show the archived ones'],
   ['Messages', '↑↓', 'Read what waits — every one answers in its session'],
-  ['Parts', 'Space', 'Toggle a part'], ['', 'Y', 'Confirm the apply'],
+  ['Parts', 'Space', 'Toggle a part; on Global, cycle its scope'], ['', 'Y', 'Confirm the apply'],
   ['', 'N', 'Cancel it'], ['', 'R', 'Reset the toggles'],
   ['Foot', 'D', 'Decisions, the forks this mission took'], ['', 'A', 'Activity, what its session did'],
   ['', 'F', 'Either at full height, ↑↓ scrolls'],

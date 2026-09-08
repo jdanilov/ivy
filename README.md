@@ -5,7 +5,8 @@
 - Factory manages an extendable set of `skills`, `tools`, `hooks` and `MCPs` for a fast, practical
   SDLC with Claude Code.
 - One command installs them into any project, one updates, one removes.
-- Parts are symlinked, so updating the Factory updates every connected project.
+- Parts are copied in, so a project stands on its own; `update --all` carries a Factory change to
+  every connected project.
 
 ![Factory status view](docs/factory-screenshot.png)
 
@@ -22,9 +23,10 @@ bun start                                # interactive: pick a command and a pro
 bun src/cli.ts <command> [args]          # or run a command directly
 ```
 
-Parts are symlinked into the project's `.claude/`. `.claude/.factory-manifest.json` records SHA-256
-hashes, so local modifications are visible and uninstall removes only what the Factory added. Recent
-projects live in `~/.factory/projects`.
+Parts are copied into the project's `.claude/`, so it can be committed and read on a machine without
+the Factory. `.claude/.factory-manifest.json` records SHA-256 hashes, so local modifications are
+visible, `update` restores them and uninstall removes only what the Factory added. Recent projects
+live in `~/.factory/projects`.
 
 ## Commands
 
@@ -36,11 +38,12 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `factory`                                      | Open Mission Control: every project, mission, session and open gate         |
 | `factory menu`                                 | The interactive picker: a command, then a project                           |
 | `factory --fixture`, `factory --frames <dir>`  | Draw the demo snapshot; write the screen as text and exit, with no terminal |
-| `install [project]`                            | Pick parts and symlink them into the project's `.claude/`                   |
+| `install [project]`                            | Pick parts and copy them into the project's `.claude/`                      |
 | `install [project] --parts a,b`                | Install exactly those parts and what they require, no menu, no confirm      |
 | `uninstall [project]`                          | Pick installed parts and take their files, hooks and settings back out      |
 | `status [project]`                             | What is installed, modified, in conflict or skipped, plus open missions     |
-| `update [project] [--skip a,b]`                | Relink parts, add new defaults, drop retired ones, leave `--skip` alone     |
+| `update [project] [--skip a,b]`                | Rewrite the copies, add defaults, drop retired ones, leave `--skip` alone   |
+| `update --all`                                 | Every registered project, then `~/.claude/`, in one run                     |
 | `install\|uninstall\|status\|update --global`  | The same four over `~/.claude/`, on the parts marked `scope: global`        |
 | `mission new <name> [--autonomy L]`            | Create the folder, the `intent` workflow copy, `state.json`, branch, claim  |
 | `mission new <name> --stub \| --quick`         | Intent skeleton with no branch, or the one-step `quick` workflow            |
@@ -94,9 +97,10 @@ that raised them; the screen shows the command and records nothing itself.
 Agents ship beside the skill that spawns them: `Worker`, `Investigator`, `Summarizer` with
 `/mission`, `Verifier` with `/verify`, `Validator` with `/validate`, `Commit` with `/commit`.
 
-`/commit`, `/explain`, `/research`, `permissions` and `hook-safe-bash` carry `scope: global`: they
-are the user's, not a project's. `factory install --global` links them into `~/.claude/`, where every
-session on the machine reads them, and no project command ever lists them.
+`/commit`, `/explain`, `/research`, `permissions` and `hook-safe-bash` recommend `scope: global`:
+they are the user's, not a project's. `factory install --global` copies them into `~/.claude/`, where
+every session on the machine reads them, and no project command ever lists them — until `parts:` in
+`~/.factory/config.yaml` says otherwise.
 
 | Type        | Prefix | What it is                                                         |
 |-------------|--------|--------------------------------------------------------------------|
@@ -115,12 +119,17 @@ that grows with every retro is a pointer, not something to pull into every conte
 already names the same path has that line rewritten in place, and gets it back on uninstall. A part
 may also declare `recipes.init` and `recipes.uninit`, shell lines run once in the project root when
 the part arrives and leaves, and `vars` defaults for `${name}` used in its hooks, MCP command and
-recipes. `~/.factory/config.yaml` overrides a var for the whole machine:
+recipes. `~/.factory/config.yaml` holds what this machine decides for every project: a var
+override, and under `parts:` where each part installs — `project`, `global` or `off` — over the
+scope its `part.yaml` recommends.
 
 ```yaml
 vars:
   codegraph: codegraph      # a local build on PATH instead of the pinned npx default
   archify: ~/src/archify    # a local clone instead of the upstream GitHub URL
+parts:
+  commit: "project"         # the author recommends global; this machine wants it per project
+  research: "off"           # installed nowhere, and update takes it back out
 ```
 
 `archify` is that shape: it ships no files, its `init` clones `${archify}` into

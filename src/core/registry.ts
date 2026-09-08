@@ -2,6 +2,7 @@ import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import type { EnvVar, HookConfig, HookEvent, McpConfig, Part, PartFile, PartType, Recipes, Scope, Snippet } from '../types.js';
 import { HOOK_EVENTS } from '../types.js';
+import { loadConfig } from './config.js';
 
 // Resolve FACTORY_ROOT from this file's location: src/core/ -> project root
 export const FACTORY_ROOT = path.resolve(import.meta.dir, '..', '..');
@@ -10,8 +11,11 @@ const TYPES: PartType[] = ['skill', 'tool', 'fixture', 'mcp'];
 
 let cache: Part[] | null = null;
 
-/** Load every parts/<name>/part.yaml. Folders without a part.yaml are not parts. */
-export async function loadParts(): Promise<Part[]> {
+/**
+ * Every part as its `part.yaml` declares it: `scope` the author's recommendation, nothing dropped.
+ * Only the PARTS pane wants this — everywhere else a part is what the machine chose it to be.
+ */
+export async function allParts(): Promise<Part[]> {
   if (cache) return cache;
 
   const dir = path.join(FACTORY_ROOT, 'parts');
@@ -32,6 +36,34 @@ export async function loadParts(): Promise<Part[]> {
 
   cache = parts;
   return parts;
+}
+
+/**
+ * The parts in play: `parts:` in `~/.factory/config.yaml` overrides the recommended scope, and a
+ * part turned `off` is simply not here — so `install`, `update`, `status` and the panes read one
+ * resolved scope and nothing downstream learns a second rule.
+ */
+export async function loadParts(): Promise<Part[]> {
+  const choices = (await loadConfig()).parts ?? {};
+  return (await allParts()).flatMap((part) => {
+    const choice = choices[part.name];
+    if (choice === 'off') return [];
+    // `global` on a part that needs a project root is not a choice the machine gets to make: the
+    // recommendation stands, the same invariant `part.yaml` is refused for.
+    const scope = choice === 'global' && projectOnly(part) ? part.recommended : choice;
+    return [scope === undefined || scope === part.scope ? part : { ...part, scope }];
+  });
+}
+
+/** A snippet needs an `AGENTS.md` and a recipe a directory to run in: the home dir has neither. */
+export function projectOnly(part: Part): boolean {
+  return part.snippet !== undefined || part.recipes !== undefined;
+}
+
+/** Parts whose config `global` `loadParts` could not honour, for a reader that says so out loud. */
+export async function ignoredScopes(): Promise<string[]> {
+  const choices = (await loadConfig()).parts ?? {};
+  return (await allParts()).filter((p) => choices[p.name] === 'global' && projectOnly(p)).map((p) => p.name);
 }
 
 /**
@@ -78,8 +110,6 @@ async function parsePart(name: string, raw: unknown): Promise<Part> {
 
   const scope = (raw.scope ?? 'project') as Scope;
   if (scope !== 'project' && scope !== 'global') fail('scope must be project or global');
-  // Nothing global has a project root: no agent file to write a line in, no directory to run in.
-  if (scope === 'global' && (raw.snippet !== undefined || raw.recipes !== undefined)) fail('a global part can have neither a snippet nor recipes');
 
   const files: PartFile[] = [];
   for (const f of raw.files as unknown[]) {
@@ -100,7 +130,7 @@ async function parsePart(name: string, raw: unknown): Promise<Part> {
     files.push({ source: path.join('parts', name, source), target, ...extra });
   }
 
-  const part: Part = { name, type, scope, description: raw.description, default: raw.default, files };
+  const part: Part = { name, type, scope, recommended: scope, description: raw.description, default: raw.default, files };
 
   if (raw.hooks !== undefined) {
     if (!Array.isArray(raw.hooks)) fail('hooks must be a list');
@@ -176,6 +206,9 @@ async function parsePart(name: string, raw: unknown): Promise<Part> {
       return { name: v.name, description: v.description, url: v.url };
     });
   }
+
+  // Nothing global has a project root: no agent file to write a line in, no directory to run in.
+  if (part.scope === 'global' && projectOnly(part)) fail('a global part can have neither a snippet nor recipes');
 
   return part;
 }

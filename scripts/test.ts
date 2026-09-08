@@ -2,12 +2,13 @@
 // The e2e walk in one process: the commands and core functions imported, not spawned. One line per
 // case, non-zero when any of them fails. `scripts/e2e.sh` stays as the black-box check.
 import path from 'node:path';
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 // The scratch HOME lands before any module that reads it loads. `$TMPDIR` is honoured, so a caller
 // with a slow temp folder can point the whole run somewhere small. Resolved, because macOS hands
-// back a symlink and the linker builds relative symlink targets a logical path leaves dangling.
+// back `/var/folders/...` for `/private/var/folders/...` and a project is compared against the
+// path it really has.
 const TMP = await realpath(await mkdtemp(path.join(tmpdir(), 'factory-test-')));
 process.env.HOME = path.join(TMP, 'home');
 
@@ -24,8 +25,9 @@ await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
 await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
 
 const { install } = await import('../src/commands/install.js');
-const { scanProject } = await import('../src/core/scanner.js');
-const { update } = await import('../src/commands/update.js');
+const { status } = await import('../src/commands/status.js');
+const { hashFile, scanProject } = await import('../src/core/scanner.js');
+const { update, updateAll } = await import('../src/commands/update.js');
 const { uninstall } = await import('../src/commands/uninstall.js');
 const { step } = await import('../src/commands/step.js');
 const { gate } = await import('../src/commands/gate.js');
@@ -35,14 +37,24 @@ const { mission } = await import('../src/commands/mission.js');
 const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission, writeState } = await import('../src/core/mission.js');
 const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
-const { dependants, loadParts } = await import('../src/core/registry.js');
+const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
+const { loadConfig, resetConfig, writePartScope } = await import('../src/core/config.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
 const exists = (p: string): Promise<boolean> => Bun.file(p).exists();
 const alive = (pid: number): boolean => { try { return process.kill(pid, 0); } catch { return false; } };
 const branchGone = async (dir: string, b: string): Promise<boolean> => (await git(dir, 'branch', '--list', b)) === '';
+
+/** What a command printed, for a case that asserts on the report and not only on the disk. */
+async function printed(fn: () => Promise<void>): Promise<string> {
+  const log = console.log;
+  const lines: string[] = [];
+  console.log = (...args: unknown[]) => { lines.push(args.join(' ')); };
+  try { await fn(); } finally { console.log = log; }
+  return lines.join('\n');
+}
 
 /** The commands talk to a human; a case only cares about what they left behind. */
 async function check(name: string, fn: () => Promise<void>): Promise<void> {
@@ -98,13 +110,20 @@ async function worktreePair(order: string[]): Promise<void> {
 
 const main = await repo('main');
 
-await check('install --yes links, snippets and records every source', async () => {
+await check('install --yes copies, snippets and records every source', async () => {
   await install(main, true);
   ok(await exists(path.join(main, '.claude/skills/mission/skill.md')), 'no mission skill');
   ok((await Bun.file(path.join(main, 'AGENTS.md')).text()).includes('@.claude/docs-format.md'), 'no snippet');
   const manifest = await readManifest(main);
   ok(manifest?.parts.mission?.sources?.['.claude/skills/mission/skill.md'] === 'parts/mission/skill.md', 'no source recorded');
   ok(!manifest?.parts.commit, 'a global part landed in a project');
+
+  // Nothing the project keeps may point back at this checkout: a plain file is the whole contract.
+  for (const [name, entry] of Object.entries(manifest!.parts)) {
+    for (const file of entry.files) {
+      ok((await lstat(path.join(main, file))).isFile(), `${name} put something other than a regular file at ${file}`);
+    }
+  }
 });
 
 await check('resolvePart expands the hooks shorthand and roots it in the project', async () => {
@@ -387,28 +406,32 @@ await check('a session asks with its last Stop, and only a prompt clears it', as
   const dir = await repo('asks');
   const session = 'Q';
   const at = (back: number): string => new Date(Date.now() - back * 60_000).toISOString();
+  const final = 'Reply sent, thread labeled DONE. Anything else?';
 
   // The shape H-7 came off: a skill preamble is a user record, and it is the last text on file.
+  // The turn ends on a question, which is the only shape that reaches the Inbox as one.
   const file = transcriptPath(dir, session);
   await mkdir(path.dirname(file), { recursive: true });
   const said = (type: string, text: string, back: number): string =>
     `${JSON.stringify({ type, timestamp: at(back), message: { id: `${type}${back}`, content: [{ type: 'text', text }] } })}\n`;
-  await writeFile(file, said('assistant', 'An earlier turn', 30) + said('user', 'Base directory for this skill', 20));
+  await writeFile(file, said('assistant', 'An earlier turn', 30)
+    + said('assistant', final, 20)
+    + said('user', 'Base directory for this skill', 15));
 
   const events = path.join(process.env.HOME!, '.factory', 'events', `${session}.jsonl`);
   await mkdir(path.dirname(events), { recursive: true });
   const logged = (event: string, detail: string | null, back: number): string =>
     `${JSON.stringify({ at: at(back), event, session, cwd: dir, mission: null, step: null, detail })}\n`;
   await writeFile(events, logged('Stop', 'An earlier turn', 8) + logged('UserPromptSubmit', 'carry on', 6)
-    + logged('Stop', 'Reply sent, thread labeled DONE', 2));
+    + logged('Stop', final, 2));
 
   const asks = async (): Promise<string[]> =>
     (await buildSnapshot()).inbox.filter((i) => i.kind === 'question' && i.project === 'asks').map((i) => i.text ?? '');
-  ok((await asks()).join() === 'Reply sent, thread labeled DONE', `asks reads ${(await asks()).join() || 'nothing'}`);
+  ok((await asks()).join() === final, `asks reads ${(await asks()).join() || 'nothing'}`);
 
   // An idle notification is the same question asked again, not a second one.
   await writeFile(events, logged('Notification', 'idle_prompt: waiting for your input', 1), { flag: 'a' });
-  ok((await asks()).join() === 'Reply sent, thread labeled DONE', 'an idle notification changed the question');
+  ok((await asks()).join() === final, 'an idle notification changed the question');
 
   await writeFile(events, logged('UserPromptSubmit', 'answered', 0), { flag: 'a' });
   ok((await asks()).length === 0, 'answering did not clear the question');
@@ -420,6 +443,90 @@ await check('writeSnippet and removeSnippet round trip', async () => {
   ok((await Bun.file(path.join(main, record.file)).text()).includes(snippet.line), 'line not written');
   ok(await removeSnippet(record, main), 'line not removed');
   ok(!(await Bun.file(path.join(main, record.file)).text()).includes('## Scratch'), 'section left behind');
+});
+
+await check('update replaces a link into the Factory with a copy and leaves the source alone', async () => {
+  const file = '.claude/skills/mission/skill.md';
+  const target = path.join(main, file);
+  const source = path.join(FACTORY_ROOT, 'parts/mission/skill.md');
+  const before = await hashFile(source);
+
+  await unlink(target);
+  await symlink(source, target);
+  await update(main);
+
+  ok((await lstat(target)).isFile(), 'the link is still a link');
+  ok((await hashFile(source)) === before, 'writing the copy edited the Factory source');
+  ok((await hashFile(target)) === before, 'the copy does not hold the source bytes');
+});
+
+await check('an edited copy reads modified and update restores it by name', async () => {
+  const file = '.claude/skills/mission/skill.md';
+  const target = path.join(main, file);
+  const source = await Bun.file(target).text();
+  await writeFile(target, source + '\nedited by the project\n');
+
+  const state = (await scanProject(main)).find((s) => s.part.name === 'mission')!;
+  ok(state.status === 'modified', `an edited copy reads ${state.status}`);
+
+  const report = await printed(() => update(main));
+  ok(report.includes(`restored ${file}`), `update did not name what it restored: ${report}`);
+  ok((await Bun.file(target).text()) === source, 'update did not put the source bytes back');
+});
+
+await check('uninstall leaves an edited copy, names it and removes the rest', async () => {
+  const dir = await repo('edited');
+  await install(dir, false, ['verify']);
+  const mine = path.join(dir, '.claude/skills/verify/skill.md');
+  await writeFile(mine, 'mine now\n');
+
+  // The report's removal block only: the listing above it names every file the part ships.
+  const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
+  ok(await exists(mine), 'uninstall took a copy the project had edited');
+  ok(report.includes('left in place: .claude/skills/verify/skill.md'), `uninstall did not name it: ${report}`);
+  ok(report.split('.claude/skills/verify/skill.md').length === 2, `a file was named both removed and left: ${report}`);
+  ok(!(await exists(path.join(dir, '.claude/agents/Verifier.md'))), 'an untouched copy was left behind');
+});
+
+await check('uninstall takes no credit for a part it left where it was', async () => {
+  const dir = await repo('kept');
+  await install(dir, false, ['verify']);
+  const files = ['.claude/skills/verify/skill.md', '.claude/agents/Verifier.md'];
+  for (const file of files) await writeFile(path.join(dir, file), 'mine now\n');
+
+  const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
+  ok(files.every((f) => report.split(f).length === 2), `a file was named twice or not at all: ${report}`);
+  ok(!report.includes('removed .claude/'), `uninstall claimed a file it never removed: ${report}`);
+  ok(report.includes('0 parts removed'), `the summary counted a part it left: ${report}`);
+});
+
+await check('a directory at a target is the project\'s: refused on the way in, named on the way out', async () => {
+  const dir = await repo('dirtarget');
+  await install(dir, false, ['verify']);
+  const file = '.claude/agents/Verifier.md';
+  await unlink(path.join(dir, file));
+  await mkdir(path.join(dir, file));
+
+  const refused = await update(dir).then(() => null, (e: Error) => e);
+  ok(refused?.message === `${path.join(dir, file)} is a directory — move it aside and rerun`,
+    `update did not refuse the directory: ${refused?.message ?? 'none'}`);
+
+  const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
+  ok(await lstat(path.join(dir, file)).then(() => true, () => false), 'uninstall took a directory of the project\'s');
+  ok(report.includes(`left in place: ${file}`), `uninstall did not name it: ${report}`);
+});
+
+await check('install names an edited copy it had to restore when nobody was asked', async () => {
+  const dir = await repo('clobber');
+  await install(dir, false, ['verify']);
+  const file = '.claude/skills/verify/skill.md';
+  await writeFile(path.join(dir, file), 'mine now\n');
+
+  const report = await printed(() => install(dir, false, ['verify']));
+  const done = report.split('Installing')[1]!;
+  ok(done.includes(`restored ${file}`), `install clobbered an edited copy in silence: ${report}`);
+  const rows = done.split('\n').filter((l) => l.includes('/verify'));
+  ok(rows.length === 1, `install named the part it restored on more than one row: ${rows.join(' | ')}`);
 });
 
 await check('update reinstalls a part its dependant requires', async () => {
@@ -658,6 +765,23 @@ await check('uninstall takes an emptied docs/ and leaves one holding the project
   ok(!(await dropCreated([], dir)).includes('docs/'), 'a docs/ with something in it was removed');
 });
 
+await check('update --all walks every registered project and then the home dir', async () => {
+  const home = process.env.HOME!;
+  const a = await repo('all-a');
+  const b = await repo('all-b');
+  await install(a, false, ['verify']);
+  await install(b, false, ['verify']);
+  await install(home, false, ['commit']);
+
+  const stamp = async (dir: string): Promise<string> => (await readManifest(dir))!.updatedAt;
+  const before = await Promise.all([a, b, home].map(stamp));
+  await Bun.sleep(5);
+  await updateAll();
+
+  const after = await Promise.all([a, b, home].map(stamp));
+  ok(after.every((t, i) => t > before[i]!), `update --all skipped a target: ${before.join()} → ${after.join()}`);
+});
+
 await check('global parts install into the home dir and come back out', async () => {
   const home = process.env.HOME!;
   await install(home, true);
@@ -688,12 +812,155 @@ await check('global parts install into the home dir and come back out', async ()
   ok(!(await readManifest(project))?.parts.commit, 'update kept a part whose scope moved');
   await install(home, true);
 
-  // `update --global` relinks the home dir without ever reaching for a project part.
+  // `update --global` refreshes the home dir without ever reaching for a project part.
   await update(home);
   ok(Object.keys((await readManifest(home))!.parts).length === 5, 'update --global changed the home manifest');
 
   await uninstall(home, true);
   ok(!(await exists(path.join(home, '.claude'))), 'uninstall left the home .claude behind');
+});
+
+// ── scope per part ───────────────────────────────────────────────────────────
+
+const CONFIG = path.join(process.env.HOME!, '.factory', 'config.yaml');
+const BASE_CONFIG = 'vars:\n  codegraph: codegraph\n';
+
+/** The config is cached and every scope resolves through it: a case that writes one drops the
+ *  cache and puts the file back, or every case after it reads the override too. */
+async function withConfig(text: string, fn: () => Promise<void>): Promise<void> {
+  await writeFile(CONFIG, text);
+  resetConfig();
+  try {
+    await fn();
+  } finally {
+    await writeFile(CONFIG, BASE_CONFIG);
+    resetConfig();
+  }
+}
+
+await check('an override wins over part.yaml, and off is in no scope at all', async () => {
+  const home = process.env.HOME!;
+  const dir = await repo('scope');
+  await withConfig(`${BASE_CONFIG}parts:\n  commit: "project"\n  research: "off"\n`, async () => {
+    const parts = await loadParts();
+    const commit = parts.find((p) => p.name === 'commit');
+    ok(commit?.scope === 'project' && commit.recommended === 'global',
+      `commit resolved ${commit?.scope}, recommending ${commit?.recommended}`);
+    ok(!parts.some((p) => p.name === 'research'), 'an off part is still in the registry');
+
+    const inProject = (await scanProject(dir)).map((s) => s.part.name);
+    const inHome = (await scanProject(home)).map((s) => s.part.name);
+    ok(inProject.includes('commit') && !inHome.includes('commit'), 'commit did not move to the project scan');
+    ok(!inProject.includes('research') && !inHome.includes('research'), 'an off part is in a scan');
+  });
+  ok((await loadParts()).find((p) => p.name === 'commit')?.scope === 'global', 'the override outlived its config');
+});
+
+await check('a snippet or recipes keeps a part out of global, whatever the config says', async () => {
+  await withConfig(`${BASE_CONFIG}parts:\n  code-format: "global"\n  codegraph: "global"\n`, async () => {
+    const parts = await loadParts();
+    const snippet = parts.find((p) => p.name === 'code-format');
+    ok(snippet?.scope === 'project' && snippet.recommended === 'project', `code-format resolved ${snippet?.scope}`);
+    ok(parts.find((p) => p.name === 'codegraph')?.scope === 'project', 'a part with recipes took the override');
+
+    const ignored = await ignoredScopes();
+    ok(ignored.includes('code-format') && ignored.includes('codegraph'), `ignoredScopes read ${ignored.join(', ')}`);
+    const said = await printed(() => status(main));
+    ok(said.includes('ignored for code-format, codegraph'), `status never named the ignored override:\n${said}`);
+
+    const { newUi } = await import('../src/tui/panes/pane.js');
+    const { nextScope } = await import('../src/tui/panes/parts.js');
+    const row = { name: 'code-format', type: 'fixture', description: '', status: 'not-installed' as const,
+      scope: 'project' as const, recommended: 'project' as const, projectOnly: true, files: [] };
+    ok(nextScope(row, newUi()) === 'off', 'Space offered global to a part that cannot take it');
+  });
+});
+
+await check('update drops a part the config turned off', async () => {
+  const home = process.env.HOME!;
+  await install(home, false, ['research']);
+  const skill = path.join(home, '.claude/skills/research/skill.md');
+  ok(await exists(skill), 'research never reached the home dir');
+
+  await withConfig(`${BASE_CONFIG}parts:\n  research: "off"\n`, async () => {
+    await update(home);
+    ok(!(await readManifest(home))?.parts.research, 'the manifest kept an off part');
+    ok(!(await exists(skill)), 'an off part was left on disk');
+  });
+});
+
+await check('install --parts refuses a part that is off or lives in the other scope', async () => {
+  const dir = await repo('refuse');
+  const elsewhere = await install(dir, false, ['commit']).then(() => null, (e: Error) => e);
+  ok(elsewhere?.message === 'commit is a global part — factory install --global', `no scope refusal: ${elsewhere?.message ?? 'none'}`);
+
+  await withConfig(`${BASE_CONFIG}parts:\n  research: "off"\n`, async () => {
+    const off = await install(dir, false, ['research']).then(() => null, (e: Error) => e);
+    ok(off?.message === 'research is off in ~/.factory/config.yaml', `no off refusal: ${off?.message ?? 'none'}`);
+  });
+});
+
+await check('writePartScope rewrites one line and leaves the rest of the config byte for byte', async () => {
+  const kept = 'caffeinate: "on"\nvars:\n  codegraph: codegraph\n';
+  await withConfig(kept, async () => {
+    await writePartScope('commit', 'project');
+    await writePartScope('commit', 'off');
+    await writePartScope('research', 'global');
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text.startsWith(kept), `the rewrite moved what was already there: ${JSON.stringify(text)}`);
+    ok(text.endsWith('parts:\n  commit: "off"\n  research: "global"\n'), `the block reads ${JSON.stringify(text)}`);
+
+    resetConfig();
+    const parts = (await loadConfig()).parts;
+    ok(parts?.commit === 'off' && parts.research === 'global', `the choices read back as ${JSON.stringify(parts)}`);
+  });
+});
+
+await check('writePartScope makes a block out of a flow-style parts line and keeps the rest', async () => {
+  const kept = 'caffeinate: "on"\n';
+  await withConfig(`${kept}parts: {commit: project}\n`, async () => {
+    await writePartScope('research', 'off');
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text === `${kept}parts:\n  commit: "project"\n  research: "off"\n`, `the flow block became ${JSON.stringify(text)}`);
+
+    resetConfig();
+    const parts = (await loadConfig()).parts;
+    ok(parts?.commit === 'project' && parts.research === 'off', `the choices read back as ${JSON.stringify(parts)}`);
+  });
+});
+
+await check('a config YAML cannot read is no config at all, and says so once', async () => {
+  await withConfig('parts: {commit: project\nvars:\n  a: b\n', async () => {
+    const said = await printed(async () => {
+      ok(Object.keys(await loadConfig()).length === 0, 'a config that does not parse resolved to something');
+      resetConfig();
+      await loadConfig();
+    });
+    ok(said.includes(CONFIG), `the parse error never named the file: ${said}`);
+    ok(said.split(CONFIG).length === 2, `the same broken config was named twice: ${said}`);
+  });
+});
+
+await check('applyScopes moves a part, updates the project that held it and names both', async () => {
+  const { applyScopes } = await import('../src/tui/actions.js');
+  const home = process.env.HOME!;
+  const dir = await repo('mover');
+  await install(dir, false, ['browse']);
+  ok(await exists(path.join(dir, '.claude/skills/browse/skill.md')), 'browse never reached the project');
+
+  try {
+    const said = await applyScopes([{ name: 'browse', choice: 'global' }]);
+    ok((await loadConfig()).parts?.browse === 'global', 'the choice never reached the config');
+    ok(!(await readManifest(dir))?.parts.browse, 'the project kept a part that went global');
+    ok(await exists(path.join(home, '.claude/skills/browse/skill.md')), 'browse never reached the home dir');
+    ok(said.includes('mover') && said.includes('installed browse in ~/.claude'), `the toast said ${JSON.stringify(said)}`);
+  } finally {
+    await writeFile(CONFIG, BASE_CONFIG);
+    resetConfig();
+    await update(home);
+  }
 });
 
 await check('install --parts takes exactly the named parts', async () => {

@@ -1,8 +1,7 @@
 # Factory — Portable Development Harness
 
-Factory is a CLI that installs a curated set of Claude Code skills, scripts and hooks into any
-project via symlinks, and runs missions across those projects. Install, update, uninstall, tracked
-in a manifest.
+Factory is a CLI that copies a curated set of Claude Code skills, scripts and hooks into any
+project, and runs missions across those projects. Install, update, uninstall, tracked in a manifest.
 
 ## Important Files
 - Terminology: @docs/terminology.md
@@ -27,9 +26,9 @@ Read the doc for the subsystem you touch before editing it; the invariants there
 ```
 src/           CLI source (entry: src/cli.ts)
 ├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env,
-│              projects (home and factoryHome read at call time, scopeOf), config (vars +
-│              caffeinate), recipes, args, workflow (YAML load + transitions, stepRole,
-│              ROLE_MODEL), mission (folder, state, claim, branch, autonomy, insert pointer,
+│              projects (home and factoryHome read at call time, scopeOf), config (vars, the
+│              parts: scope block, caffeinate), recipes, args, workflow (YAML load + transitions,
+│              stepRole, ROLE_MODEL), mission (folder, state, claim, branch, autonomy, insert pointer,
 │              archive), decision (decisions.md table, waits, first answer wins),
 │              spawn (preset, Warp tab config, claude command)
 ├── ui/        Presentation — theme, prompts, formatters
@@ -53,10 +52,11 @@ scripts/spawn.ts        The one real model run behind `e2e.spawn`: a @Worker's d
 workflows/     intent, story, fix, chore, research, quick — the shipped workflow YAML: every
                mission starts on intent and `mission shape` appends a preset behind that step
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
-~/.factory/    Home dir: projects list, config.yaml (var overrides plus `caffeinate: auto|on|off`,
-               which the hook reads per event and Mission Control's `c` rewrites),
-               events/<session>.jsonl, caffeinate/<session>.pid and control.pid
-~/.claude/     Where `scope: global` parts install: the same links, `.factory-manifest.json` and
+~/.factory/    Home dir: projects list, config.yaml (var overrides, a `parts:` block choosing
+               `project`, `global` or `off` per part over the scope its part.yaml recommends, plus
+               `caffeinate: auto|on|off`, which the hook reads per event and Mission Control's `c`
+               rewrites), events/<session>.jsonl, caffeinate/<session>.pid and control.pid
+~/.claude/     Where `scope: global` parts install: the same copies, `.factory-manifest.json` and
                one `settings.json` holding both the hooks and the allow list
 .factory/archive/<dir>  a closed mission's folder, renamed there by `mission archive`. Both it
                and `.factory/missions/` are ignored: a run's record belongs to the machine that
@@ -66,9 +66,10 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
 
 ### Key principle
 
-Files under `parts/<name>/` get **symlinked** into the target `.claude/`. Updating the Factory
-updates every connected project. A file marked `skipIfExists` is copied in as a template only when
-the project has nothing there.
+Files under `parts/<name>/` get **copied** into the target `.claude/`, so the project stands on its
+own and the manifest is the only link back. A Factory change reaches a project through `update`
+there, and `update --all` runs it on every registered project and then the home dir. A file marked
+`skipIfExists` is copied in as a template only when the project has nothing there.
 
 Roles ship as parts: `/mission` carries the Orchestrator's manual plus `Worker`, `Investigator`
 and `Summarizer`; `/verify` carries `Verifier`; `/validate` carries `Validator`; `/retro` sweeps

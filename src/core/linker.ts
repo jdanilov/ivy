@@ -1,7 +1,8 @@
 import path from 'node:path';
-import { mkdir, symlink, unlink, readdir, readlink, realpath, rmdir, readFile, lstat } from 'node:fs/promises';
+import { mkdir, unlink, readdir, rmdir, readFile, lstat } from 'node:fs/promises';
 import type { Part, HookConfig, McpConfig, ManifestPart, Settings, Snippet, SnippetRecord } from '../types.js';
 import { hashFile } from './scanner.js';
+import { Refusal } from './mission.js';
 import { scopeOf } from './projects.js';
 
 /** Hooks are the project's local business; at user level there is only `~/.claude/settings.json`. */
@@ -19,10 +20,35 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
   }
 }
 
-export async function linkPart(part: Part, targetDir: string, factoryRoot: string): Promise<ManifestPart> {
+/**
+ * Ours to overwrite or to remove: a file still holding the bytes the manifest recorded or the ones
+ * the source holds now. A link into the Factory from an older install reads as the source, so it
+ * counts too, and a dangling one reads as nothing at a path the manifest names. Anything else the
+ * project wrote itself. Only asked about a target that exists.
+ */
+async function ours(targetPath: string, manifestHash?: string, sourcePath?: string): Promise<boolean> {
+  const hash = await hashFile(targetPath);
+  // Nothing to read is ours only from a dangling link; a directory at the path is the project's.
+  if (hash === '') return (await lstat(targetPath).catch(() => null))?.isSymbolicLink() ?? false;
+  if (hash === manifestHash) return true;
+  return sourcePath !== undefined && hash === (await hashFile(sourcePath));
+}
+
+/**
+ * Puts the part's files in place as copies, so the project stands on its own and the manifest is
+ * the only link back to the Factory. Names the files that held something neither the manifest nor
+ * the source knows, for the caller to report as restored.
+ */
+export async function copyPart(
+  part: Part,
+  targetDir: string,
+  factoryRoot: string,
+  prev?: ManifestPart,
+): Promise<{ entry: ManifestPart; restored: string[] }> {
   const files: string[] = [];
   const hashes: Record<string, string> = {};
   const sources: Record<string, string> = {};
+  const restored: string[] = [];
 
   for (const pf of part.files) {
     const sourcePath = path.join(factoryRoot, pf.source);
@@ -42,17 +68,17 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
 
     await mkdir(path.dirname(targetPath), { recursive: true });
 
-    try {
-      await lstat(targetPath);
-      await unlink(targetPath);
-    } catch {
-      // doesn't exist
+    const at = await lstat(targetPath).catch(() => null);
+    // Bun.write onto a directory is a raw EISDIR, where every other refusal in the family is a line.
+    if (at?.isDirectory()) throw new Refusal(`${targetPath} is a directory — move it aside and rerun`);
+    if (at) {
+      if (!(await ours(targetPath, prev?.hashes[pf.target], sourcePath))) restored.push(pf.target);
+      // A legacy install left a link into the Factory here, and writing through it edits the source.
+      // Only a link is unlinked: any other file Bun.write replaces where it is.
+      if (at.isSymbolicLink()) await unlink(targetPath);
     }
 
-    // Counted from where the link really lives: a project reached through a symlink (`/tmp` on
-    // macOS) is one hop shallower than its path reads, and lexical `..` would climb past the root.
-    const relPath = path.relative(await realpath(path.dirname(targetPath)), sourcePath);
-    await symlink(relPath, targetPath);
+    await Bun.write(targetPath, Bun.file(sourcePath));
 
     files.push(pf.target);
     hashes[pf.target] = await hashFile(sourcePath);
@@ -77,7 +103,7 @@ export async function linkPart(part: Part, targetDir: string, factoryRoot: strin
     entry.uninit = part.recipes.uninit;
   }
 
-  return entry;
+  return { entry, restored };
 }
 
 // ── Snippets ─────────────────────────────────────────────────────────────────
@@ -197,21 +223,8 @@ export async function removeSnippet(record: SnippetRecord, targetDir: string): P
   return true;
 }
 
-/** A target we may remove: a symlink the manifest records as ours, else one pointing into the Factory. */
-async function isFactoryLink(targetPath: string, factoryRoot: string, source?: string): Promise<boolean> {
-  try {
-    if (!(await lstat(targetPath)).isSymbolicLink()) return false;
-    // The manifest says we linked it, so where it points now is not the question. Dangling counts.
-    if (source !== undefined) return true;
-    const dest = path.resolve(path.dirname(targetPath), await readlink(targetPath));
-    return dest.startsWith(factoryRoot + path.sep);
-  } catch {
-    return false;
-  }
-}
-
-/** Removes the part's symlinks. Anything the Factory cannot claim is reported as left behind. */
-export async function unlinkPart(
+/** Removes the part's files. A copy the project has since edited is reported as left behind. */
+export async function removePartFiles(
   entry: ManifestPart,
   targetDir: string,
   factoryRoot: string,
@@ -221,9 +234,11 @@ export async function unlinkPart(
 
   for (const file of entry.files) {
     const targetPath = path.join(targetDir, file);
+    const source = entry.sources?.[file];
 
-    if (!(await isFactoryLink(targetPath, factoryRoot, entry.sources?.[file]))) {
-      if (await lstat(targetPath).catch(() => null)) left.push(file);
+    if (!(await lstat(targetPath).catch(() => null))) continue;
+    if (!(await ours(targetPath, entry.hashes[file], source && path.join(factoryRoot, source)))) {
+      left.push(file);
       continue;
     }
 

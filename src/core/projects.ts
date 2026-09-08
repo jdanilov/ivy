@@ -17,7 +17,9 @@ export const factoryHome = (): string => path.join(home(), '.factory');
 export const scopeOf = (targetDir: string): Scope => (path.resolve(targetDir) === home() ? 'global' : 'project');
 
 const projectsFile = (): string => path.join(factoryHome(), 'projects');
-const SEED_FILE = path.join(FACTORY_ROOT, '.projects');
+// A function, not a constant: `registry → config → projects → registry` is a cycle, and a module
+// that reads FACTORY_ROOT while registry is still evaluating gets nothing.
+const seedFile = (): string => path.join(FACTORY_ROOT, '.projects');
 const DROID_FILES = ['auth.v2.key', 'droids'];
 
 let ready: Promise<boolean> | null = null;
@@ -34,11 +36,11 @@ function ownHome(): Promise<boolean> {
 
     await mkdir(factoryHome(), { recursive: true });
 
-    const seed = Bun.file(SEED_FILE);
+    const seed = Bun.file(seedFile());
     if (!(await Bun.file(projectsFile()).exists()) && (await seed.exists())) {
       await Bun.write(projectsFile(), await seed.text());
     }
-    await unlink(SEED_FILE).catch(() => {});
+    await unlink(seedFile()).catch(() => {});
 
     return true;
   })();

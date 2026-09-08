@@ -55,7 +55,8 @@ async function run(line: string, cwd: string): Promise<number> {
 
 /**
  * Runs `recipes.init` once. `initAt` in the manifest is the record that it ran, so a rerun is a
- * no-op. A failing line refuses with the part linked: fix the cause and run `update` again.
+ * no-op. A failing line refuses with the part's files already copied in: fix the cause and run
+ * `update` again.
  */
 export async function runInit(part: Part, prev: ManifestPart | undefined, entry: ManifestPart, cwd: string): Promise<void> {
   if (prev?.initAt) {

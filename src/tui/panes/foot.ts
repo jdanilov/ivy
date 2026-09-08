@@ -6,9 +6,15 @@ import type { Activity, Decision, Mission, Project, Snapshot } from '../model.js
 /** The pane along the foot: the decisions of whatever is selected, or its sessions' activity. */
 
 const VERB: Record<Activity['verb'], string> = {
-  Bash: C.bright, Edit: C.bright, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
+  You: C.accent, Bash: C.bright, Edit: C.success, Read: C.dim, Agent: C.agent, Text: C.bright, Ask: C.warning,
   Tool: C.dim, Stop: C.success,
 };
+
+/** What of a row is the human's or the model's own words, drawn bright; the rest is tooling, dim. */
+const SAID = new Set<Activity['verb']>(['You', 'Text', 'Ask']);
+
+/** A row wraps under its text column to this many lines; a longer command is a paragraph nobody reads here. */
+const ACTIVITY_ROWS = 2;
 
 /** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch. */
 const tabs = (ui: Ui): Cell[] => [
@@ -29,11 +35,16 @@ const pad = (p: Pane, shown: number, room: number): void => {
   for (let i = shown; i < room; i++) p.row([]);
 };
 
-/** Which missions the selection covers: a mission is one, a project its own, the Inbox every one. */
+/**
+ * Which missions the selection covers: a mission is one, a project its open ones, the Inbox every
+ * open one. A closed mission's decisions are its record, read by selecting it; over a project they
+ * would bury the live rows under every run that came before.
+ */
 function missionsOf(snap: Snapshot, here: LeftItem): Mission[] {
-  return here.kind === 'inbox' ? snap.projects.flatMap((project) => project.missions)
+  const open = (missions: Mission[]): Mission[] => missions.filter((m) => m.status === 'open');
+  return here.kind === 'inbox' ? open(snap.projects.flatMap((project) => project.missions))
     : here.kind === 'mission' ? [here.mission]
-    : here.kind === 'project' ? here.project.missions : [];
+    : here.kind === 'project' ? open(here.project.missions) : [];
 }
 
 /** Where a decision stands, left of its id. A question the human still owes an answer to is the
@@ -102,13 +113,19 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
 
   p.row(spread(tabs(ui), [[`${rows.length}`, C.dim]], p.width));
   p.rule();
-  const shown = visible(rows, room, ui);
-  for (const a of shown) {
-    p.row([
+  // The scroll walks lines, not rows: a wrapped row is two of them.
+  const lines = rows.flatMap((a): Cell[][] => {
+    const head: Cell[] = [
       [`${clock(a.at)}  `, C.dim], ...(merged ? ([[(owners.get(a.session) ?? '').padEnd(9), C.dim]] as Cell[]) : []),
-      [a.verb.padEnd(7), VERB[a.verb]], [a.text, a.verb === 'Text' || a.verb === 'Ask' ? C.bright : C.dim],
-    ]);
-  }
+      [a.verb.padEnd(7), VERB[a.verb]],
+    ];
+    const indent = len(head);
+    const color = SAID.has(a.verb) ? C.bright : C.dim;
+    return wrap(a.text, Math.max(20, p.width - indent), ACTIVITY_ROWS)
+      .map((text, i): Cell[] => (i === 0 ? [...head, [text, color]] : [[' '.repeat(indent), C.dim], [text, color]]));
+  });
+  const shown = visible(lines, room, ui);
+  for (const line of shown) p.row(line);
   pad(p, shown.length, room);
 }
 

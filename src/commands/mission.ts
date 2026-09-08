@@ -5,7 +5,7 @@ import { str, type Flags } from '../core/args.js';
 import {
   Refusal, archiveMission, closeMission, createMission, currentBranch, currentCheckout, ensureIgnored,
   git, listArchived, listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub,
-  pointAtInserted, promoteMission, readClaim, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
+  pointAtInserted, readClaim, readyToOpen, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
 } from '../core/mission.js';
 import { dumpWorkflow, loadWorkflow, runnerLabel, stepRole } from '../core/workflow.js';
 import { loadPreset, openSession } from '../core/spawn.js';
@@ -101,16 +101,9 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
 /** Writes the Warp tab config and opens it. The session id reaches state.json first. */
 async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
-  if (m.state.status === 'closed') throw new Refusal(`mission ${m.state.name} is closed`);
   const dry = flags['dry-run'] === true;
   const stub = m.state.status === 'stub';
-
-  // A dry run writes nothing at all, so even the promotion waits for the real run.
-  let ignored: 'added' | 'committed' | null = null;
-  if (stub && !dry) {
-    await promoteMission(cwd, m);
-    ignored = await ensureIgnored(await currentCheckout(cwd));
-  }
+  const ignored = await readyToOpen(cwd, m, dry);
   const preset = await loadPreset(str(flags, 'preset') ?? 'orchestrator');
   const spawn = await openSession(cwd, m, preset, dry);
   const opened = spawn.warp ? 'tab opened' : 'no warp — run it yourself';

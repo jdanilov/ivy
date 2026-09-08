@@ -2,7 +2,7 @@ import { BoxRenderable, TextRenderable, type CliRenderer } from '@opentui/core';
 import { C } from '../theme.js';
 import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
-import type { Mission, Project, Session, Snapshot } from '../model.js';
+import type { Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
 
 /**
  * What every pane shares: the Ui state it reads, the rows the left column lists — one of which the
@@ -14,7 +14,8 @@ export interface Ui {
   left: number;
   msg: number;
   part: number;
-  toggles: Record<string, boolean>;
+  /** What `↵` would apply: install or not on a project row, the chosen scope on the global one. */
+  toggles: Record<string, boolean | ScopeChoice>;
   confirm: boolean;
   full: boolean;
   /** Rows the full-height foot is scrolled back from its own foot. Zero everywhere else. */

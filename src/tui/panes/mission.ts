@@ -1,5 +1,5 @@
 import { C, GLYPH, stateColor, stepColor } from '../theme.js';
-import { ago, dur, id, spread, tokens, wrap, type Cell } from '../format.js';
+import { dur, id, spread, tokens, wrap, type Cell } from '../format.js';
 import { runnerLabel } from '../../core/workflow.js';
 import type { Pane } from './pane.js';
 import type { Mission, Session } from '../model.js';
@@ -43,7 +43,9 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
       [' '.repeat(Math.max(1, NAME_COL - s.name.length - again.length)), C.dim],
       [runner(s), C.dim], ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
-    const spend = s.tokens ? s.tokens.input + s.tokens.cached + s.tokens.output : 0;
+    // What the step itself cost: tokens it added and produced. Cache reads re-send the whole
+    // history every turn, so counting them makes a late step look heavier than an early one.
+    const spend = s.tokens ? s.tokens.input + s.tokens.output : 0;
     // A duration is only news for a step that is getting somewhere: skipped and blocked both
     // measure a time nobody wants, and the word is what the row is for.
     const timed = s.status === 'running' || s.status === 'done';
@@ -68,13 +70,15 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
 }
 
 export function sessionPane(p: Pane, s: Session): void {
-  p.row([['SESSION', C.bright], [`  ${s.preset}`, C.dim]]);
+  p.row([['SESSION', C.bright], [`  ${s.name ?? id(s.id)}`, C.dim], [' · ', C.rule], [s.preset, C.dim]]);
   p.rule();
-  p.row([['session ', C.dim], [id(s.id), C.bright], [' · idle ', C.dim], [dur(Date.now() - s.idleSince), C.bright]]);
+  p.row([['session ', C.dim], [id(s.id), C.bright], DOT,
+    ...(s.busy ? ([['working', C.bright], ...(s.agent ? [DOT, [s.agent, C.dim]] : [])] as Cell[])
+      : ([['idle ', C.dim], [dur(Date.now() - s.idleSince), C.bright]] as Cell[]))]);
   p.row([['cwd ', C.dim], [s.cwd, C.bright]]);
-  p.row([['last ', C.dim], [s.last ? `${s.last.verb}  ${s.last.detail}  ${ago(s.last.at)}` : '—', C.bright]]);
-  if (!s.question) return;
+  // Its last word, whole: a statement as often as a question, so the label claims neither.
+  if (!s.said) return;
   p.rule();
-  p.row([['asks', C.warning]]);
-  for (const l of wrap(s.question, p.width, 6)) p.row([[l, C.bright]]);
+  p.row([['said', C.dim]]);
+  for (const l of wrap(s.said, p.width, 6)) p.row([[l, C.bright]]);
 }

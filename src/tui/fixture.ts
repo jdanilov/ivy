@@ -146,6 +146,8 @@ const ivyParts: PartRow[] = [
 /** The global row lists every part, because scope is chosen there: the ones copied into
  *  `~/.claude/` and shared by every project, the ones a project keeps, and the ones turned off. */
 const globalParts: PartRow[] = [
+  // Chosen `global` and not there yet: the one state the scope column draws in warning.
+  part('browse', 'tool', 'drive a real or headless browser through agent-browser', 'not-installed', 'global', 'global'),
   part('commit', 'skill', 'structured git commits', 'installed', 'global', 'global'),
   part('explain', 'skill', 'visual code explanations and flow diagrams', 'installed', 'global', 'global'),
   part('hook-safe-bash', 'fixture', 'block destructive commands', 'installed', 'global', 'global'),

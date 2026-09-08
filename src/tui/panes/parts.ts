@@ -10,6 +10,9 @@ import type { PartRow, Project, ScopeChoice } from '../model.js';
 const DOT: Cell = [' · ', C.rule];
 /** The longest description any part ships takes three rows beside the status columns. */
 const DESCRIPTION_ROWS = 3;
+/** Narrower than this the column says nothing, so a narrow pane drops the description whole rather
+ *  than wrapping wider than the row and letting the pane edge cut it mid-word. */
+const DESCRIPTION_MIN = 20;
 const CHOICES: ScopeChoice[] = ['project', 'global', 'off'];
 
 export function partStatus(name: string, base: string, ui: Ui): string {
@@ -84,7 +87,7 @@ function partBlock(p: Pane, part: PartRow, i: number, ui: Ui, global: boolean): 
   const tail: Cell[] = [[changed ? '±' : ' ', C.accent]];
   const indent = len(head);
   const room = p.width - indent - len(tail) - 2;
-  const body = wrap(part.description, Math.max(20, room), DESCRIPTION_ROWS);
+  const body = room >= DESCRIPTION_MIN ? wrap(part.description, room, DESCRIPTION_ROWS) : [];
   return [
     { cells: spread([...head, [body[0] ?? '', C.dim]], tail, p.width), selected },
     ...body.slice(1).map((text): Row => ({ cells: [[' '.repeat(indent), C.dim], [text, C.dim]], selected })),

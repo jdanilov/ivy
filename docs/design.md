@@ -159,7 +159,9 @@ its own column, so a row copies whole into the session that answers it.
 | `overruled` | `✗`   | error red     | bright, the note follows the summary        |
 | `auto`      | `✓`   | dim label     | dim: settled by the dial, not by a human    |
 
-PARTS wraps its descriptions the same way, under the description column. On the `Global` row the
+PARTS wraps its descriptions the same way, under the description column, and a pane too narrow to
+leave that column twenty cells drops the description whole rather than letting the edge cut it
+mid-word. On the `Global` row the
 status column is the scope, because scope is chosen there and nowhere else: one word, `project`,
 `global` or `off`, `●` for a part that is going somewhere and `○` for one that is not, success
 while a global part is in `~/.claude`, warning while it is not there yet or its copy has drifted,

@@ -83,3 +83,18 @@ their `memory-candidates.md`. Proposed only — a human confirms each note befor
   answering each with `decision answer`. A bulk "accept all outstanding" path would match how the
   dial is actually used under load.
   Applies to: the `decision` CLI and the Orchestrator's waiting-decision rule.
+- **Workflow (missions)** — a shared checkout with two live sessions on one branch needs every commit
+  and revert scoped by pathspec; `.factory/claim` guards against a second mission, not a hand-started
+  session.
+  Applies to: any mission running while another session is active in the same checkout.
+- **Harness (Factory)** — a config-parse guard is not the fix until every reader is checked:
+  `src/core/config.ts` and `parts/hook-factory/hook-factory.ts` each parse `~/.factory/config.yaml`
+  on their own.
+  Applies to: any fix claimed against one parser of a file more than one part reads.
+- **Workflow (specs)** — a new TUI column's layout is a guess until a frame exists to look at; the
+  copies mission redesigned its scope column from a screenshot after round 1.
+  Applies to: any spec describing a pane column before `tui-keys` or `width.ts` can render it.
+- **Harness (YAML)** — a scratch HOME must say `caffeinate: "off"` with the quotes: YAML reads a bare
+  `off` as `false`, and the hook reads anything that is not `on` or `off` as `auto`, so a test run
+  starts a real `caffeinate -dims` it never stops.
+  Applies to: any script writing `~/.factory/config.yaml` for a child process.

@@ -92,34 +92,42 @@ export async function applyParts(project: string, add: string[], drop: string[])
   return said.filter((s) => s !== '').join(' · ');
 }
 
+/** The parts a manifest lists: what a target holds, read before and after a move. */
+const held = async (dir: string): Promise<string[]> => Object.keys((await readManifest(dir))?.parts ?? {});
+
+/** `−a +b`: what a target lost and gained, the move before what came in beside it. Empty when the run changed nothing there. */
+function moved(before: string[], after: string[]): string {
+  return [...before.filter((n) => !after.includes(n)).map((n) => `−${n}`), ...after.filter((n) => !before.includes(n)).map((n) => `+${n}`)].join(' ');
+}
+
 /**
  * A scope change is a move, and a move is only done once both ends have run: the choices land in
  * `~/.factory/config.yaml`, then `update` on every project whose manifest still lists one of them
  * — that is what drops a part that left the project — and last the home dir, refreshed for what
- * left it and installed for what became global.
+ * left it and installed for what became global. The toast says what each target gained and lost,
+ * `update` seeding a part beside the moved one included: that it ran is not news.
  */
 export async function applyScopes(changes: { name: string; choice: ScopeChoice }[]): Promise<string> {
   for (const { name, choice } of changes) await writePartScope(name, choice);
   resetConfig();
 
   const names = changes.map((c) => c.name);
-  const updated: string[] = [];
+  const report: string[] = [];
   for (const project of await existingProjects()) {
-    const manifest = await readManifest(project);
-    if (!names.some((name) => manifest?.parts[name])) continue;
+    const before = await held(project);
+    if (!names.some((name) => before.includes(name))) continue;
     await quiet(() => update(project));
-    updated.push(path.basename(project));
+    const diff = moved(before, await held(project));
+    if (diff) report.push(`${path.basename(project)} ${diff}`);
   }
 
   const global = changes.filter((c) => c.choice === 'global').map((c) => c.name);
+  const before = await held(home());
   if (global.length < changes.length) await quiet(() => update(home()));
   if (global.length > 0) await quiet(() => install(home(), false, global));
-
-  const said = [
-    updated.length > 0 ? `updated ${updated.join(', ')}` : '',
-    global.length > 0 ? `installed ${global.join(', ')} in ~/.claude` : 'refreshed ~/.claude',
-  ];
-  return said.filter((s) => s !== '').join(' · ');
+  const diff = moved(before, await held(home()));
+  if (diff) report.push(`~/.claude ${diff}`);
+  return report.length ? report.join(' · ') : 'scopes written · nothing moved';
 }
 
 // ── caffeinate ───────────────────────────────────────────────────────────────

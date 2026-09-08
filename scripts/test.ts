@@ -979,7 +979,7 @@ await check('applyScopes moves a part, updates the project that held it and name
     ok((await loadConfig()).parts?.browse === 'global', 'the choice never reached the config');
     ok(!(await readManifest(dir))?.parts.browse, 'the project kept a part that went global');
     ok(await exists(path.join(home, '.claude/skills/browse/skill.md')), 'browse never reached the home dir');
-    ok(said.includes('mover') && said.includes('installed browse in ~/.claude'), `the toast said ${JSON.stringify(said)}`);
+    ok(said.includes('mover −browse') && said.includes('~/.claude +browse') && !said.includes('updated'), `the toast said ${JSON.stringify(said)}`);
   } finally {
     await writeFile(CONFIG, BASE_CONFIG);
     resetConfig();

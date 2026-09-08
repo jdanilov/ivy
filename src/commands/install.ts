@@ -178,7 +178,7 @@ export async function install(targetDir: string, yes = false, only: string[] = [
     // `--yes` and `--parts` ask nothing, so a copy the project had edited is named here the way
     // `update` names it; the interactive path already asked with confirmModified.
     const named = !asked && restored.length > 0;
-    for (const file of named ? restored : []) partRow(symbols.installed, colors.green, displayName(part), `restored ${file}`);
+    if (named) for (const file of restored) partRow(symbols.check, colors.green, displayName(part), `restored ${file}`);
 
     // Inject hooks if part has them
     if (part.hooks) {

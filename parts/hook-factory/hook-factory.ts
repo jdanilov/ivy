@@ -150,8 +150,14 @@ type Mode = 'auto' | 'on' | 'off';
 
 async function caffeinateMode(): Promise<Mode> {
   const raw = await readFile(CONFIG, 'utf-8').catch(() => '');
-  const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
-  return value === 'on' || value === 'off' ? value : 'auto';
+  try {
+    const value = raw === '' ? null : (Bun.YAML.parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
+    return value === 'on' || value === 'off' ? value : 'auto';
+  } catch {
+    // A hand-broken config is no config, as `loadConfig` reads it: a parse throw here is swallowed
+    // by main() and the machine silently stops being held awake.
+    return 'auto';
+  }
 }
 
 async function caffeinateStart(session: string): Promise<void> {

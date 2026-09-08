@@ -406,28 +406,32 @@ await check('a session asks with its last Stop, and only a prompt clears it', as
   const dir = await repo('asks');
   const session = 'Q';
   const at = (back: number): string => new Date(Date.now() - back * 60_000).toISOString();
+  const final = 'Reply sent, thread labeled DONE. Anything else?';
 
   // The shape H-7 came off: a skill preamble is a user record, and it is the last text on file.
+  // The turn ends on a question, which is the only shape that reaches the Inbox as one.
   const file = transcriptPath(dir, session);
   await mkdir(path.dirname(file), { recursive: true });
   const said = (type: string, text: string, back: number): string =>
     `${JSON.stringify({ type, timestamp: at(back), message: { id: `${type}${back}`, content: [{ type: 'text', text }] } })}\n`;
-  await writeFile(file, said('assistant', 'An earlier turn', 30) + said('user', 'Base directory for this skill', 20));
+  await writeFile(file, said('assistant', 'An earlier turn', 30)
+    + said('assistant', final, 20)
+    + said('user', 'Base directory for this skill', 15));
 
   const events = path.join(process.env.HOME!, '.factory', 'events', `${session}.jsonl`);
   await mkdir(path.dirname(events), { recursive: true });
   const logged = (event: string, detail: string | null, back: number): string =>
     `${JSON.stringify({ at: at(back), event, session, cwd: dir, mission: null, step: null, detail })}\n`;
   await writeFile(events, logged('Stop', 'An earlier turn', 8) + logged('UserPromptSubmit', 'carry on', 6)
-    + logged('Stop', 'Reply sent, thread labeled DONE', 2));
+    + logged('Stop', final, 2));
 
   const asks = async (): Promise<string[]> =>
     (await buildSnapshot()).inbox.filter((i) => i.kind === 'question' && i.project === 'asks').map((i) => i.text ?? '');
-  ok((await asks()).join() === 'Reply sent, thread labeled DONE', `asks reads ${(await asks()).join() || 'nothing'}`);
+  ok((await asks()).join() === final, `asks reads ${(await asks()).join() || 'nothing'}`);
 
   // An idle notification is the same question asked again, not a second one.
   await writeFile(events, logged('Notification', 'idle_prompt: waiting for your input', 1), { flag: 'a' });
-  ok((await asks()).join() === 'Reply sent, thread labeled DONE', 'an idle notification changed the question');
+  ok((await asks()).join() === final, 'an idle notification changed the question');
 
   await writeFile(events, logged('UserPromptSubmit', 'answered', 0), { flag: 'a' });
   ok((await asks()).length === 0, 'answering did not clear the question');

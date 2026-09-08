@@ -249,8 +249,8 @@ keys do, and none of these three do the same thing.
 | `Y`     | Parts            | confirm the apply                                                |
 | `N`     | Parts            | cancel it                                                        |
 | `R`     | Parts            | reset the toggles                                                |
-| `O`     | mission row      | open the mission's Warp tab; a bound mission is refused          |
-| `X`     | mission, session | SIGTERM the session's process, SIGKILL on a second press         |
+| `O`     | mission row      | start the mission's session under `claude --bg` and open the Warp tab attached to it; a bound mission is refused |
+| `X`     | mission, session | `claude stop` for a session `O` started, which keeps its conversation; SIGTERM for one started by hand, SIGKILL on a second press |
 | `T`     | mission, MISSION | autonomy full → partial → none                                   |
 | `H`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
 | `Z`     | left             | show the archived missions                                       |

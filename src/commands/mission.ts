@@ -99,7 +99,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   if (!stub && flags['no-open'] !== true) await open(created.state.name, flags, cwd);
 }
 
-/** Writes the Warp tab config and opens it. The session id reaches state.json first. */
+/** Starts the session under `claude --bg`, then writes the Warp tab config that attaches to it. */
 async function open(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
   const m = await resolveMission(cwd, name);
   const dry = flags['dry-run'] === true;
@@ -116,8 +116,9 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
     `${colors.dim}${note}${colors.reset}`,
   );
   rule();
-  field('session', spawn.session);
+  field('session', spawn.session || `${colors.dim}chosen by claude --bg${colors.reset}`);
   field('cwd', spawn.cwd);
+  field('attach', spawn.attach);
   field('config', dry ? `would write ${spawn.configPath}` : spawn.configPath);
   field('uri', spawn.uri);
   if (dry && stub) field('promote', `would branch mission/${m.state.name} and claim the checkout`);

@@ -27,7 +27,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 
 | Term         | Meaning                                                                                           |
 |--------------|---------------------------------------------------------------------------------------------------|
-| Session      | One Claude Code process in a Warp tab. Known to the Factory through hook events, spawned or adopted. |
+| Session      | One Claude Code process, started by `claude --bg` and shown in a Warp tab that attaches to it, or started by hand. Known to the Factory through hook events. |
 | Mission      | One unit of tracked work. Folder `.factory/missions/<YYYY-MM-DD-name>/`, ignored by git, branch `mission/<name>`. One workflow, one session. |
 | Stub         | A mission with an intent and no branch. `mission open` promotes it.                               |
 | Archive      | `.factory/archive/<dir>`, where `mission archive` moves a closed mission's folder. Only `mission list --all` reads it. |

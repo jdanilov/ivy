@@ -30,7 +30,7 @@ src/           CLI source (entry: src/cli.ts)
 │              parts: scope block, caffeinate), recipes, args, workflow (YAML load + transitions,
 │              stepRole, ROLE_MODEL), mission (folder, state, claim, branch, autonomy, insert pointer,
 │              archive), decision (decisions.md table, waits, first answer wins),
-│              spawn (preset, Warp tab config, claude command)
+│              spawn (preset, the mission's settings overlay, `claude --bg`, the Warp tab that attaches)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys

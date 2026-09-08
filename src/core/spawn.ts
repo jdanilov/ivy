@@ -7,12 +7,17 @@ import { home } from './projects.js';
 
 /** Warp reads tab configs from here and opens them with warp://tab_config/<file stem>. */
 const tabConfigs = (): string => path.join(home(), '.warp', 'tab_configs');
+/** Where `claude --bg` keeps one record per session it started, under the short id it printed. */
+const jobFile = (short: string): string => path.join(home(), '.claude', 'jobs', short, 'state.json');
 
 export interface Spawn {
   preset: Preset;
+  /** The full id `--bg` gave the session; empty on a dry run, where nothing was started. */
   session: string;
   cwd: string;
+  /** What starts the session, and what the tab runs to show it. */
   command: string;
+  attach: string;
   configPath: string;
   uri: string;
   warp: boolean;
@@ -40,25 +45,67 @@ export async function loadPreset(name: string): Promise<Preset> {
 
 // ── the claude command ───────────────────────────────────────────────────────
 
-/** Warp runs the command string through the shell, so anything unusual is single-quoted. */
+/** The shell sees the command on a dry run's printout, so anything unusual is single-quoted. */
 const quote = (value: string): string =>
   /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 
-export function assembleCommand(preset: Preset, mission: Mission, session: string): string {
-  const args = [
-    'claude',
-    '--session-id', session,
+/** The session is the human's own, so it runs the way they run `claude` by hand. */
+const HUMAN_FLAGS = ['--permission-mode', 'acceptEdits', '--dangerously-skip-permissions'];
+
+/** The preset's overlay with what only this mission knows, written beside its state. */
+const settingsPath = (mission: Mission): string => path.join(mission.dir, 'settings.json');
+
+/**
+ * `--bg` hands the session to a daemon, so no id can be chosen for it and no variable on the
+ * command line reaches it: the id is read back from the daemon's record, the mission dir goes in
+ * through the settings overlay, which its hooks do inherit.
+ */
+export function assembleArgs(preset: Preset, mission: Mission): string[] {
+  return [
+    'claude', '--bg',
     '--name', mission.state.name,
     '--model', preset.model,
     '--effort', preset.effort,
+    ...HUMAN_FLAGS,
     '--append-system-prompt-file', path.join(preset.dir, 'prompt.md'),
-    '--settings', path.join(preset.dir, 'settings.json'),
+    '--settings', settingsPath(mission),
     '--mcp-config', path.join(preset.dir, 'mcp.json'),
     '--strict-mcp-config',
   ];
+}
 
-  // Warp tab configs carry no env key, so the variable is inlined in the command.
-  return `FACTORY_MISSION=${quote(mission.dir)} ${args.map(quote).join(' ')}`;
+export const assembleCommand = (preset: Preset, mission: Mission): string => assembleArgs(preset, mission).map(quote).join(' ');
+
+/**
+ * `accept` lets Mission Control's messages in: a session that bypasses permission prompts would
+ * otherwise hold a message from a sender that claims no permission class behind a dialog.
+ */
+async function writeSettings(preset: Preset, mission: Mission): Promise<void> {
+  const base = await Bun.file(path.join(preset.dir, 'settings.json')).json().catch(() => ({})) as Record<string, unknown>;
+  const env = { ...(base.env as Record<string, string> | undefined), FACTORY_MISSION: mission.dir };
+  await Bun.write(settingsPath(mission), `${JSON.stringify({ ...base, env, crossSessionInbound: 'accept' }, null, 2)}\n`);
+}
+
+/** `backgrounded · <short id> · <name>` is the one line `--bg` prints; the full id is in its record. */
+async function startSession(args: string[], cwd: string): Promise<{ short: string; session: string }> {
+  const proc = Bun.spawn(args, { cwd, stdout: 'pipe', stderr: 'pipe' });
+  const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+  const short = /backgrounded · ([0-9a-f]{8})/.exec(out)?.[1];
+  if ((await proc.exited) !== 0 || !short) throw new Refusal(`claude --bg did not start a session: ${(err || out).trim().split('\n')[0] ?? ''}`);
+  const job = await Bun.file(jobFile(short)).json().catch(() => null) as { sessionId?: string } | null;
+  if (typeof job?.sessionId !== 'string') throw new Refusal(`claude --bg started ${short} but wrote no record at ${jobFile(short)}`);
+  return { short, session: job.sessionId };
+}
+
+/** A session `--bg` started is the daemon's to stop: its record names the full id it was given. */
+export async function stopSession(session: string): Promise<string | null> {
+  const short = session.slice(0, 8);
+  const job = await Bun.file(jobFile(short)).json().catch(() => null) as { sessionId?: string } | null;
+  if (job?.sessionId !== session) return null;
+  const proc = Bun.spawn(['claude', 'stop', short], { stdout: 'pipe', stderr: 'pipe' });
+  const out = (await new Response(proc.stdout).text()).trim();
+  await proc.exited;
+  return out || `stopped ${short}`;
 }
 
 // ── the Warp tab config ──────────────────────────────────────────────────────
@@ -92,11 +139,12 @@ export async function warpInstalled(): Promise<boolean> {
 // ── open ─────────────────────────────────────────────────────────────────────
 
 /**
- * The session id is written to state.json before the tab exists, so the hook events the
- * new session emits always find a mission already bound to them. A mission carrying a *live*
- * session is never rebound here: the old tab keeps sending events at a mission that has moved on,
- * and every one of them goes nowhere. `mission adopt` is the deliberate rebind, and it says so.
- * A recorded session whose tab is gone is simply replaced, or the mission could never be reopened.
+ * The session starts first, under `claude --bg`, and its id is in state.json before the tab
+ * exists: the tab only attaches, and Warp sees `claude` in it, which is what its badge reads. A
+ * mission carrying a *live* session is never rebound here: the old tab keeps sending events at a
+ * mission that has moved on, and every one of them goes nowhere. `mission adopt` is the deliberate
+ * rebind, and it says so. A recorded session that is gone is simply replaced, or the mission
+ * could never be reopened.
  */
 export async function openSession(cwd: string, mission: Mission, preset: Preset, dryRun: boolean): Promise<Spawn> {
   const bound = mission.state.session;
@@ -105,15 +153,18 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
     throw new Refusal(`mission ${mine} is bound to session ${bound} — factory mission adopt ${mine} --session <id> to rebind`);
   }
 
-  const session = crypto.randomUUID();
   const checkout = mission.state.worktree ?? (await mainCheckout(cwd));
   const name = `factory-${mission.state.name}`;
-  const command = assembleCommand(preset, mission, session);
+  const command = assembleCommand(preset, mission);
   const configPath = path.join(tabConfigs(), `${name}.toml`);
   const uri = `warp://tab_config/${encodeURIComponent(name)}`;
-  const spawn: Spawn = { preset, session, cwd: checkout, command, configPath, uri, warp: await warpInstalled() };
+  const warp = await warpInstalled();
 
-  if (dryRun) return spawn;
+  if (dryRun) return { preset, session: '', cwd: checkout, command, attach: 'claude attach <id>', configPath, uri, warp };
+
+  await writeSettings(preset, mission);
+  const { short, session } = await startSession(assembleArgs(preset, mission), checkout);
+  const attach = `claude attach ${short}`;
 
   mission.state.session = session;
   await writeState(mission.dir, mission.state);
@@ -123,9 +174,9 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
   if (claim?.mission === mission.state.name) await writeClaim(main, { ...claim, session, at: now() });
 
   await mkdir(path.dirname(configPath), { recursive: true });
-  await Bun.write(configPath, tabConfig(name, checkout, command));
+  await Bun.write(configPath, tabConfig(name, checkout, attach));
 
-  if (spawn.warp) await Bun.spawn(['open', uri], { stdout: 'ignore', stderr: 'ignore' }).exited;
+  if (warp) await Bun.spawn(['open', uri], { stdout: 'ignore', stderr: 'ignore' }).exited;
 
-  return spawn;
+  return { preset, session, cwd: checkout, command, attach, configPath, uri, warp };
 }

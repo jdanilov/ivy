@@ -11,6 +11,18 @@ export HOME="$TMP/home"
 # No tab ever opens from a test run, whatever this machine has installed.
 export WARP_MISSING=1
 trap 'rm -rf "$TMP"' EXIT
+# The `claude` a test run starts: no daemon and no model, just the one line and the one record
+# that `--bg` leaves behind, so `mission open` walks its real path and no session ever runs.
+mkdir -p "$TMP/bin" && cat > "$TMP/bin/claude" <<'STUB'
+#!/bin/sh
+case "$1" in
+   --bg) id="$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"; mkdir -p "$HOME/.claude/jobs/$id"
+      printf '{"sessionId":"%s-e2e0-4000-8000-000000000000"}\n' "$id" > "$HOME/.claude/jobs/$id/state.json"
+      echo "backgrounded · $id · $3";;
+   stop) echo "stopped $2";;
+esac
+STUB
+chmod +x "$TMP/bin/claude"; export PATH="$TMP/bin:$PATH"
 
 die() { echo "e2e: $1" >&2; exit 1; }
 # Never a tty on stdin: a run from a terminal must reach the same refusals a script does.
@@ -123,6 +135,8 @@ grep -q '\$HOME/.claude/scripts/safe-bash.sh' "$HOME/.claude/settings.json" || d
 says "$TMP" status --global | grep -q '5 installed' || die 'status --global does not read the parts back'
 # One run over every registered project and then the home dir, with no positional and no picker.
 says "$TMP" update --all | grep -q 'All done' || die 'update --all did not walk the projects and the home dir'
+# The daemon's records under ~/.claude are Claude Code's own, never the Factory's to remove.
+rm -rf "$HOME/.claude/jobs"
 fin "$TMP" uninstall --global --yes
 [ ! -e "$HOME/.claude" ] || die 'uninstall --global left the home .claude behind'
 

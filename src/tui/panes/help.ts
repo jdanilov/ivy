@@ -10,7 +10,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', '↵', 'Open the selection, or apply what is pending'], ['', '←', 'Back to the left column'],
   ['', 'esc', 'Back, or discard the pending toggles first'], ['', 'C', 'Caffeinate auto → on → off'],
   ['', '?', 'This panel'], ['', 'Q', 'Quit'],
-  ['Projects', 'O', 'Open the mission\'s Warp tab'], ['', 'X', 'Kill its session, again within 5s to SIGKILL'],
+  ['Projects', 'O', 'Start the mission\'s session and open its Warp tab'], ['', 'X', 'Stop its session; a hand-started one is signalled, again within 5s to SIGKILL'],
   ['', 'T', 'Autonomy full → partial → none'], ['', 'H', 'Archive a closed mission or a stub, or bring it back'],
   ['', 'Z', 'Show the archived ones'], ['', 'N', 'Rename: a mission\'s title, a session\'s name'],
   ['', 'M', 'A new stub mission in the project'], ['', '⇧↑↓', 'Move the row up or down; the order is kept'],

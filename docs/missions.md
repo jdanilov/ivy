@@ -32,8 +32,12 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission close` checks its own postconditions, so a rerun after a crash finishes the remaining work.
 - The mission folder always resolves through `git worktree list`, so worktrees find it in the main checkout.
 - Any transition that disagrees with `workflow.yaml` appends a `deviations` entry with a reason.
-- `mission open` writes the session id to `state.json` before the tab exists, so the first hook
-  event the new session emits already finds a mission bound to it.
+- `mission open` starts the session with `claude --bg`, whose daemon chooses the id, writes that id
+  to `state.json`, and only then opens a Warp tab running `claude attach <id>`: the first hook
+  event the session emits already finds a mission bound to it, and the tab holds a `claude`, which
+  is what Warp's badge reads. A daemon's child inherits nothing from the command line, so the
+  mission dir reaches the hook as `FACTORY_MISSION` through the mission's own `settings.json`, the
+  preset's overlay plus that `env` and `crossSessionInbound: accept`, written beside its state.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
 - A decision is one row in the mission's `decisions.md`, `id | step | by | confidence | summary |
   status | note`, written temp plus rename by `src/core/decision.ts` and, standalone, by the hook.

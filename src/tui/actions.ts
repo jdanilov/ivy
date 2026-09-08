@@ -5,7 +5,7 @@ import { update } from '../commands/update.js';
 import { removeParts } from '../core/parts.js';
 import { readManifest } from '../core/manifest.js';
 import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy, setTitle } from '../core/mission.js';
-import { loadPreset, openSession } from '../core/spawn.js';
+import { loadPreset, openSession, stopSession } from '../core/spawn.js';
 import { resetConfig, writeCaffeinate, writePartScope, type Caffeinate } from '../core/config.js';
 import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { id } from './format.js';
@@ -54,17 +54,16 @@ const ESCALATE = 5000;
 const termed = new Map<string, number>();
 
 /**
- * A process whose argv carries this session id, the flag `claude` was spawned with, so no other
- * process on the machine can match it by accident; or the pid the hook logged, for a session the
- * human started by hand and the Factory only adopted.
+ * A session `mission open` started belongs to Claude Code's own daemon, and `claude stop` is how
+ * it ends: the conversation stays, and `claude attach` opens it again. A session the human
+ * started by hand has only the pid the hook logged, and gets the signal.
  */
 export async function killSession(session: string): Promise<string> {
-  const proc = Bun.spawn(['pgrep', '-f', '--', `--session-id ${session}`], { stdout: 'pipe', stderr: 'ignore' });
-  const out = await new Response(proc.stdout).text();
-  await proc.exited;
+  const stopped = await stopSession(session);
+  if (stopped !== null) return `${stopped} · ${id(session)}`;
 
   const logged = await sessionPid(session);
-  const pids = [...new Set([...out.split('\n').map(Number), logged ?? 0])].filter((pid) => pid > 0 && pid !== process.pid);
+  const pids = logged === null || logged === process.pid ? [] : [logged];
   if (pids.length === 0) return `no process for ${id(session)}`;
 
   const hard = Date.now() - (termed.get(session) ?? 0) < ESCALATE;
@@ -75,7 +74,7 @@ export async function killSession(session: string): Promise<string> {
       process.kill(pid, signal);
       killed.push(pid);
     } catch {
-      // Gone between the pgrep and the signal: nothing left to kill.
+      // Gone between the lookup and the signal: nothing left to kill.
     }
   }
   termed.set(session, Date.now());

@@ -10,8 +10,8 @@ All five act on the checkout you are standing in, never prompt (the one exceptio
 offer in `mission new` on a claimed checkout) and exit 1 with a one-line `✗ …` on a refusal.
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
-factory mission shape <preset> [--autonomy L] | autonomy full|partial|none [name]
+factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
+factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
 factory mission archive <name> | unarchive <name>
@@ -66,8 +66,10 @@ factory handoff save <step>            # reads the handoff from stdin
   it. `mission shape <preset>` appends that preset's own steps behind `intent`, adds their pending
   `steps` entries and records the preset as `state.workflow`; it refuses once anything follows
   `intent` (`already shaped as story`) unless the preset is the one already there, and refuses a
-  preset that does not start with `intent`. `--autonomy` on either sets the dial; `mission autonomy
-  L` moves it later, with a `deviations` entry.
+  preset that does not start with `intent`. `--verify` on either puts `verify` (role verifier, back
+  to `implement`, max 2) behind `implement`, and refuses a preset with no `implement` or one that
+  verifies already. `--autonomy` on either sets the dial; `mission autonomy L` moves it later, with
+  a `deviations` entry.
 - One pointer rule serves `step add` and `mission shape`: after an insert, when the step before the
   new one is done or skipped and the pointer stands on it or on the step the insert displaced, the
   pointer moves to the new step. Anywhere else the pointer stays where it was.

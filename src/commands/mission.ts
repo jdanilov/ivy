@@ -5,7 +5,7 @@ import { str, type Flags } from '../core/args.js';
 import {
   Refusal, archiveMission, closeMission, createMission, currentBranch, currentCheckout, ensureIgnored,
   git, listArchived, listMissions, listWorktrees, mainCheckout, missionRowState, missionWorkflow, notStub,
-  pointAtInserted, readClaim, readyToOpen, resolveMission, sessionLive, setAutonomy, writeClaim, writeState,
+  pointAtInserted, readClaim, readyToOpen, resolveMission, sessionLive, setAutonomy, withVerify, writeClaim, writeState,
 } from '../core/mission.js';
 import { dumpWorkflow, loadWorkflow, runnerLabel, stepRole } from '../core/workflow.js';
 import { loadPreset, openSession } from '../core/spawn.js';
@@ -52,7 +52,7 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
 }
 
 async function create(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
-  if (!name) throw new Refusal('mission new <name> [--stub] [--quick] [--workflow W] [--autonomy full|partial|none] [--title T] [--worktree]');
+  if (!name) throw new Refusal('mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--title T] [--worktree]');
 
   const autonomy = autonomyOf(flags, 'partial');
 
@@ -79,6 +79,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
     autonomy,
     worktree,
     stub,
+    verify: flags.verify === true,
   });
 
   // A stub has no branch to commit on: `mission open` promotes it and takes care of the ignore then.
@@ -132,11 +133,12 @@ async function open(name: string | undefined, flags: Flags, cwd: string): Promis
  * intent the shape is settled, and asking for the same preset again is a no-op.
  */
 async function shape(preset: string | undefined, flags: Flags, cwd: string): Promise<void> {
-  if (!preset) throw new Refusal(`mission shape <preset> [--autonomy ${AUTONOMY.join('|')}]`);
+  if (!preset) throw new Refusal(`mission shape <preset> [--verify] [--autonomy ${AUTONOMY.join('|')}]`);
 
   const m = await resolveMission(cwd);
   const state = m.state;
-  const wanted = await loadWorkflow(preset, await mainCheckout(cwd));
+  const loaded = await loadWorkflow(preset, await mainCheckout(cwd));
+  const wanted = flags.verify === true ? withVerify(loaded) : loaded;
   if (wanted.steps[0]?.name !== 'intent') throw new Refusal(`${preset} has no intent step`);
   if (wanted.steps.length === 1) throw new Refusal(`${preset} has nothing after intent`);
 

@@ -49,8 +49,9 @@ scripts/tui-snapshot.ts The fixture screen as plain text, for a look review with
 scripts/spawn.ts        The one real model run behind `e2e.spawn`: a @Worker's decision injected back
 .factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run, e2e.spawn — a
                nested recipe reads back under its dotted path
-workflows/     intent, story, fix, chore, research, quick — the shipped workflow YAML: every
-               mission starts on intent and `mission shape` appends a preset behind that step
+workflows/     intent, story, chore, research, quick — the shipped workflow YAML: every mission
+               starts on intent, `mission shape` appends a preset behind that step and `--verify`
+               puts a verifier loop behind a chore's implement
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
 ~/.factory/    Home dir: projects list, config.yaml (var overrides, a `parts:` block choosing
                `project`, `global` or `off` per part over the scope its part.yaml recommends, plus

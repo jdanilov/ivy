@@ -36,15 +36,14 @@ of it, one `work` step with no intent to shape.
 | Preset     | Steps after `intent`                                                | Fits                    |
 |------------|---------------------------------------------------------------------|-------------------------|
 | `story`    | research → spec → implement → review (verify ∥ validate, back to implement, max 3) → merge | a feature, anything with a contract |
-| `fix`      | implement → verify (back to implement, max 2) → merge               | a known bug             |
-| `chore`    | implement → merge                                                   | mechanical work         |
+| `chore`    | implement → merge; `--verify` adds verify (back to implement, max 2) | mechanical work, a known bug with it |
 | `research` | investigate (sources ∥ transcripts) → report                        | a question, no code     |
 
 ## CLI
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
-factory mission shape <preset> [--autonomy L] | autonomy full|partial|none [name]
+factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
+factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset P] [--dry-run] | list [--all] | status|resume|close [name] | adopt <name> --session <id>
 factory step start|done|skip|loop <step> [--reason R] [--mission M] | add <step> --after <step> --role R --reason R
 factory gate open <step> --file F | answer <step> accept|amend|reject [--note N] | list

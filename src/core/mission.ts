@@ -350,6 +350,18 @@ export interface NewMission {
   autonomy: Autonomy;
   worktree: boolean;
   stub: boolean;
+  /** `--verify`: a verifier loop behind `implement`, for a chore whose change earns a second look. */
+  verify?: boolean;
+}
+
+/** A shipped preset verifies or it does not; the flag adds the loop to one that has an `implement`. */
+export function withVerify(workflow: Workflow): Workflow {
+  const at = workflow.steps.findIndex((s) => s.name === 'implement');
+  if (at === -1) throw new Refusal(`${workflow.name} has no implement step to verify`);
+  if (workflow.steps.some((s) => s.name === 'verify' || s.parallel?.includes('verify'))) throw new Refusal(`${workflow.name} already verifies`);
+  const steps = [...workflow.steps];
+  steps.splice(at + 1, 0, { name: 'verify', role: 'verifier', loop: { back: 'implement', max: 2 } });
+  return { ...workflow, steps };
 }
 
 /**
@@ -362,7 +374,8 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   const main = await mainCheckout(cwd);
   await registered(main);
   const checkout = await currentCheckout(cwd);
-  const workflow = await loadWorkflow(opts.workflow, main);
+  const loaded = await loadWorkflow(opts.workflow, main);
+  const workflow = opts.verify ? withVerify(loaded) : loaded;
   const title = opts.title ?? opts.name;
   const folder = path.join(missionsDir(main), `${today()}-${opts.name}`);
 

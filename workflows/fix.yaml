@@ -1,8 +1,0 @@
-name: fix
-steps:
-  - intent: { gate: human }
-  - implement: { role: worker }
-  - verify:
-      role: verifier
-      loop: { back: implement, max: 2 }
-  - merge

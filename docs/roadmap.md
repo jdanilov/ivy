@@ -10,6 +10,5 @@ a human prunes it, nothing else reads it.
 - [ ] OhMyPi harness: `omp` reads an existing `.claude/` tree, so parts need no second format; its per-project SQLite memory backend is the Memory candidate; the human runs the five-step scratch test first, then decide against the `mem` MCP line (2026-09-07-decisions)
 - [ ] Fresh-system install path: the `factory` command shipped or documented instead of a hand `bun link`, README rewritten why-first for a human reader (2026-09-07-decisions)
 - [ ] Graph editing from the screen: toggle a mission's steps on and off in the MISSION pane, `validate` first (2026-09-07-decisions)
-- [ ] Workflows: keep `story`, `research` and `quick`; drop `fix`; `chore` takes `--verify`, which adds the verifier loop after implement. `intent` stays the start of every shaped mission (2026-09-07-decisions)
 - [ ] Scroll the PARTS pane's list instead of clipping it — two rounds found the same bug class at different heights (2026-09-07-copies)
 - [ ] `applyScopes`' toast names only which projects updated, not what `update` seeded along with the moved part — report what changed, not that it ran (2026-09-07-copies)

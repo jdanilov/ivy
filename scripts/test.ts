@@ -617,9 +617,25 @@ await check('an insert past a finished step takes the pointer with it', async ()
   ok((await resolveMission(dir, 't')).state.step === 'x', 'step add did not take the pointer');
 });
 
+await check('--verify puts a verifier loop behind implement, and only where one fits', async () => {
+  const dir = await repo('verify');
+  await mission('new', ['v'], { 'no-open': true }, dir);
+  await mission('shape', ['chore'], { verify: true }, dir);
+  const shaped = await resolveMission(dir, 'v');
+  ok((await graph(dir, 'v')).join() === 'intent,implement,verify,merge', `shape chore --verify gave ${(await graph(dir, 'v')).join()}`);
+  ok(shaped.state.workflow === 'chore' && shaped.state.steps.verify?.status === 'pending', 'the verify step is not a pending chore step');
+  const wf = await missionWorkflow(shaped);
+  ok(wf.steps[2]?.role === 'verifier' && wf.steps[2]?.loop?.back === 'implement' && wf.steps[2]?.loop?.max === 2, 'verify is not a verifier loop back to implement');
+
+  for (const [preset, why] of [['story', 'already verifies'], ['research', 'no implement']] as const) {
+    const refused = await createMission(dir, { name: `v-${preset}`, workflow: preset, verify: true, autonomy: 'partial', worktree: false, stub: true }).then(() => null, (e: Error) => e);
+    ok(refused?.name === 'Refusal' && refused.message.includes(why), `${preset} --verify was not refused for ${why}: ${refused?.message}`);
+  }
+});
+
 await check('a step the mission looped back to counts its runs', async () => {
   const dir = await repo('runs');
-  await mission('new', ['t'], { workflow: 'fix', 'no-open': true }, dir);
+  await mission('new', ['t'], { workflow: 'chore', verify: true, 'no-open': true }, dir);
   await step('start', ['intent'], { mission: 't' }, dir);
   await gate('open', ['intent'], { mission: 't', file: 'intent.md' }, dir);
   await gate('answer', ['intent', 'accept'], { mission: 't' }, dir);

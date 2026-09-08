@@ -8,11 +8,11 @@ import type { Snapshot } from './model.js';
 /**
  * Files change, the screen follows. `fs.watch` on everything a snapshot is built from, one rebuild
  * per burst, and a poll underneath it: a watcher that never fired — a mission folder created after
- * we started, a filesystem that drops events — costs two seconds, not the session.
+ * we started, a filesystem that drops events — costs a second, not the session.
  */
 
 const DEBOUNCE = 200;
-const POLL = 2000;
+const POLL = 1000;
 
 /** Recursive on the mission folders, which grow subfolders; flat on the rest, which do not. */
 function watched(snap: Snapshot): [dir: string, recursive: boolean][] {

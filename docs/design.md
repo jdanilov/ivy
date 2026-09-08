@@ -104,8 +104,8 @@ long since its last event on the right.
 
 A stub has no graph, so the MISSION pane gives its title and the first paragraph under `## Why`
 in its `intent.md` where the steps would be: two stubs differ by what they are for, not by name.
-An open mission whose title is not its name carries it in the pane header, `MISSION  copies ·
-Parts as copies`.
+Any mission whose title is not its name carries it under the pane's rule, wrapped to two lines:
+the title is what the mission is for, and a header's tail is where a line gets cut.
 
 The bar is also the one line the screen takes typing on. `N` and `M` ask for a name or a title
 there — the label, what has been typed, a cursor — and while the line is open every key is a
@@ -182,7 +182,9 @@ into, and the two kinds sit in one list where the tail of a row is too far to re
 A session is `▸ working` from its prompt to its Stop — no hook fires in between, so the last event's age
 says nothing — and `▸ working · <role>` while a sub-agent is out in the background; then the
 turn that ended is not a question, and the Inbox lists it only once the last sub-agent has
-reported back. `▹ idle <since its last Stop>` otherwise.
+reported back. `▹ idle <since its last Stop>` otherwise. A session is listed while its events
+file is under ten minutes old and the pid the hook logged is still a `claude` process: a tab closed
+on an idle session fires no hook, and the file alone would keep the row until the window ran out.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.
@@ -231,7 +233,7 @@ keys do, and none of these three do the same thing.
 | `O`     | mission row      | open the mission's Warp tab; a bound mission is refused          |
 | `X`     | mission, session | SIGTERM the session's process, SIGKILL on a second press         |
 | `T`     | mission, MISSION | autonomy full → partial → none                                   |
-| `H`     | mission row      | archive a closed mission, or bring an archived one back          |
+| `H`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
 | `Z`     | left             | show the archived missions                                       |
 | `N`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
 | `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |

@@ -196,19 +196,8 @@ export async function ensureIgnored(checkout: string): Promise<'added' | 'commit
 
 // ── sessions ─────────────────────────────────────────────────────────────────
 
-/** Live means the session's events file was touched inside the last ten minutes. */
-export async function sessionLive(session: string | null): Promise<boolean> {
-  if (!session) return false;
-  const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
-  return info !== null && Date.now() - info.mtimeMs < LIVE_WINDOW_MS;
-}
-
-/**
- * The Claude process behind a session, from the pid the hook logs on every event line. A session
- * started by hand has no `--session-id` in its argv, so this is the only way to find it; the pid
- * counts only while a process named `claude` still holds it, since pids get reused.
- */
-export async function sessionPid(session: string): Promise<number | null> {
+/** The pid the hook logged on the session's last event line, whether or not it still runs. */
+async function loggedPid(session: string): Promise<number | null> {
   const text = await readFile(path.join(eventsDir(), `${session}.jsonl`), 'utf-8').catch(() => '');
   const last = text.trimEnd().split('\n').at(-1) ?? '';
   let pid: unknown;
@@ -217,11 +206,38 @@ export async function sessionPid(session: string): Promise<number | null> {
   } catch {
     return null;
   }
-  if (typeof pid !== 'number' || pid <= 0) return null;
+  return typeof pid === 'number' && pid > 0 ? pid : null;
+}
+
+/** Pids get reused: a pid counts only while a process named `claude` still holds it. */
+async function isClaude(pid: number): Promise<boolean> {
   const proc = Bun.spawn(['ps', '-o', 'comm=', '-p', String(pid)], { stdout: 'pipe', stderr: 'ignore' });
   const comm = (await new Response(proc.stdout).text()).trim();
   await proc.exited;
-  return path.basename(comm) === 'claude' ? pid : null;
+  return path.basename(comm) === 'claude';
+}
+
+/**
+ * Live means the session's events file was touched inside the last ten minutes and the process the
+ * hook logged is still there: a tab closed on an idle session fires no hook, so the file alone would
+ * keep it on the screen until the window ran out. A line from before the hook logged pids has only
+ * the window to go by.
+ */
+export async function sessionLive(session: string | null): Promise<boolean> {
+  if (!session) return false;
+  const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
+  if (info === null || Date.now() - info.mtimeMs >= LIVE_WINDOW_MS) return false;
+  const pid = await loggedPid(session);
+  return pid === null || isClaude(pid);
+}
+
+/**
+ * The Claude process behind a session, from the pid the hook logs on every event line. A session
+ * started by hand has no `--session-id` in its argv, so this is the only way to find it.
+ */
+export async function sessionPid(session: string): Promise<number | null> {
+  const pid = await loggedPid(session);
+  return pid !== null && (await isClaude(pid)) ? pid : null;
 }
 
 // ── finding missions ─────────────────────────────────────────────────────────
@@ -534,7 +550,8 @@ export async function archiveMission(cwd: string, name: string, back = false): P
     if ((await readMissions(to)).find(named)) return [];
     throw new Refusal(`no mission "${name}" in ${from}`);
   }
-  if (mission.state.status !== 'closed') throw new Refusal(`mission ${name} is ${mission.state.status} — close it first`);
+  // A stub has no branch and no session: dropping it into the archive loses nothing, so it may go too.
+  if (mission.state.status === 'open') throw new Refusal(`mission ${name} is open — close it first`);
 
   const target = path.join(to, path.basename(mission.dir));
   await mkdir(to, { recursive: true });

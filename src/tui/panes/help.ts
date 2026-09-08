@@ -11,7 +11,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', 'esc', 'Back, or discard the pending toggles first'], ['', 'C', 'Caffeinate auto → on → off'],
   ['', '?', 'This panel'], ['', 'Q', 'Quit'],
   ['Projects', 'O', 'Open the mission\'s Warp tab'], ['', 'X', 'Kill its session, again within 5s to SIGKILL'],
-  ['', 'T', 'Autonomy full → partial → none'], ['', 'H', 'Archive a closed mission, or bring it back'],
+  ['', 'T', 'Autonomy full → partial → none'], ['', 'H', 'Archive a closed mission or a stub, or bring it back'],
   ['', 'Z', 'Show the archived ones'], ['', 'N', 'Rename: a mission\'s title, a session\'s name'],
   ['', 'M', 'A new stub mission in the project'], ['', '⇧↑↓', 'Move the row up or down; the order is kept'],
   ['Messages', '↑↓', 'Read what waits — every one answers in its session'],

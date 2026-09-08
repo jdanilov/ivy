@@ -25,13 +25,13 @@ const NAME_COL = 13;
 
 export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
-  // The title a human gave it rides the header; a stub's stands alone below, where its graph would be.
-  const titled: Cell[] = m.title !== m.name && m.steps.length ? [DOT, [m.title, C.dim]] : [];
-  p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim], ...titled], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
+  p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
-  // A stub has no graph, so the pane says what it is for: the title, then the intent's own why.
-  if (!m.steps.length) {
-    p.row([[' ', C.dim], [m.title, C.bright]]);
+  // The title is what a mission is for, so it gets two whole lines, never a header's tail. A stub
+  // has nothing to run yet: the first paragraph of its intent's why stands where the graph would.
+  const stub = m.status === 'stub';
+  if (stub || m.title !== m.name) for (const l of wrap(m.title, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.bright]]);
+  if (stub) {
     for (const l of wrap(m.why ?? 'no intent yet', p.width - 1, 6)) p.row([[' ', C.dim], [l, C.dim]]);
     p.rule();
     return;

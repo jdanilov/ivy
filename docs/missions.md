@@ -84,7 +84,7 @@ factory handoff save <step>            # reads the handoff from stdin
   opens again. Mission Control's `O` raises the same refusal as a toast.
 - `mission new` on a claimed checkout with no tty on stdin refuses with `add --worktree` instead of
   hanging on a prompt nobody can answer, and leaves no folder behind.
-- `mission archive <name>` refuses unless the mission is closed and renames its folder into
-  `.factory/archive/`; git is not involved, both folders are ignored. `unarchive` is the reverse,
+- `mission archive <name>` refuses while the mission is open, and renames a closed one's or a
+  stub's folder into `.factory/archive/` — a stub has no branch, so nothing is lost with it; git is not involved, both folders are ignored. `unarchive` is the reverse,
   both are idempotent, and only `mission list --all` reads the archive.
 - `mission list` and `gate list` skip a registered project whose path is gone. The projects file keeps it.

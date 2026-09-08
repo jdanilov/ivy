@@ -717,6 +717,11 @@ await check('a closed mission archives, comes back and is idempotent either way'
 
   await archiveMission(dir, 'a', true);
   ok((await listMissions(dir)).length === 1 && (await listArchived(dir)).length === 0, 'unarchive did not put it back');
+
+  // A stub has no branch, so it may go without being closed first.
+  await createMission(dir, { name: 's', workflow: 'chore', autonomy: 'partial', worktree: false, stub: true });
+  ok((await archiveMission(dir, 's')).length === 1, 'a stub did not archive');
+  ok((await listArchived(dir)).map((m) => m.state.name).join() === 's', 'the archive does not hold the stub');
 });
 
 await check('the Factory\'s own files are ignored, once and committed', async () => {

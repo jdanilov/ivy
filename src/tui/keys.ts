@@ -178,7 +178,7 @@ function handleKey(app: App, key: KeyEvent): void {
       if (right) break;
       if (here.kind !== 'mission') return toast(app, 'select a mission to archive it');
       const m = here.mission;
-      if (m.status !== 'closed') return toast(app, `${m.name} is ${m.status} — close it first`);
+      if (m.status === 'open') return toast(app, `${m.name} is open — close it first`);
       return act(app, `${m.archived ? 'unarchiving' : 'archiving'} ${m.name}…`,
         () => archive(here.project.path, m.name, m.archived));
     }

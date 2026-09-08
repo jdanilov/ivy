@@ -580,11 +580,15 @@ await check('intent.md round-trips and leaves out what nothing filled', async ()
 });
 
 await check('an intent written under `## Why` reads as a goal', async () => {
-  const why = parseIntent('# Intent: old\n\n## Why\n\nthe old missions say it here.\n\na second paragraph.\n');
-  ok(why.goal === 'the old missions say it here.', `the why did not stand in for the goal: ${JSON.stringify(why.goal)}`);
+  // The whole body, paragraphs and all: the first save rewrites the file, so a why read by halves
+  // would be a why deleted by halves.
+  const body = 'the old missions say it here.\n\na second paragraph.';
+  const why = parseIntent(`# Intent: old\n\n## Why\n\n${body}\n`);
+  ok(why.goal === body, `the why did not stand in for the goal whole: ${JSON.stringify(why.goal)}`);
+  ok(parseIntent(renderIntent('old', why)).goal === body, 'the save lost part of the why');
   const both = parseIntent('# Intent: old\n\n## Why\n\nthe why\n\n## Goal\n\nthe goal\n');
   ok(both.goal === 'the goal', `the why won over a goal that is there: ${JSON.stringify(both.goal)}`);
-  // Read only: a save moves the line under `## Goal` and never writes `## Why` back.
+  // Read only: a save moves the body under `## Goal` and never writes `## Why` back.
   ok(!renderIntent('old', why).includes('## Why'), 'render wrote a `## Why` section');
 });
 

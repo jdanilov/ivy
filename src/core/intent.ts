@@ -52,9 +52,10 @@ export function parseIntent(text: string): Intent {
   const intent: Intent = { ...EMPTY };
   for (const [key, heading] of SECTIONS) intent[key] = found[heading] ?? '';
   // Half the missions written before the form say what they are for under `## Why`, and a stub
-  // with no goal cannot be opened from Mission Control. Read the why as the goal — the first
-  // paragraph, which is the line a human would have written into the field — and a save migrates it.
-  if (intent.goal === '') intent.goal = (found[WHY] ?? '').split(/\n\s*\n/)[0]!.trim();
+  // with no goal cannot be opened from Mission Control. Read the why as the goal — the whole body,
+  // because the first save rewrites the file and anything left behind here is deleted — and the
+  // pane's own first-paragraph rule still draws one line of it.
+  if (intent.goal === '') intent.goal = found[WHY] ?? '';
   return intent;
 }
 

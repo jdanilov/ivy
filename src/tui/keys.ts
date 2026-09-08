@@ -7,10 +7,10 @@ import {
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
+import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
-import { AUTONOMY, AUTONOMY_FIELD, FIELDS, draftFor, formOf, showsForm, untouched } from './panes/form.js';
+import { AUTONOMY, AUTONOMY_FIELD, FIELDS, draftFor, formOf, showsParts, untouched, type Form } from './panes/form.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
 import type { Caffeinate, Intent, Launch, Mission, Project } from './model.js';
 
@@ -90,16 +90,15 @@ function composing(app: App, key: KeyEvent): void {
 function forming(app: App, key: KeyEvent): void {
   const { ui } = app;
   const { here } = select(app.snap, ui);
-  const formKey = formOf(here);
+  const form = formOf(here);
   // The row moved out from under the form — an archived stub, a promoted one: the keys go back.
-  if (formKey === null) {
+  if (form === null) {
     ui.form = false;
     return draw(app);
   }
-  const create = here.kind === 'project';
   const d = draftFor(ui, here);
   // A stub's name is fixed once the folder exists, so the cursor never lands on it there.
-  const first = create ? 0 : 1;
+  const first = form.create ? 0 : 1;
   const stops = AUTONOMY_FIELD + 1 - first;
   const field = FIELDS[d.field];
 
@@ -108,10 +107,10 @@ function forming(app: App, key: KeyEvent): void {
     // A draft still equal to what it was made from leaves nothing behind: the project row goes
     // back to its parts, a stub's pane back to following its file. A changed one is kept, and
     // the pane keeps showing it.
-    if (untouched(d, here)) delete ui.intents[formKey];
+    if (untouched(d, here)) delete ui.intents[form.key];
   } else if (key.name === 'tab') {
     d.field = first + (((d.field - first + (key.shift ? -1 : 1)) % stops) + stops) % stops;
-  } else if (key.ctrl && key.name === 's') return saveForm(app, here, formKey, create);
+  } else if (key.ctrl && key.name === 's') return saveForm(app, form, d);
   else if (key.ctrl && key.name === 'u') {
     if (field) d[field[0]] = { text: '', cursor: 0 };
   } else if (field === undefined && (key.name === 'left' || key.name === 'right')) {
@@ -125,12 +124,10 @@ function forming(app: App, key: KeyEvent): void {
 
 /** `^S`: what the form refuses is named on the status bar and the cursor is put on it, so the
  *  next keystroke fixes it. Nothing is written until both required fields hold something. */
-function saveForm(app: App, here: LeftItem, formKey: string, create: boolean): void {
+function saveForm(app: App, form: Form, d: IntentDraft): void {
   const { ui } = app;
-  if (here.kind === 'inbox') return;
-  const project = here.project;
-  const d = draftFor(ui, here);
-  const name = create ? d.name.text.trim() : here.kind === 'mission' ? here.mission.name : '';
+  const { project, create } = form;
+  const name = create ? d.name.text.trim() : form.name;
   const goal = d.goal.text.trim();
 
   if (create && !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
@@ -148,7 +145,7 @@ function saveForm(app: App, here: LeftItem, formKey: string, create: boolean): v
 
   const intent: Intent = { goal, done: d.done.text.trim(), not: d.not.text.trim(), start: d.start.text.trim() };
   const autonomy = d.autonomy;
-  delete ui.intents[formKey];
+  delete ui.intents[form.key];
   ui.form = false;
   act(app, `saving ${name}…`, () => saveIntent(project.path, name, intent, autonomy, create));
 }
@@ -209,7 +206,7 @@ function handleKey(app: App, key: KeyEvent): void {
   const inGlobal = here.kind === 'global';
   // The form outranks Parts on a project row, so the Parts keys go where the pane went: `space`
   // must never toggle a part nobody can see.
-  const inParts = right && (inGlobal || (here.kind === 'project' && !showsForm(ui, here)));
+  const inParts = right && showsParts(ui, here);
   // A stub has no graph and no dial in the pane: its right pane is the intent form.
   const inMission = right && here.kind === 'mission' && here.mission.status !== 'stub';
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);

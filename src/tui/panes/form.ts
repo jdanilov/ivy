@@ -2,7 +2,7 @@ import { C } from '../theme.js';
 import { spread, type Cell } from '../format.js';
 import { draftRows, type Draft } from './compose.js';
 import { itemKey, type IntentDraft, type LeftItem, type Pane, type Ui } from './pane.js';
-import type { Autonomy, Intent } from '../model.js';
+import type { Autonomy, Intent, Project } from '../model.js';
 
 /**
  * INTENT: the stub's own pane. A mission is created and edited here, not on the status bar, so
@@ -24,10 +24,23 @@ export type TextField = 'name' | 'goal' | 'done' | 'not' | 'start';
 export const AUTONOMY_FIELD = FIELDS.length;
 export const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 
-/** The row's form key: one draft per project for a new mission, one per stub for an edit. */
-export function formOf(here: LeftItem): string | null {
-  if (here.kind === 'project') return `new ${here.project.name}`;
-  if (here.kind === 'mission' && here.mission.status === 'stub') return itemKey(here);
+/** The row the form belongs to, and everything saving it needs: one rule, stated once, so no
+ *  caller has to narrow the row again to find the project or the name. */
+export interface Form {
+  /** The draft's key: one per project for a new mission, one per stub for an edit. */
+  key: string;
+  project: Project;
+  /** '' while the stub is not made: until then the name is a field of the form. */
+  name: string;
+  create: boolean;
+}
+
+/** A project row writes a new mission, a stub row edits its own; every other row has no form. */
+export function formOf(here: LeftItem): Form | null {
+  if (here.kind === 'project') return { key: `new ${here.project.name}`, project: here.project, name: '', create: true };
+  if (here.kind === 'mission' && here.mission.status === 'stub') {
+    return { key: itemKey(here), project: here.project, name: here.mission.name, create: false };
+  }
   return null;
 }
 
@@ -47,10 +60,7 @@ function fresh(here: LeftItem): IntentDraft {
 }
 
 /** The row's draft, made on demand: from here on the pane shows it and not the file. */
-export const draftFor = (ui: Ui, here: LeftItem): IntentDraft => (ui.intents[formOf(here)!] ??= fresh(here));
-
-const hasText = (d: IntentDraft | undefined): boolean =>
-  d !== undefined && FIELDS.some(([key]) => d[key].text.trim() !== '');
+export const draftFor = (ui: Ui, here: LeftItem): IntentDraft => (ui.intents[formOf(here)!.key] ??= fresh(here));
 
 /** A draft nobody has changed yet: still the row's own files. `Esc` drops one, so the pane goes
  *  back to following `intent.md` instead of freezing against it. */
@@ -61,20 +71,32 @@ export function untouched(d: IntentDraft, here: LeftItem): boolean {
 
 /**
  * When the right pane is the form. A stub is edited in it, so it always is; a project row shows a
- * new mission's draft the way any row shows a draft — while it has text, or while it has the keys.
+ * new mission's draft the way any row shows a draft — while it has the keys, or while it holds
+ * something the row did not give it. `untouched` is the one reading of that, so the draft `Esc`
+ * keeps is exactly the draft the pane goes on showing: a turned dial counts as much as typing.
  */
 export function showsForm(ui: Ui, here: LeftItem): boolean {
-  const key = formOf(here);
-  if (key === null) return false;
-  return here.kind === 'mission' || ui.form || hasText(ui.intents[key]);
+  const form = formOf(here);
+  if (form === null) return false;
+  if (here.kind === 'mission' || ui.form) return true;
+  const d = ui.intents[form.key];
+  return d !== undefined && !untouched(d, here);
 }
 
+type PartsRow = Extract<LeftItem, { kind: 'global' | 'project' }>;
+
+/** When the right pane is PARTS. The form outranks it on a project row, and the keys and the key
+ *  bar read this rather than restate it: `space` toggling a part nobody can see was that bug.
+ *  A predicate, so both callers still reach the project the pane is about. */
+export const showsParts = (ui: Ui, here: LeftItem): here is PartsRow =>
+  here.kind === 'global' || (here.kind === 'project' && !showsForm(ui, here));
+
 export function formPane(p: Pane, ui: Ui, here: LeftItem): void {
-  const key = formOf(here);
-  if (key === null) return;
+  const form = formOf(here);
+  if (form === null) return;
   // No draft yet: a throwaway of what is on disk, so a hand edit of `intent.md` shows on the next
   // poll. Once one exists it is what the pane draws, until it is saved or dropped.
-  const d = ui.intents[key] ?? fresh(here);
+  const d = ui.intents[form.key] ?? fresh(here);
   const stub = here.kind === 'mission';
 
   p.row(spread([['INTENT', C.bright], [`  ${d.name.text || 'new mission'}`, C.dim]],

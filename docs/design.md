@@ -174,7 +174,9 @@ form and not Parts — the key bar lists the pane on screen. What `^S` writes is
 left out.
 
 A stub's autonomy is the form's dial and nothing else: `T` on a stub row says so rather than
-writing beside a draft that would put its own value back on the next `^S`.
+writing beside a draft that would put its own value back on the next `^S`, and the key bar leaves
+the key out on both sides. A dial turned in the form is a changed draft like any typing: `Esc`
+keeps it and the pane goes on showing it, so a value the row never gave is never held unseen.
 
 `O` on a stub whose goal is empty is refused — the session would only ask what the form is for.
 The CLI's own `mission open` is not: running it is a deliberate act, and a bare stub is a fair
@@ -331,7 +333,7 @@ keys do, and none of these three do the same thing.
 | `R`     | Parts            | reset the toggles                                                |
 | `O`     | mission row      | open the mission's Warp tab with `/mission` as the session's first prompt: `claude` in the tab, or under `claude --bg` with the tab attached when `launch: bg`; a bound mission is refused |
 | `K`     | mission, session | kill: `claude stop` for a session started under `--bg`, which keeps its conversation; SIGTERM for any other, SIGKILL on a second press |
-| `T`     | mission, MISSION | autonomy full → partial → none; on a stub the form's dial is the writer |
+| `T`     | mission, MISSION | autonomy full → partial → none; on a stub the form's dial is the writer and the bar does not offer the key |
 | `E`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |
@@ -345,9 +347,10 @@ keys do, and none of these three do the same thing.
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
-would be a toast: a mission row answers `O K T E`, a session row `K R`, a project `M`, the Inbox
-and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row with a session behind it
-and `Open` on the rest.
+would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
+project `M`, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
+with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
+Autonomy` on a stub, whose pane is the form and not MISSION.
 
 A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `R`
 keeps the Factory's word on the session's own events file: one `Rename` line carrying what the

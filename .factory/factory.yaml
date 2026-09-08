@@ -13,6 +13,10 @@ recipes:
       # decision paths fired the way Claude Code fires them. Both check themselves.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row global right space return escape escape
+      # The intent form: `m` opens it on a project row, and both refusals happen before any write,
+      # so the fixture pointing at this very repo is safe to drive.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' m type:x C-s --expect goal
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/recall' o --expect 'no goal'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

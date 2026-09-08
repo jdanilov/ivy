@@ -4,7 +4,8 @@ import { install } from '../commands/install.js';
 import { update } from '../commands/update.js';
 import { removeParts } from '../core/parts.js';
 import { readManifest } from '../core/manifest.js';
-import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy, setTitle } from '../core/mission.js';
+import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { writeIntent, type Intent } from '../core/intent.js';
 import { loadPreset, openSession, stopSession } from '../core/spawn.js';
 import { inboxOf, post } from '../core/peer.js';
 import { resetConfig, writeCaffeinate, writeLaunch, writePartScope, type Caffeinate, type Launch } from '../core/config.js';
@@ -200,16 +201,20 @@ export async function setAutonomy(project: string, name: string, autonomy: Auton
   return `${name} autonomy ${autonomy}`;
 }
 
-/** What `mission new --stub` makes: a folder and an intent skeleton, no branch. `O` promotes it. */
-export async function newMission(project: string, name: string, title: string): Promise<string> {
-  const created = await createMission(project, { name, title: title || undefined, workflow: 'intent', autonomy: 'partial', worktree: false, stub: true });
-  return `stub ${created.state.name} · O opens it`;
-}
-
-/** The title moves; the name is the branch and the folder, and stays. */
-export async function renameMission(project: string, name: string, title: string): Promise<string> {
-  await setTitle(project, name, title);
-  return `${name} titled "${title}"`;
+/**
+ * What the intent form writes. A new one is `mission new --stub`: a folder and the intent it was
+ * filled with, no branch, and `O` promotes it. An existing stub keeps its folder and its name —
+ * the form never renames — so only `intent.md` and, when the dial moved, `state.json` are written.
+ */
+export async function saveIntent(project: string, name: string, intent: Intent, autonomy: Autonomy, create: boolean): Promise<string> {
+  if (create) {
+    const made = await createMission(project, { name, intent, workflow: 'intent', autonomy, worktree: false, stub: true });
+    return `stub ${made.state.name} · O opens it`;
+  }
+  const mission = await resolveMission(project, name);
+  await writeIntent(mission.dir, name, intent);
+  if (mission.state.autonomy !== autonomy) await writeAutonomy(project, name, autonomy, 'set from the intent form');
+  return `${name} intent saved`;
 }
 
 /**

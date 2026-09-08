@@ -159,7 +159,7 @@ const globalParts: PartRow[] = [
 /** Everything a mission needs but a fixture rarely varies. */
 function mission(m: Partial<Mission> & Pick<Mission, 'name' | 'workflow'>): Mission {
   return {
-    title: m.name, status: 'open', state: 'pending', autonomy: 'full', archived: false, step: null, round: 0,
+    status: 'open', state: 'pending', autonomy: 'full', archived: false, step: null, round: 0,
     session: null, preset: null, branch: null, worktree: null, wall: 0,
     tokens: { input: 0, cached: 0, output: 0 }, steps: [], decisions: [], deviations: [],
     ...m,
@@ -184,9 +184,16 @@ const projects: Project[] = [
         decisions: refitDecisions, diff: { added: 412, removed: 96 },
       }),
       mission({
-        name: 'memory', title: 'Memory: the mem MCP', workflow: 'intent', status: 'stub',
-        why: 'Every mission relearns the project from scratch. A per-project note store the hook recalls on prompt would let a session start where the last one stopped.',
+        name: 'memory', workflow: 'intent', status: 'stub',
+        intent: {
+          goal: 'A per-project note store the hook recalls on prompt, so a session starts where the last one stopped instead of relearning the project.',
+          done: 'the hook injects the three notes closest to the prompt\na mission\'s retro proposes memories and /retro files them',
+          not: 'embeddings: a grep index is instant and dumb, and v1 wants dumb',
+          start: '@docs/memories.md, the seed corpus',
+        },
       }),
+      // No goal: what `O` refuses, and what the form opens on.
+      mission({ name: 'recall', workflow: 'intent', status: 'stub' }),
     ],
   },
   {

@@ -108,10 +108,10 @@ counts. `Global` is `~/.claude has 5/17 parts installed`. The settings, `Launch`
 A session has no steps to bar and no project to count: `IDLE`, its id, preset and cwd, and how
 long since its last event on the right.
 
-A stub has no graph, so the MISSION pane gives its title and the first paragraph under `## Why`
-in its `intent.md` where the steps would be: two stubs differ by what they are for, not by name.
-Any mission whose title is not its name carries it under the pane's rule, wrapped to two lines:
-the title is what the mission is for, and a header's tail is where a line gets cut.
+A mission's one human line is the first line of `## Goal` in its `intent.md`, and the MISSION pane
+carries it under the rule, wrapped to two lines: what the mission is for deserves whole lines, and
+a header's tail is where a line gets cut. A stub has no graph and no facts to state, so its right
+pane is the intent form instead.
 
 The SESSION pane says what ACTIVITY cannot at a glance: `now`, the `bash` or `sub` row still out
 and how long it has been; `turn`, the open turn's tool count and length so far, or the last
@@ -119,10 +119,9 @@ turn's; `spend`, the session's own tokens in and out and `context`, what its las
 the one figure that says how full the window is. Its last word is the log's last row, and the
 pane does not repeat it.
 
-The bar is also the one line the screen takes a name on. `R` and `M` ask for a name or a title
-there — the label, what has been typed, a cursor — and while the line is open every key is a
-character but `↵`, `Esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
-writes nothing.
+The bar is also the one line the screen takes a name on. `R` asks for one there — the label, what
+has been typed, a cursor — and while the line is open every key is a character but `↵`, `Esc` and
+backspace, `q` included. Nothing is written until `↵`; an empty line writes nothing.
 
 ### The message box
 
@@ -148,6 +147,32 @@ answered in the tab, and the screen only shows that one is waiting. A session st
 `--dangerously-skip-permissions` holds a message from a sender with no permission class behind a
 dialog unless its `crossSessionInbound` is `accept`; the sessions `O` starts carry that in their
 settings overlay, a hand-started one needs it in `~/.claude/settings.json`.
+
+### The intent form
+
+A stub is written where it is read: `M` on any of a project's rows, or `↵` on a stub, gives the
+right pane the INTENT form, and the status bar takes nothing. A status-bar line can ask for a name;
+it cannot ask for the four sections the Orchestrator otherwise interviews the human for in the tab,
+one turn late. The form is those sections, so `O` opens onto a filled `intent.md` and the session
+starts working.
+
+Six fields, in the order they are walked: `name`, a lowercase slug that is the folder and later
+the branch, and fixed once the folder exists — renaming a stub is delete and remake, so on a stub
+the name is drawn and never focused; `goal`, what the mission is for; `done looks like`, one per
+line; `not in this mission`, the guardrails; `start from`, the files, docs and prior work; and
+`autonomy`, the dial, `full | partial | none` with the chosen one bright.
+
+Every field is a message-box draft — the same editor, the same wrap, the same cursor — so `↵` is a
+line break inside a field and the field is changed with `⇥` and `⇧⇥`. `^S` saves: an empty goal or
+a name that is not a slug, taken, or empty is refused with a toast naming the field and the cursor
+put on it, and nothing is written. `Esc` hands the keys back and keeps the draft, one per row, so
+`↑↓` between two stubs keeps what was typed into each; a new mission's draft belongs to its project
+row and is shown there, dim, until it is saved. What `^S` writes is the whole of `intent.md`: the
+form owns the file, `## Goal` is always there and a section with nothing in it is left out.
+
+`O` on a stub whose goal is empty is refused — the session would only ask what the form is for.
+The CLI's own `mission open` is not: running it is a deliberate act, and a bare stub is a fair
+thing to open by hand.
 
 ### The Inbox
 
@@ -286,6 +311,12 @@ keys do, and none of these three do the same thing.
 | `^K`    | message box      | erase the line the cursor is on                                  |
 | `^V`    | message box      | paste the clipboard; `⌘V` is the terminal's own paste and lands the same |
 | `Esc`   | message box      | keep the draft, hand the keys back                               |
+| `↵`     | stub row         | edit its intent in the form, on the goal                          |
+| `⇥` `⇧⇥` | intent form     | the next field, the one before; the last stop is the autonomy dial |
+| `←→`    | intent form      | on autonomy, turn the dial; in a field, walk the text             |
+| `^S`    | intent form      | save: the stub is made, or its `intent.md` and autonomy rewritten |
+| `^U`    | intent form      | clear the field                                                   |
+| `Esc`   | intent form      | keep the draft, hand the keys back                                |
 | `←`     | right            | back to the left pane                                            |
 | `Esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
 | `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
@@ -297,8 +328,8 @@ keys do, and none of these three do the same thing.
 | `T`     | mission, MISSION | autonomy full → partial → none                                   |
 | `E`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
 | `S`     | left             | show the archived missions                                       |
-| `R`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
-| `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |
+| `R`     | session          | rename a session; a mission's name is its branch and never moves |
+| `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
 | `L`     | any              | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
@@ -308,8 +339,9 @@ keys do, and none of these three do the same thing.
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
-would be a toast: a mission row answers `O K T E R`, a session row `K R`, a project `M`, the Inbox
-and `Global` none of them; `↵` reads `Message` on a row with a session behind it and `Open` on the rest.
+would be a toast: a mission row answers `O K T E`, a session row `K R`, a project `M`, the Inbox
+and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row with a session behind it
+and `Open` on the rest.
 
 A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `R`
 keeps the Factory's word on the session's own events file: one `Rename` line carrying what the

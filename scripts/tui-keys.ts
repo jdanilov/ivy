@@ -14,8 +14,9 @@
  *   --focus right|left  starting focus (default left)
  *   --wait <ms>         pause after each key so an action's write lands (default 400)
  *   --quiet             only the last frame
+ *   --expect <substr>   the last frame must contain it, else ✗ and exit 1
  *   --spans <substr>    after the last key, print colour + column of every span holding substr ('*' = all)
- *   keys: up down left right return escape space backspace delete home end a d e k m s t c l o y r ? q
+ *   keys: up down left right tab return escape space backspace delete home end a d e k m s t c l o y r ? q
  *         S-<key> (shifted), C-<key> (control), M-<key> (option)  |  type:<text> (one key per character)  |  sleep:ms  |  reload
  */
 import type { KeyEvent } from '@opentui/core';
@@ -30,7 +31,7 @@ const opt = (name: string): string | undefined => {
   return i === -1 ? undefined : argv[i + 1];
 };
 const flag = (name: string): boolean => argv.includes(`--${name}`);
-const VALUE_FLAGS = new Set(['row', 'focus', 'wait', 'spans']);
+const VALUE_FLAGS = new Set(['row', 'focus', 'wait', 'spans', 'expect']);
 const keys = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1]?.startsWith('--') && VALUE_FLAGS.has(argv[i - 1]!.slice(2))));
 
 const rebuild = async (): Promise<Snapshot> => {
@@ -58,12 +59,15 @@ const wait = Number(opt('wait') ?? 400);
 const quiet = flag('quiet');
 
 let broken = 0;
+/** The frame the run ended on: what `--expect` is checked against. */
+let last = '';
 
 /** The frame a key left behind, and the two things every frame owes whoever is looking at it. */
 async function frame(label: string): Promise<void> {
   render(renderer, app.snap, app.ui);
   await renderOnce();
   const text = captureCharFrame();
+  last = text;
   // `onKey` swallows a throw into a toast rather than taking the screen down, so the toast is the
   // only trace left: a run that nobody reads the frames of has to read them here.
   const failed = text.split('\n').find((row) => row.includes('error: '));
@@ -91,15 +95,15 @@ for (const key of keys) {
     const ctrl = key.startsWith('C-');
     const meta = key.startsWith('M-');
     const name = shift || ctrl || meta ? key.slice(2) : key;
-    onKey(app, { name, ctrl, meta, shift, sequence: name === 'space' ? ' ' : name === 'return' ? '\r' : name } as KeyEvent);
+    const sequence = name === 'space' ? ' ' : name === 'return' ? '\r' : name === 'tab' ? '\t' : name;
+    onKey(app, { name, ctrl, meta, shift, sequence } as KeyEvent);
   }
   await Bun.sleep(wait);
   await frame(key);
 }
 if (quiet) {
-  const last = keys[keys.length - 1] ?? 'start';
-  console.log(`\n═══ ${last} ═══`);
-  console.log(captureCharFrame());
+  console.log(`\n═══ ${keys[keys.length - 1] ?? 'start'} ═══`);
+  console.log(last);
 }
 
 const want = opt('spans');
@@ -117,9 +121,17 @@ if (want !== undefined) {
   });
 }
 
+const expect = opt('expect');
+if (expect !== undefined && !last.includes(expect)) {
+  broken++;
+  console.log(`✗ expected ${JSON.stringify(expect)} in the last frame`);
+}
+
 renderer.destroy();
 if (broken > 0) {
   console.log(`✗ tui-keys: ${broken} broken frame(s)`);
   process.exit(1);
 }
 console.log(`✓ tui-keys: ${keys.length + 1} frames`);
+// Toasts leave a two-second timer behind; the frames are drawn and the run is over.
+process.exit(0);

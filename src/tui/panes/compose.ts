@@ -28,7 +28,7 @@ export function targetOf(here: LeftItem): { session: string; name: string } | nu
 /** One screen row of the text: a hard break ends a row, a full width starts the next. */
 interface Row { start: number; end: number }
 
-function rows(text: string, width: number): Row[] {
+export function rows(text: string, width: number): Row[] {
   const out: Row[] = [];
   let start = 0;
   for (const para of text.split('\n')) {
@@ -106,24 +106,30 @@ export function composeHeight(ui: Ui, here: LeftItem, width: number): number {
   return 1 + Math.min(MAX_ROWS, rows(draft?.text ?? '', width).length);
 }
 
-export function composePane(p: Pane, ui: Ui, here: LeftItem): void {
-  const target = targetOf(here);
-  if (!target) return;
-  const d = draftOf(ui, here);
-  const all = rows(d.text, p.width);
+/**
+ * A draft's text as rows, at most `max` of them, wrapped at the width the caller edits it at. The
+ * cursor's row stays in view — the last rows up to it, never the first ones — and carries the
+ * cursor while the keys are the draft's; a draft nobody is typing into draws dim and whole.
+ * The intent form draws its fields through this too: one editor, one wrap, one cursor.
+ */
+export function draftRows(p: Pane, d: Draft, width: number, active: boolean, max: number): void {
+  const all = rows(d.text, width);
   const at = rowOf(all, d.cursor);
-
-  p.rule();
-  // The cursor's row stays in view: the box shows the last rows up to it, never the first ones.
-  const from = Math.max(0, at - MAX_ROWS + 1);
-  for (const [i, row] of all.slice(from, from + MAX_ROWS).entries()) {
+  const from = Math.max(0, at - max + 1);
+  for (const [i, row] of all.slice(from, from + max).entries()) {
     const text = d.text.slice(row.start, row.end);
-    if (!ui.compose || from + i !== at) {
-      p.row([[text, ui.compose ? C.bright : C.dim]]);
+    if (!active || from + i !== at) {
+      p.row([[text, active ? C.bright : C.dim]]);
       continue;
     }
     const col = d.cursor - row.start;
     const cells: Cell[] = [[text.slice(0, col), C.bright], [text[col] ?? ' ', C.bright, true], [text.slice(col + 1), C.bright]];
     p.row(cells);
   }
+}
+
+export function composePane(p: Pane, ui: Ui, here: LeftItem): void {
+  if (!targetOf(here)) return;
+  p.rule();
+  draftRows(p, draftOf(ui, here), p.width, ui.compose, MAX_ROWS);
 }

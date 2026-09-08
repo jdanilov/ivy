@@ -27,15 +27,10 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
   p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
-  // The title is what a mission is for, so it gets two whole lines, never a header's tail. A stub
-  // has nothing to run yet: the first paragraph of its intent's why stands where the graph would.
-  const stub = m.status === 'stub';
-  if (stub || m.title !== m.name) for (const l of wrap(m.title, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.bright]]);
-  if (stub) {
-    for (const l of wrap(m.why ?? 'no intent yet', p.width - 1, 6)) p.row([[' ', C.dim], [l, C.dim]]);
-    p.rule();
-    return;
-  }
+  // What the mission is for, from the one line a human wrote: the first line of `## Goal`. It gets
+  // two whole lines of its own, never a header's tail, which is where a line gets cut.
+  const goal = m.intent?.goal.split('\n')[0]?.trim() ?? '';
+  if (goal !== '') for (const l of wrap(goal, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.bright]]);
 
   for (const s of m.steps) {
     // A step the mission looped back to says so: one run is the norm and carries no mark.

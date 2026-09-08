@@ -108,9 +108,9 @@ counts. `Global` is `~/.claude has 5/17 parts installed`. The settings, `Launch`
 A session has no steps to bar and no project to count: `IDLE`, its id, preset and cwd, and how
 long since its last event on the right.
 
-A mission's one human line is the first line of `## Goal` in its `intent.md`, and the MISSION pane
-carries it under the rule, wrapped to two lines: what the mission is for deserves whole lines, and
-a header's tail is where a line gets cut. A stub has no graph and no facts to state, so its right
+A mission's one human line is the first paragraph of `## Goal` in its `intent.md`, and the MISSION
+pane carries it under the rule, wrapped to two lines with an ellipsis where it cuts and a blank row
+after: what the mission is for deserves whole lines, and a header's tail is where a line gets cut. A stub has no graph and no facts to state, so its right
 pane is the intent form instead.
 
 The SESSION pane says what ACTIVITY cannot at a glance: `now`, the `bash` or `sub` row still out

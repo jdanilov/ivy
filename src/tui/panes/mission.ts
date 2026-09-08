@@ -27,10 +27,16 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
   p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
-  // What the mission is for, from the one line a human wrote: the first line of `## Goal`. It gets
-  // two whole lines of its own, never a header's tail, which is where a line gets cut.
-  const goal = m.intent?.goal.split('\n')[0]?.trim() ?? '';
-  if (goal !== '') for (const l of wrap(goal, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.bright]]);
+  // What the mission is for: the first paragraph of `## Goal`, joined onto one line since the file
+  // wraps it where the editor did. Two rows of its own, an ellipsis where the second one cuts,
+  // then a blank row so the graph does not read as its third line.
+  const goal = m.intent?.goal.split(/\n\s*\n/)[0]?.replace(/\s+/g, ' ').trim() ?? '';
+  if (goal !== '') {
+    const rows = wrap(goal, p.width - 1, 2);
+    if (rows.join(' ').length < goal.length) rows[rows.length - 1] = `${rows[rows.length - 1]!.slice(0, p.width - 2)}…`;
+    for (const l of rows) p.row([[' ', C.dim], [l, C.bright]]);
+    p.row([]);
+  }
 
   for (const s of m.steps) {
     // A step the mission looped back to says so: one run is the norm and carries no mark.

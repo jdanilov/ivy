@@ -218,17 +218,17 @@ async function isClaude(pid: number): Promise<boolean> {
 }
 
 /**
- * Live means the session's events file was touched inside the last ten minutes and the process the
- * hook logged is still there: a tab closed on an idle session fires no hook, so the file alone would
- * keep it on the screen until the window ran out. A line from before the hook logged pids has only
- * the window to go by.
+ * Live means the process the hook logged on the session's last event line is still a `claude`: a
+ * tab closed on an idle session fires no hook, and an idle session fires none either, so neither
+ * the file nor its age can tell the two apart. A line from before the hook logged pids has only
+ * the file's age to go by: live while it was touched inside the last ten minutes.
  */
 export async function sessionLive(session: string | null): Promise<boolean> {
   if (!session) return false;
-  const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
-  if (info === null || Date.now() - info.mtimeMs >= LIVE_WINDOW_MS) return false;
   const pid = await loggedPid(session);
-  return pid === null || isClaude(pid);
+  if (pid !== null) return isClaude(pid);
+  const info = await stat(path.join(eventsDir(), `${session}.jsonl`)).catch(() => null);
+  return info !== null && Date.now() - info.mtimeMs < LIVE_WINDOW_MS;
 }
 
 /**

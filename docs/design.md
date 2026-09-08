@@ -182,9 +182,11 @@ into, and the two kinds sit in one list where the tail of a row is too far to re
 A session is `▸ working` from its prompt to its Stop — no hook fires in between, so the last event's age
 says nothing — and `▸ working · <role>` while a sub-agent is out in the background; then the
 turn that ended is not a question, and the Inbox lists it only once the last sub-agent has
-reported back. `▹ idle <since its last Stop>` otherwise. A session is listed while its events
-file is under ten minutes old and the pid the hook logged is still a `claude` process: a tab closed
-on an idle session fires no hook, and the file alone would keep the row until the window ran out.
+reported back. `▹ idle <since its last Stop>` otherwise. A session is listed while the pid the
+hook logged on its last event line is still a `claude` process: a tab closed on an idle session
+fires no hook, and an idle session fires none either, so the file's age tells the two apart no
+better than it tells a long think from a walk. A line from before pids were logged has only the
+age: ten minutes.
 
 - Rules and the column divider are `#3a3a3a`, one step up from the sampled `#232323`, which
   disappears on a terminal background lighter than the screenshots'.

@@ -175,7 +175,9 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   // The message box takes its rows off the top of the region, and the foot keeps its share of the rest.
   const composeH = Math.min(composeHeight(ui, here, w), Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - 5));
   const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - composeH);
-  const actH = ui.full ? region : ui.help ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
+  // The panel wants the whole body, on `?` and on an Inbox with nothing in it alike.
+  const panel = ui.help || (here.kind === 'inbox' && snap.inbox.length === 0);
+  const actH = ui.full ? region : panel ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
   const bodyH = region - actH;
 
   // Two blank columns down the left and none anywhere else: the key bar sits on the last row and
@@ -198,7 +200,8 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
     leftPane(left, items, snap, ui);
-    if (ui.help) helpPane(right, bodyH);
+    // An empty Inbox has nothing to show, so the panel stands there: a fresh install opens on it.
+    if (panel) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global', bodyH);
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');

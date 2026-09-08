@@ -1,6 +1,6 @@
 import { C } from '../theme.js';
 import { len, spread, wrap, type Cell } from '../format.js';
-import { marker, type Pane, type Ui } from './pane.js';
+import type { Pane, Ui } from './pane.js';
 import type { PartRow, Project, ScopeChoice } from '../model.js';
 
 /** PARTS: what a project has installed, what it could have, and the toggles `↵` would apply. The
@@ -78,7 +78,7 @@ function partBlock(p: Pane, part: PartRow, i: number, ui: Ui, global: boolean): 
   // A part whose files no longer match the Factory is neither installed nor available: `update` fixes it.
   const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
   const head: Cell[] = [
-    marker(i === ui.part, ui.focus === 'right'), [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
+    ['  ', C.dim], [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
     global ? scopeCell(part, status, ui)
       : [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
   ];
@@ -94,12 +94,14 @@ function partBlock(p: Pane, part: PartRow, i: number, ui: Ui, global: boolean): 
   ];
 }
 
-/** What the pane closes on: a pending change and the way out of it, else the selected part's files. */
+/** What the pane closes on: a pending change and the way out of it, else the selected part's files —
+ *  those only while the pane has the focus, since unfocused it has no selection to speak of. */
 function footRows(parts: PartRow[], ui: Ui, changes: string[], global: boolean): Cell[][] {
   if (ui.confirm) {
     return [[['apply: ', C.dim], [changes.join(', '), C.bright], ['   Y ', C.accent], ['Confirm  ', C.dim], ['N ', C.accent], ['Cancel', C.dim]]];
   }
   if (changes.length > 0) return [[['↵ ', C.accent], ['Apply', C.dim], DOT, ['Esc ', C.accent], ['Discard', C.dim]]];
+  if (ui.focus !== 'right') return [];
   const part = parts[ui.part];
   return [
     ...(global && part ? [[['recommended ', C.dim], [part.recommended, C.accent]] as Cell[]] : []),
@@ -130,8 +132,9 @@ export function partsPane(p: Pane, project: Project, ui: Ui, global: boolean, h:
   // a `Y` on the apply line, and a confirmation drawn past the foot is one nobody can read.
   const foot = footRows(parts, ui, changes, global);
   const blocks = parts.map((part, i) => partBlock(p, part, i, ui, global));
-  for (const { cells, selected } of clip(blocks, Math.max(0, h - 3 - foot.length), ui.part)) p.row(cells, selected);
+  for (const { cells, selected } of clip(blocks, Math.max(0, h - 2 - (foot.length ? foot.length + 1 : 0)), ui.part)) p.row(cells, selected);
 
+  if (foot.length === 0) return;
   p.rule();
   for (const cells of foot) p.row(cells);
 }

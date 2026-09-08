@@ -14,11 +14,11 @@ const jobFile = (short: string): string => path.join(home(), '.claude', 'jobs', 
 export interface Spawn {
   preset: Preset;
   launch: Launch;
-  /** The session's id: chosen here for a direct launch, read back from the daemon for `bg`, empty on
+  /** The session's id: chosen here for a foreground launch, read back from the daemon for `bg`, empty on
    *  a `bg` dry run, where nothing was started. */
   session: string;
   cwd: string;
-  /** What starts the session, and what the tab runs: the same line for a direct launch. */
+  /** What starts the session, and what the tab runs: the same line for a foreground launch. */
   command: string;
   tab: string;
   configPath: string;
@@ -63,7 +63,7 @@ const KICKOFF = '/mission';
 const settingsPath = (mission: Mission): string => path.join(mission.dir, 'settings.json');
 
 /**
- * A direct launch runs in the tab under an id chosen here. `--bg` hands the session to a daemon,
+ * A foreground launch runs in the tab under an id chosen here. `--bg` hands the session to a daemon,
  * so no id can be chosen for it and no variable on the command line reaches it: the id is read
  * back from the daemon's record. Either way the mission dir goes in through the settings overlay,
  * which the hooks of both inherit.
@@ -155,7 +155,7 @@ export async function warpInstalled(): Promise<boolean> {
 
 /**
  * The session id is in state.json before the tab exists, so the first hook event the session
- * emits finds a mission bound to it: chosen here for a direct launch, and under `bg` read back
+ * emits finds a mission bound to it: chosen here for a foreground launch, and under `bg` read back
  * from the daemon that started it, the tab then only attaching. A mission carrying a *live*
  * session is never rebound here: the old tab keeps sending events at a mission that has moved on,
  * and every one of them goes nowhere. `mission adopt` is the deliberate rebind, and it says so. A
@@ -171,12 +171,12 @@ export async function openSession(cwd: string, mission: Mission, preset: Preset,
   const checkout = mission.state.worktree ?? (await mainCheckout(cwd));
   const name = `factory-${mission.state.name}`;
   const launch = await readLaunch();
-  const chosen = launch === 'direct' ? crypto.randomUUID() : '';
+  const chosen = launch === 'fg' ? crypto.randomUUID() : '';
   const command = assembleCommand(preset, mission, launch, chosen);
   const configPath = path.join(tabConfigs(), `${name}.toml`);
   const uri = `warp://tab_config/${encodeURIComponent(name)}`;
   const warp = await warpInstalled();
-  const spawn = { preset, launch, session: chosen, cwd: checkout, command, tab: launch === 'direct' ? command : 'claude attach <id>', configPath, uri, warp };
+  const spawn = { preset, launch, session: chosen, cwd: checkout, command, tab: launch === 'fg' ? command : 'claude attach <id>', configPath, uri, warp };
 
   if (dryRun) return spawn;
 

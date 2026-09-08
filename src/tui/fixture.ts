@@ -267,5 +267,5 @@ const inbox: InboxItem[] = [
 ];
 
 export const snapshot: Snapshot = {
-  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto', launch: 'direct',
+  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto', launch: 'fg',
 };

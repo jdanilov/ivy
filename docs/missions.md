@@ -34,7 +34,7 @@ factory handoff save <step>            # reads the handoff from stdin
 - Any transition that disagrees with `workflow.yaml` appends a `deviations` entry with a reason.
 - `mission open` writes the session id to `state.json` before the tab exists, so the first hook
   event the session emits already finds a mission bound to it. `launch` in `~/.factory/config.yaml`
-  says how: `direct`, the default, runs `claude --session-id <id> …` in the tab itself, where Warp
+  says how: `fg`, the default, runs `claude --session-id <id> …` in the tab itself, where Warp
   keeps its blocks over the conversation; `bg` starts it first with `claude --bg`, whose daemon
   chooses the id, reads that id back from `~/.claude/jobs/<short>/state.json`, and opens the tab on
   `claude attach <short>`, a session that outlives its tab and draws fullscreen, so no blocks. A

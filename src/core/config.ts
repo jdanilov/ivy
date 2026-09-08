@@ -19,9 +19,9 @@ const CHOICES: ScopeChoice[] = ['project', 'global', 'off'];
 /** AUTO holds the machine awake while a session is mid-turn, ON always, OFF never. */
 export type Caffeinate = 'auto' | 'on' | 'off';
 
-/** How `mission open` runs claude: DIRECT in the tab, where Warp keeps its blocks over the
+/** How `mission open` runs claude: FG in the tab, where Warp keeps its blocks over the
  *  conversation; BG under Claude Code's daemon, where the tab attaches and the session outlives it. */
-export type Launch = 'direct' | 'bg';
+export type Launch = 'fg' | 'bg';
 
 const configPath = (): string => path.join(factoryHome(), 'config.yaml');
 
@@ -83,7 +83,7 @@ export async function readCaffeinate(): Promise<Caffeinate> {
 export async function readLaunch(): Promise<Launch> {
   const raw = await Bun.file(configPath()).text().catch(() => '');
   const value = raw === '' ? null : (parse(raw) as { launch?: unknown } | null)?.launch;
-  return value === 'bg' ? 'bg' : 'direct';
+  return value === 'bg' ? 'bg' : 'fg';
 }
 
 /**

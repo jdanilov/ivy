@@ -5,14 +5,14 @@ import { itemKey, type LeftItem, type Pane, type Ui } from './pane.js';
 
 /**
  * COMPOSE: a message to the selected row's session, written under the foot and posted to the
- * session's inbox. No header names the session: the selected row already does. One draft per row, kept while the selection moves and while `esc` hands the
+ * session's inbox. No header names the session: the selected row already does. One draft per row, kept while the selection moves and while `Esc` hands the
  * keys back, so a half-written reply survives a look at another session.
  */
 
 export interface Draft { text: string; cursor: number }
 
 /** The box grows with the text to this many rows, then scrolls to keep the cursor in view. */
-const MAX_ROWS = 6;
+const MAX_ROWS = 12;
 
 export const draftOf = (ui: Ui, here: LeftItem): Draft => (ui.drafts[itemKey(here)] ??= { text: '', cursor: 0 });
 
@@ -51,31 +51,48 @@ const rowOf = (all: Row[], cursor: number): number => all.findLastIndex((r) => r
 /** A typed character or a paste, never a control sequence: those name keys and come through `name`. */
 const printable = (s: string): boolean => /^[^\x00-\x08\x0b-\x1f\x7f]+$/.test(s);
 
+/** Text at the cursor, typed or pasted: a terminal's line ends become the draft's own. */
+export function insert(d: Draft, s: string): void {
+  const text = s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  d.text = d.text.slice(0, d.cursor) + text + d.text.slice(d.cursor);
+  d.cursor += text.length;
+}
+
+/** The word before the cursor, with the spaces after it: what `⌥⌫` and `^W` take. */
+const wordBefore = (d: Draft): number => /\S+\s*$|\s+$/.exec(d.text.slice(0, d.cursor))?.[0].length ?? 0;
+
 /** What a key does to the draft. `↵` is a line break here: sending is a chord, and the caller's. */
 export function editKey(d: Draft, key: KeyEvent, width: number): boolean {
   const all = rows(d.text, width);
   const r = rowOf(all, d.cursor);
-  const insert = (s: string): void => {
-    d.text = d.text.slice(0, d.cursor) + s + d.text.slice(d.cursor);
-    d.cursor += s.length;
+  const cut = (from: number, to: number): void => {
+    d.text = d.text.slice(0, from) + d.text.slice(to);
+    d.cursor = from;
   };
   const jump = (to: number): void => {
     const row = all[to];
     if (row) d.cursor = Math.min(row.start + (d.cursor - all[r]!.start), row.end);
   };
-  if (key.name === 'return') insert('\n');
-  else if (key.name === 'backspace') {
+  // A modifier on backspace is a word: Option in the terminal's own reading, Control in kitty's.
+  const word = (key.name === 'backspace' && (key.meta || key.option || key.ctrl)) || (key.ctrl && key.name === 'w');
+  if (key.name === 'return') insert(d, '\n');
+  else if (word) cut(d.cursor - wordBefore(d), d.cursor);
+  else if (key.ctrl && key.name === 'k') {
+    // The line the cursor is on, break included; the last line takes the break before it instead.
+    const from = d.text.lastIndexOf('\n', d.cursor - 1) + 1;
+    const end = d.text.indexOf('\n', d.cursor);
+    cut(end === -1 ? Math.max(0, from - 1) : from, end === -1 ? d.text.length : end + 1);
+  } else if (key.name === 'backspace') {
     if (d.cursor === 0) return false;
-    d.text = d.text.slice(0, d.cursor - 1) + d.text.slice(d.cursor);
-    d.cursor -= 1;
-  } else if (key.name === 'delete') d.text = d.text.slice(0, d.cursor) + d.text.slice(d.cursor + 1);
+    cut(d.cursor - 1, d.cursor);
+  } else if (key.name === 'delete') cut(d.cursor, d.cursor + 1);
   else if (key.name === 'left') d.cursor = Math.max(0, d.cursor - 1);
   else if (key.name === 'right') d.cursor = Math.min(d.text.length, d.cursor + 1);
   else if (key.name === 'up') jump(r - 1);
   else if (key.name === 'down') jump(r + 1);
   else if (key.name === 'home' || (key.ctrl && key.name === 'a')) d.cursor = all[r]!.start;
   else if (key.name === 'end' || (key.ctrl && key.name === 'e')) d.cursor = all[r]!.end;
-  else if (!key.ctrl && !key.meta && printable(key.sequence)) insert(key.sequence.replaceAll('\r', '\n'));
+  else if (!key.ctrl && !key.meta && printable(key.sequence)) insert(d, key.sequence);
   else return false;
   return true;
 }

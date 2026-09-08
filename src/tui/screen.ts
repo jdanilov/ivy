@@ -13,9 +13,9 @@ import { helpPane } from './panes/help.js';
 import { onKey, onPaste } from './keys.js';
 import type { Mission, Session, Snapshot } from './model.js';
 
-/** Chrome rows: blank, header, rule, status, rule — rule, key bar. The key bar sits on the last
- *  terminal row: a row left undrawn under it reads as a gap the screen forgot to fill. */
-const CHROME = 7;
+/** Chrome rows: blank, header, rule — rule, key bar. The key bar sits on the last terminal row:
+ *  a row left undrawn under it reads as a gap the screen forgot to fill. */
+const CHROME = 5;
 /** Full activity keeps the blank row, the rule and the key bar, and gives the log everything else. */
 const FULL_CHROME = 3;
 /** Factory's own mark. Single-width in a monospace font, unlike most of the geometric glyphs. */
@@ -38,13 +38,8 @@ function caffeinateCells(snap: Snapshot): Cell[] {
 /** How `O` will run the next session: FG in the tab, BG under the daemon with the tab attached. */
 const launchCells = (snap: Snapshot): Cell[] => [['L', C.bright], ['aunch ', C.dim], [snap.launch.toUpperCase(), C.bright], ['  ', C.dim]];
 
-/** The brand alone: the path is the project bar's, the settings are the key bar's tail. */
-function header(p: Pane): void {
-  p.row([[`${BRAND} `, C.accent], ['FACTORY', C.accent]]);
-}
-
 /** The bar is a third of the line at most, and only what the words on either side leave. */
-const barRoom = (p: Pane, used: number): number => Math.min(Math.floor(p.width * 0.3), p.width - used - 6);
+const barRoom = (width: number, used: number): number => Math.min(Math.floor(width * 0.3), width - used - 6);
 
 /** What the missions are, as counts: `1 running · 3 stub · 8 closed`, the zeros left out. */
 function counts(missions: Mission[]): Cell[] {
@@ -60,12 +55,12 @@ function counts(missions: Mission[]): Cell[] {
 }
 
 /** A project is where it lives, then what its missions are; the Inbox, how many projects there are. */
-const summary = (p: Pane, where: Cell, missions: Mission[]): void => p.row([where, [' · ', C.rule], ...counts(missions)]);
+const summary = (where: Cell, missions: Mission[]): Cell[] => [where, [' · ', C.rule], ...counts(missions)];
 
 /** The state word varies in width and the bar behind it would move with it. */
 const STATE_W = 8;
 
-function missionBar(p: Pane, m: Mission): void {
+function missionBar(width: number, m: Mission): Cell[] {
   const total = m.steps.length;
   const done = m.steps.filter((s) => s.status === 'done').length;
   const word = m.status === 'stub' ? 'STUB' : m.status === 'closed' ? 'CLOSED' : m.state.toUpperCase();
@@ -81,39 +76,46 @@ function missionBar(p: Pane, m: Mission): void {
     ['Out ', C.dim], [tokens(m.tokens.output), C.bright],
   ];
 
-  const bar = barRoom(p, len(left) + len(count) + len(metrics));
+  const bar = barRoom(width, len(left) + len(count) + len(metrics));
   const fill = total && bar > 0 ? Math.round((bar * done) / total) : 0;
   const middle: Cell[] = total && bar > 0
     ? [['  ', C.dim], ['█'.repeat(fill), C.success], ['█'.repeat(bar - fill), C.track]] : [];
-  p.row(spread([...left, ...middle, ...count], metrics, p.width));
+  return spread([...left, ...middle, ...count], metrics, width);
 }
 
 /** A session has no steps to bar: its state word, then whose tab it is and how long it has waited. */
-function sessionBar(p: Pane, s: Session): void {
+function sessionBar(width: number, s: Session): Cell[] {
   const asking = s.now?.verb === 'ask';
   const word = asking ? 'ASKING' : s.busy ? 'WORKING' : 'IDLE';
   const left: Cell[] = [s.busy ? [`${SESSION.working} `, asking ? C.warning : C.accent] : [`${SESSION.idle} `, C.dim], [word.padEnd(STATE_W), C.bright],
     ['  ', C.dim], [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [' · ', C.rule], [s.cwd, C.dim]];
   const right: Cell[] = s.busy ? (s.agent ? [[s.agent, C.bright]] : []) : [['since ', C.dim], [dur(Date.now() - s.idleSince), C.bright]];
-  p.row(spread(left, right, p.width));
+  return spread(left, right, width);
 }
 
-function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
+/** What the selected row is, in `width` cells: the status the header row carries left of the brand. */
+function status(width: number, snap: Snapshot, here: LeftItem, ui: Ui): Cell[] {
   // The one line the screen takes typing on: what the key asked for, then what has been typed.
-  if (ui.input) return p.row([[`${ui.input.label} `, C.dim], [ui.input.value, C.bright], ['▏', C.accent]]);
-  if (ui.toast) return p.row([[ui.toast, C.dim]]);
-  if (here.kind === 'mission') return missionBar(p, here.mission);
-  if (here.kind === 'session') return sessionBar(p, here.session);
+  if (ui.input) return [[`${ui.input.label} `, C.dim], [ui.input.value, C.bright], ['▏', C.accent]];
+  if (ui.toast) return [[ui.toast, C.dim]];
+  if (here.kind === 'mission') return missionBar(width, here.mission);
+  if (here.kind === 'session') return sessionBar(width, here.session);
   if (here.kind === 'inbox') {
     const n = snap.projects.length;
-    return summary(p, [`${n} project${n === 1 ? '' : 's'}`, C.bright], snap.projects.flatMap((project) => project.missions));
+    return summary([`${n} project${n === 1 ? '' : 's'}`, C.bright], snap.projects.flatMap((project) => project.missions));
   }
   if (here.kind === 'global') {
     const on = here.project.parts.filter((part) => part.status !== 'not-installed').length;
-    return p.row([[path.join(here.project.path, '.claude'), C.bright], [' has ', C.dim],
-      [`${on}/${here.project.parts.length}`, C.bright], [' parts installed', C.dim]]);
+    return [[path.join(here.project.path, '.claude'), C.bright], [' has ', C.dim],
+      [`${on}/${here.project.parts.length}`, C.bright], [' parts installed', C.dim]];
   }
-  summary(p, [here.project.path, C.bright], here.project.missions);
+  return summary([here.project.path, C.bright], here.project.missions);
+}
+
+/** One row: the status of the selection, then the brand at the right edge. Two rows said no more. */
+function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
+  const brand: Cell[] = [[`${BRAND} `, C.accent], ['FACTORY', C.accent]];
+  p.row(spread(status(p.width - len(brand) - 2, snap, here, ui), brand, p.width));
 }
 
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
@@ -182,9 +184,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   root.row([]);
   // A full-height foot is that pane and nothing else: the header and the status bar are rows it can have.
   if (!ui.full) {
-    header(root);
-    root.rule();
-    statusBar(root, snap, here, ui);
+    header(root, snap, here, ui);
     root.rule();
   }
 

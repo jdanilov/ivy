@@ -67,7 +67,7 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 
 ```
 row 0        blank
-row 1        ⌬ FACTORY  <project or path>           Launch FG   Caffeinate AUTO [ON]
+row 1        ⌬ FACTORY
 row 2        ───────────────────────────────────────────────────────────────────────
 row 3        status: mission bar or project bar, or the toast that replaces it
 row 4        ───────────────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ row 4        ──────────────────────�
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  S Show Archived  Q Quit  ? Help
+             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  S Show Archived  Q Quit  ? Help        Launch FG  Caffeinate AUTO [ON]
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
@@ -101,9 +101,10 @@ progress bar of its done steps, the fraction, and the metrics right. `PENDING` t
 circle: a mission nobody has started is waiting on the human, where a pending *step* is only next
 in line.
 
-A project — or the Inbox, over every project — is one bar over its missions instead of the words
-alone: closed green, open amber, stub grey, one segment each. The counts stay behind it as the
-dim legend that names the colours.
+A project is its path, then what its missions are as counts, `1 running · 3 stub · 8 closed`,
+the zeros left out; the Inbox, over every project, is how many projects there are and the same
+counts. `Global` is `~/.claude has 5/17 parts installed`. The settings, `Launch` and
+`Caffeinate`, sit at the right end of the key bar, beside the keys that turn them.
 
 A session has no steps to bar and no project to count: `IDLE`, its id, preset and cwd, and how
 long since its last event on the right.
@@ -320,9 +321,10 @@ screen's name outranks the transcript's; it is the later word. The order `⇧↑
 outside it stays. What a list does not name follows it, as it came: a new stub lands last, a
 session that appears lands last.
 
-The panel is KEYS, then TERMS — one row per step kind in its own colour, then the words the screen
-uses — then HOW FACTORY WORKS. The primer is what a short terminal loses: all of it or none, never
-a sentence cut in half.
+The panel is HOW FACTORY WORKS, the primer, then TERMS, the words the screen uses, then KEYS, one
+key to a line under its pane. Top down, so what a short terminal loses is the end of the key list,
+which the bar repeats. While the Inbox is empty the panel stands where MESSAGES would, so a fresh
+install opens on it.
 
 Messages answers nothing: a gate row and a decision row each carry the command that answers them
 in the session that raised them, and `←`, `→` and `↵` on one write nothing.

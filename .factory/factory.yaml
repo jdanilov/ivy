@@ -13,6 +13,12 @@ recipes:
       # decision paths fired the way Claude Code fires them. Both check themselves.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row global right space return escape escape
+      # The intent form: `m` opens it on a project row, and each `--expect` is the toast's own
+      # words and no field label, so the line fails the moment a guard stops refusing. The refusal
+      # is the assertion, not a safety: the fixture's `ivy` row is this checkout, so a regressed
+      # goal guard writes a mission into `.factory/missions/` here and fails after the write.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' m type:x C-s --expect 'goal is empty'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/recall' o --expect 'no goal'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

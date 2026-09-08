@@ -37,7 +37,6 @@ interface HookInput {
 interface Bound {
   dir: string;
   name: string;
-  title: string;
   step: string;
   session: string | null;
   round: number;
@@ -58,7 +57,7 @@ async function readMission(dir: string): Promise<Bound | null> {
   if (!state) return null;
   const name = state.name ?? path.basename(dir).replace(/^\d{4}-\d{2}-\d{2}-/, '');
   return {
-    dir, name, title: state.title ?? name, step: state.step ?? '', session: state.session ?? null,
+    dir, name, step: state.step ?? '', session: state.session ?? null,
     round: state.round ?? 0, autonomy: state.autonomy ?? 'partial', gates: state.gates ?? {},
   };
 }
@@ -364,7 +363,7 @@ async function waitingText(mission: Bound): Promise<string> {
 function focus(mission: Bound): string {
   const open = Object.entries(mission.gates).filter(([, g]) => g.status === 'open').map(([step]) => step);
   return [
-    `Mission: ${mission.title}`,
+    `Mission: ${mission.name}`,
     `Step: ${mission.step || '—'}${mission.round > 0 ? ` r${mission.round}` : ''}`,
     `Open gates: ${open.length > 0 ? open.join(', ') : 'none'}`,
     `Folder: ${mission.dir}`,

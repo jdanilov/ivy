@@ -35,7 +35,7 @@ The human answers the whole table in one go: `as recommended`, or per number, `1
 | Answer      | You do                                                                            |
 |-------------|------------------------------------------------------------------------------------|
 | `apply now` | held back for the batch below                                                      |
-| `stub`      | `factory mission new <slug> --stub --title "<line>"`, then write the line into the stub's `intent.md` under `## Why` |
+| `stub`      | `factory mission new <slug> --stub`, then write the line into the stub's `intent.md` under `## Goal` |
 | `roadmap`   | append `- [ ] <line> (<mission>)` under `## Unsorted` in `docs/roadmap.md`          |
 | `drop`      | nothing                                                                            |
 

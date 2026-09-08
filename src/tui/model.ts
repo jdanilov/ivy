@@ -3,9 +3,10 @@
 import type { Caffeinate, Launch } from '../core/config.js';
 import { stepRole } from '../core/workflow.js';
 import type { Decision } from '../core/decision.js';
+import type { Intent } from '../core/intent.js';
 import type { ScopeChoice, Scope, WorkflowStep } from '../types.js';
 
-export type { Caffeinate, Decision, Launch, Scope, ScopeChoice };
+export type { Caffeinate, Decision, Intent, Launch, Scope, ScopeChoice };
 
 export type RunState = 'pending' | 'running' | 'done' | 'blocked' | 'skipped';
 
@@ -58,10 +59,9 @@ export type Autonomy = 'full' | 'partial' | 'none';
 
 export interface Mission {
   name: string;
-  /** The line `mission new --title` gave it, or the name again. */
-  title: string;
-  /** The first paragraph under `## Why` in `intent.md`, read for a stub: the one row that has no steps to say what it is. */
-  why?: string;
+  /** What `intent.md` holds, when the mission has one: the goal's first paragraph is the two rows
+   *  the MISSION pane gives a mission, and the intent form edits the whole of it. */
+  intent?: Intent;
   workflow: string;
   status: 'open' | 'stub' | 'closed';
   state: RunState;

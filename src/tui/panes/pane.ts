@@ -2,7 +2,7 @@ import { BoxRenderable, TextRenderable, type CliRenderer } from '@opentui/core';
 import { C } from '../theme.js';
 import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
-import type { Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
+import type { Autonomy, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
 import type { Draft } from './compose.js';
 
 /**
@@ -34,13 +34,30 @@ export interface Ui {
   /** The keys are the message box's; the drafts stay by row whether or not they are. */
   compose: boolean;
   drafts: Record<string, Draft>;
+  /** The keys are the intent form's. */
+  form: boolean;
+  /** One intent draft per row, kept like a message draft: a stub row by its own key, a new
+   *  mission under `new <project>`, so a project row shows what has been typed for it. */
+  intents: Record<string, IntentDraft>;
+}
+
+/** The intent form's own state: a draft per field, the dial, and which field has the cursor. */
+export interface IntentDraft {
+  name: Draft;
+  goal: Draft;
+  done: Draft;
+  not: Draft;
+  start: Draft;
+  autonomy: Autonomy;
+  /** Indexes the editable order `name goal done not start autonomy`. */
+  field: number;
 }
 
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
-    showArchived: false, toast: null, input: null, compose: false, drafts: {},
+    showArchived: false, toast: null, input: null, compose: false, drafts: {}, form: false, intents: {},
   };
 }
 

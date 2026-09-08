@@ -2,21 +2,21 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, newMission, openTab, renameMission, renameSession, sendMessage, setAutonomy, setCaffeinate, setLaunch,
+  applyParts, applyScopes, archive, killSession, openTab, renameSession, saveIntent, sendMessage, setAutonomy, setCaffeinate, setLaunch,
 } from './actions.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
+import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
-import { act, draw, toast, type App } from './screen.js';
-import type { Autonomy, Caffeinate, Launch, Mission, Project } from './model.js';
+import { AUTONOMY, AUTONOMY_FIELD, FIELDS, draftFor, formOf, showsParts, untouched, type Form } from './panes/form.js';
+import { act, draw, rightWidth, toast, type App } from './screen.js';
+import type { Caffeinate, Intent, Launch, Mission, Project } from './model.js';
 
 /** What every key does. The screen draws; this is the only place a keypress changes anything. */
 
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
-const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 const LAUNCH: Launch[] = ['fg', 'bg'];
 
 /** The one focusable value in the MISSION pane. Turned at once and written behind that: the
@@ -83,6 +83,74 @@ function composing(app: App, key: KeyEvent): void {
 }
 
 /**
+ * The intent form has the keys: `⇥` walks the fields, `↵` breaks a line inside one, `^S` writes
+ * the stub, `Esc` hands the keys back and keeps what was typed. Every field is a message-box
+ * draft, so the editing below the field level is `editKey`'s and nothing here repeats it.
+ */
+function forming(app: App, key: KeyEvent): void {
+  const { ui } = app;
+  const { here } = select(app.snap, ui);
+  const form = formOf(here);
+  // The row moved out from under the form — an archived stub, a promoted one: the keys go back.
+  if (form === null) {
+    ui.form = false;
+    return draw(app);
+  }
+  const d = draftFor(ui, here);
+  // A stub's name is fixed once the folder exists, so the cursor never lands on it there.
+  const first = form.create ? 0 : 1;
+  const stops = AUTONOMY_FIELD + 1 - first;
+  const field = FIELDS[d.field];
+
+  if (key.name === 'escape') {
+    ui.form = false;
+    // A draft still equal to what it was made from leaves nothing behind: the project row goes
+    // back to its parts, a stub's pane back to following its file. A changed one is kept, and
+    // the pane keeps showing it.
+    if (untouched(d, here)) delete ui.intents[form.key];
+  } else if (key.name === 'tab') {
+    d.field = first + (((d.field - first + (key.shift ? -1 : 1)) % stops) + stops) % stops;
+  } else if (key.ctrl && key.name === 's') return saveForm(app, form, d);
+  else if (key.ctrl && key.name === 'u') {
+    if (field) d[field[0]] = { text: '', cursor: 0 };
+  } else if (field === undefined && (key.name === 'left' || key.name === 'right')) {
+    const step = key.name === 'right' ? 1 : AUTONOMY.length - 1;
+    d.autonomy = AUTONOMY[(AUTONOMY.indexOf(d.autonomy) + step) % AUTONOMY.length]!;
+  } else if (field === undefined) return;
+  else if (key.ctrl && key.name === 'v') return pasteClipboard(app, d[field[0]]);
+  else if (!editKey(d[field[0]], key, rightWidth(app.r))) return;
+  draw(app);
+}
+
+/** `^S`: what the form refuses is named on the status bar and the cursor is put on it, so the
+ *  next keystroke fixes it. Nothing is written until both required fields hold something. */
+function saveForm(app: App, form: Form, d: IntentDraft): void {
+  const { ui } = app;
+  const { project, create } = form;
+  const name = create ? d.name.text.trim() : form.name;
+  const goal = d.goal.text.trim();
+
+  if (create && !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
+    d.field = 0;
+    return toast(app, 'the name is the folder and the branch — lowercase letters, digits and dashes');
+  }
+  if (create && project.missions.some((m) => m.name === name)) {
+    d.field = 0;
+    return toast(app, `${project.name} already has a mission called ${name}`);
+  }
+  if (goal === '') {
+    d.field = 1;
+    return toast(app, 'goal is empty — say what the mission is for');
+  }
+
+  const intent: Intent = { goal, done: d.done.text.trim(), not: d.not.text.trim(), start: d.start.text.trim() };
+  const autonomy = d.autonomy;
+  delete ui.intents[form.key];
+  ui.form = false;
+  act(app, `saving ${name}…`, () => saveIntent(project.path, name, intent, autonomy, create));
+}
+
+/**
  * Shift+↑↓ swaps the row with its neighbour of the same kind — the one shown, so a hidden archived
  * mission is stepped over — and keeps the whole list's order in config. The snapshot is swapped in
  * place too, so the row moves under the selection before the rebuild that reads config lands.
@@ -110,6 +178,7 @@ function handleKey(app: App, key: KeyEvent): void {
   const { snap, ui } = app;
 
   if (ui.input) return typing(app, key);
+  if (ui.form) return forming(app, key);
   if (ui.compose) return composing(app, key);
 
   // The panel holds the right pane until it is asked to leave; nothing else acts behind it.
@@ -135,8 +204,11 @@ function handleKey(app: App, key: KeyEvent): void {
   const right = ui.focus === 'right';
   const inMessages = right && here.kind === 'inbox';
   const inGlobal = here.kind === 'global';
-  const inParts = right && (here.kind === 'project' || inGlobal);
-  const inMission = right && here.kind === 'mission';
+  // The form outranks Parts on a project row, so the Parts keys go where the pane went: `space`
+  // must never toggle a part nobody can see.
+  const inParts = right && showsParts(ui, here);
+  // A stub has no graph and no dial in the pane: its right pane is the intent form.
+  const inMission = right && here.kind === 'mission' && here.mission.status !== 'stub';
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);
 
   if (inParts && ui.confirm) {
@@ -190,6 +262,13 @@ function handleKey(app: App, key: KeyEvent): void {
         ui.confirm = true;
         break;
       }
+      // A stub is not written to, it is written: `↵` gives the intent form the keys, on the goal,
+      // because the name is the folder and fixed once the folder is there.
+      if (!right && here.kind === 'mission' && here.mission.status === 'stub') {
+        ui.form = true;
+        draftFor(ui, here).field = 1;
+        break;
+      }
       // A row with a session behind it is written to; the arrows already enter the right pane.
       if (!right && (here.kind === 'session' || here.kind === 'mission')) {
         if (targetOf(here) === null) return toast(app, `${here.kind === 'mission' ? here.mission.name : id(here.session.id)} has no session — O opens one`);
@@ -222,6 +301,9 @@ function handleKey(app: App, key: KeyEvent): void {
     }
     case 't':
       if (here.kind !== 'mission') break;
+      // A stub's autonomy is the form's dial, and a kept draft would write its own value back
+      // over anything `T` did here: one writer per value.
+      if (here.mission.status === 'stub') return toast(app, '↵ edits the intent, autonomy is in the form');
       return cycleAutonomy(app, here.project, here.mission);
     case 'c': {
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;
@@ -236,6 +318,9 @@ function handleKey(app: App, key: KeyEvent): void {
     case 'o':
       if (right) break;
       if (here.kind !== 'mission') return toast(app, 'select a mission to open its tab');
+      // The Orchestrator's first act is to read the intent: an empty goal makes it interview the
+      // human in the tab instead. The CLI's own `open` is untouched — that one is deliberate.
+      if (here.mission.status === 'stub' && !here.mission.intent?.goal) return toast(app, `${here.mission.name} has no goal — ↵ fills the intent`);
       return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
     case 'r': {
       // In Parts the toggles are what `r` resets; on a row it is the name.
@@ -244,26 +329,22 @@ function handleKey(app: App, key: KeyEvent): void {
         break;
       }
       if (right) break;
-      if (here.kind === 'mission') {
-        const { project, mission } = here;
-        return ask(app, `title for ${mission.name}:`, (title) =>
-          title === '' ? draw(app) : act(app, `titling ${mission.name}…`, () => renameMission(project.path, mission.name, title)));
-      }
       if (here.kind === 'session') {
         const { session } = here;
         return ask(app, `name for ${id(session.id)}:`, (name) =>
           name === '' ? draw(app) : act(app, `naming ${id(session.id)}…`, () => renameSession(session.id, name)));
       }
-      return toast(app, 'select a mission or a session to rename it');
+      return toast(app, 'select a session to rename it');
     }
     case 'm': {
-      if (right || here.kind === 'inbox' || here.kind === 'global') return toast(app, 'select a project to add a mission to');
+      if (here.kind === 'inbox' || here.kind === 'global') return toast(app, 'select a project to add a mission to');
+      // The form belongs to the project, so any of its rows opens it and the selection moves there:
+      // a new mission's draft is shown by the project row, the way a message draft is by its own.
       const { project } = here;
-      // Two lines: the name, which is the folder and later the branch, then the title a human reads.
-      return ask(app, `new mission in ${project.name} · name:`, (name) => {
-        if (name === '') return draw(app);
-        ask(app, `title for ${name}:`, (title) => act(app, `creating ${name}…`, () => newMission(project.path, name, title)));
-      });
+      ui.left = items.findIndex((item) => item.kind === 'project' && item.project === project);
+      ui.form = true;
+      draftFor(ui, items[ui.left]!).field = 0;
+      break;
     }
     case 'k': {
       if (right) break;
@@ -292,7 +373,11 @@ function footKey(ui: Ui, tab: Ui['foot']): void {
 export function onPaste(app: App, text: string): void {
   const { ui } = app;
   if (ui.input) ui.input.value += text.replace(/\s+/g, ' ').trim();
-  else if (ui.compose) insert(draftOf(ui, select(app.snap, ui).here), text);
+  else if (ui.form && formOf(select(app.snap, ui).here) !== null) {
+    const d = draftFor(ui, select(app.snap, ui).here);
+    const field = FIELDS[d.field];
+    if (field) insert(d[field[0]], text);
+  } else if (ui.compose) insert(draftOf(ui, select(app.snap, ui).here), text);
   else return;
   draw(app);
 }

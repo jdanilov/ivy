@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { mkdir, readdir, readFile, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
 import type { Autonomy, Claim, Deviation, Mission, MissionState, Workflow } from '../types.js';
+import { EMPTY, writeIntent, type Intent } from './intent.js';
 import { factoryHome, loadProjects, saveProject } from './projects.js';
 import { dumpWorkflow, loadWorkflow, readWorkflowFile } from './workflow.js';
 
@@ -85,7 +86,6 @@ export async function readState(dir: string): Promise<MissionState> {
   const status = raw.status ?? 'open';
   return {
     name,
-    title: raw.title ?? name,
     workflow: raw.workflow ?? 'story',
     autonomy: raw.autonomy ?? 'partial',
     status,
@@ -122,18 +122,6 @@ export async function setAutonomy(cwd: string, name: string | undefined, autonom
   mission.state.autonomy = autonomy;
   deviate(mission.state, `autonomy set to ${autonomy}`, from);
   await writeState(mission.dir, mission.state);
-  return mission;
-}
-
-/** The title is the one line of a mission a human reads in a list; the name is its branch and stays. */
-export async function setTitle(cwd: string, name: string, title: string): Promise<Mission> {
-  const mission = await resolveMission(cwd, name);
-  mission.state.title = title;
-  await writeState(mission.dir, mission.state);
-  // The intent's heading is the same line, written from the same title when the folder was made.
-  const intent = path.join(mission.dir, 'intent.md');
-  const text = await readFile(intent, 'utf-8').catch(() => '');
-  if (text.startsWith('# Intent:')) await Bun.write(intent, text.replace(/^# Intent:.*$/m, `# Intent: ${title}`));
   return mission;
 }
 
@@ -345,7 +333,8 @@ export async function missionWorkflow(mission: Mission): Promise<Workflow> {
 
 export interface NewMission {
   name: string;
-  title?: string;
+  /** What the intent form filled in, or nothing: a stub's `intent.md` is a render of it. */
+  intent?: Intent;
   workflow: string;
   autonomy: Autonomy;
   worktree: boolean;
@@ -376,7 +365,6 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   const checkout = await currentCheckout(cwd);
   const loaded = await loadWorkflow(opts.workflow, main);
   const workflow = opts.verify ? withVerify(loaded) : loaded;
-  const title = opts.title ?? opts.name;
   const folder = path.join(missionsDir(main), `${today()}-${opts.name}`);
 
   const taken = opts.stub
@@ -403,12 +391,11 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
   // 2. folder
   await mkdir(path.join(folder, 'handoffs'), { recursive: true });
   await Bun.write(path.join(folder, 'workflow.yaml'), dumpWorkflow(workflow));
-  if (opts.stub) await Bun.write(path.join(folder, 'intent.md'), intentSkeleton(title));
+  if (opts.stub) await writeIntent(folder, opts.name, opts.intent ?? EMPTY);
 
   // 3. state.json last
   const state: MissionState = {
     name: opts.name,
-    title,
     workflow: workflow.name,
     autonomy: opts.autonomy,
     status: opts.stub ? 'stub' : 'open',
@@ -430,11 +417,6 @@ export async function createMission(cwd: string, opts: NewMission): Promise<Miss
 
   await saveProject(main);
   return { dir: folder, state };
-}
-
-/** The Why, Done looks like and Not in this mission the human fills in before opening the stub. */
-function intentSkeleton(title: string): string {
-  return `# Intent: ${title}\n\n## Why\n\n## Done looks like\n\n## Not in this mission\n`;
 }
 
 /** A stub becomes a real mission: branch from HEAD, claim, status open. `open` then proceeds as usual. */

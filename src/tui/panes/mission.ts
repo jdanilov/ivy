@@ -27,14 +27,15 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   const done = m.steps.filter((s) => s.status === 'done').length;
   p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
-  // The title is what a mission is for, so it gets two whole lines, never a header's tail. A stub
-  // has nothing to run yet: the first paragraph of its intent's why stands where the graph would.
-  const stub = m.status === 'stub';
-  if (stub || m.title !== m.name) for (const l of wrap(m.title, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.bright]]);
-  if (stub) {
-    for (const l of wrap(m.why ?? 'no intent yet', p.width - 1, 6)) p.row([[' ', C.dim], [l, C.dim]]);
-    p.rule();
-    return;
+  // What the mission is for: the first paragraph of `## Goal`, joined onto one line since the file
+  // wraps it where the editor did. Two rows of its own, an ellipsis where the second one cuts,
+  // then a blank row so the graph does not read as its third line.
+  const goal = m.intent?.goal.split(/\n\s*\n/)[0]?.replace(/\s+/g, ' ').trim() ?? '';
+  if (goal !== '') {
+    const rows = wrap(goal, p.width - 1, 2);
+    if (rows.join(' ').length < goal.length) rows[rows.length - 1] = `${rows[rows.length - 1]!.slice(0, p.width - 2)}…`;
+    for (const l of rows) p.row([[' ', C.dim], [l, C.bright]]);
+    p.row([]);
   }
 
   for (const s of m.steps) {

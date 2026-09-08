@@ -40,6 +40,7 @@ const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/l
 const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
+const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writePartScope } = await import('../src/core/config.js');
 
 let failed = 0;
@@ -564,10 +565,41 @@ await check('update reinstalls a part its dependant requires', async () => {
 
 await git(main, 'add', '-A'); await git(main, 'commit', '-qm', 'install factory');
 
+await check('intent.md round-trips and leaves out what nothing filled', async () => {
+  const filled = { goal: 'a goal', done: 'one\ntwo', not: 'not this', start: '@docs/design.md' };
+  ok(JSON.stringify(parseIntent(renderIntent('n', filled))) === JSON.stringify(filled), 'the round trip lost a section');
+  const bare = renderIntent('n', { goal: '', done: '', not: '', start: '' });
+  ok(bare.includes('# Intent: n') && bare.includes('## Goal'), `the skeleton is missing a heading: ${JSON.stringify(bare)}`);
+  ok(!bare.includes('## Done') && !bare.includes('## Not') && !bare.includes('## Start'), `an empty section was written: ${JSON.stringify(bare)}`);
+  const only = renderIntent('n', { goal: 'g', done: 'd', not: '', start: '' });
+  ok(only.includes('## Done looks like\n\nd') && !only.includes('## Not'), `render wrote the wrong sections: ${JSON.stringify(only)}`);
+  // A field is cut by the headings the format knows and by nothing else: `## Start from` is where
+  // a human pastes a doc excerpt, headings and all.
+  const pasted = { goal: 'g', done: '', not: '', start: 'line one\n## a heading\nline three' };
+  ok(parseIntent(renderIntent('n', pasted)).start === pasted.start, 'a heading inside a field cut it');
+});
+
+await check('an intent written under `## Why` reads as a goal', async () => {
+  // The whole body, paragraphs and all: the first save rewrites the file, so a why read by halves
+  // would be a why deleted by halves.
+  const body = 'the old missions say it here.\n\na second paragraph.';
+  const why = parseIntent(`# Intent: old\n\n## Why\n\n${body}\n`);
+  ok(why.goal === body, `the why did not stand in for the goal whole: ${JSON.stringify(why.goal)}`);
+  ok(parseIntent(renderIntent('old', why)).goal === body, 'the save lost part of the why');
+  const both = parseIntent('# Intent: old\n\n## Why\n\nthe why\n\n## Goal\n\nthe goal\n');
+  ok(both.goal === 'the goal', `the why won over a goal that is there: ${JSON.stringify(both.goal)}`);
+  // Read only: a save moves the body under `## Goal` and never writes `## Why` back.
+  ok(!renderIntent('old', why).includes('## Why'), 'render wrote a `## Why` section');
+});
+
 await check('a stub takes no branch and promote gives it one', async () => {
   const m = await createMission(main, { name: 'x', workflow: 'chore', autonomy: 'partial', worktree: false, stub: true });
   ok(m.state.branch === null, 'the stub took a branch');
   ok((await currentBranch(main)) === 'main', 'the stub left the trunk');
+  // The skeleton is a render of an empty intent, and the state carries no line beside the name.
+  const intent = await Bun.file(path.join(m.dir, 'intent.md')).text();
+  ok(intent.startsWith('# Intent: x') && intent.includes('## Goal'), `the stub's intent.md reads ${JSON.stringify(intent)}`);
+  ok(!('title' in (await Bun.file(path.join(m.dir, 'state.json')).json())), 'state.json still carries a title');
   await promoteMission(main, m);
   ok((await currentBranch(main)) === 'mission/x', 'promote did not branch');
 });

@@ -102,7 +102,6 @@ interface Bound {
   dir: string;
   cwd: string;
   name: string;
-  title: string;
   workflow: string;
   step: string;
   round: number;
@@ -125,7 +124,6 @@ function parseState(dir: string, cwd: string, text: string): Bound | null {
     dir,
     cwd: cwd === '' ? dir.replace(/\/\.factory\/missions\/[^/]+$/, '') : cwd,
     name,
-    title: typeof state.title === 'string' ? state.title : name,
     workflow: typeof state.workflow === 'string' ? state.workflow : 'story',
     step: typeof state.step === 'string' ? state.step : '',
     round: typeof state.round === 'number' ? state.round : 0,

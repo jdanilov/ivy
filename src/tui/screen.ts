@@ -9,6 +9,7 @@ import { missionPane, sessionPane } from './panes/mission.js';
 import { partsPane, pending } from './panes/parts.js';
 import { footPane } from './panes/foot.js';
 import { composeHeight, composePane, targetOf } from './panes/compose.js';
+import { formOf, formPane, showsForm, showsParts } from './panes/form.js';
 import { helpPane } from './panes/help.js';
 import { onKey, onPaste } from './keys.js';
 import type { Mission, Session, Snapshot } from './model.js';
@@ -121,31 +122,41 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E', 'R'], session: ['K', 'R'],
+  inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
 };
 const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
+
+/** A stub's autonomy is the form's dial, so `T` there answers with a toast and nothing else: the
+ *  bar drops it, the way it lists Parts only where Parts is the pane. */
+const rowKeys = (here: LeftItem): string[] =>
+  here.kind === 'mission' && here.mission.status === 'stub'
+    ? ROW_KEYS.mission.filter((key) => key !== 'T')
+    : ROW_KEYS[here.kind];
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. `L`, `C`, `A`
  *  and `D` are not here: the header and the foot tabs carry them as their bright first letter. */
 function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
-  const parts = here.kind === 'project' || here.kind === 'global';
+  // The bar lists the pane that is drawn: a project row showing the intent form is not Parts.
+  const parts = showsParts(ui, here);
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
+    ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
-    !right ? [['↑↓', 'Select'], ['↵', targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
+    !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!)),
       ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
     // Space picks the scope on the global row and the install on a project's: one key, two panes.
     : parts ? [['↑↓', 'Select'], ['Space', here.kind === 'global' ? 'Scope' : 'Toggle'], ['↵', 'Apply'],
       ...(pending(here.project, ui, here.kind === 'global').length ? [['R', 'Reset'], ['Esc', 'Discard']] : [['← Esc', 'Back']]), ['Q', 'Quit'], ['?', 'Help']]
-    // The mission pane has one thing to focus, and the row it sits on is the autonomy dial.
-    : [...(here.kind === 'mission' ? [['→ T', 'Autonomy']] : []),
+    // The mission pane has one thing to focus, and the row it sits on is the autonomy dial. A
+    // stub's right pane is the form instead, where neither key turns anything.
+    : [...(here.kind === 'mission' && here.mission.status !== 'stub' ? [['→ T', 'Autonomy']] : []),
       ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']];
 
   const cells = (list: string[][]): Cell[] =>
@@ -157,6 +168,18 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
+
+/** The left column takes two fifths, never under this. */
+const LEFT_MIN = 30;
+const leftWidth = (w: number): number => Math.max(LEFT_MIN, Math.floor(w * 0.4));
+
+/** What the right pane draws into. The intent form wraps its fields to it, and `editKey` has to
+ *  be given the same width or the cursor's row is not the one on screen. */
+export const rightWidth = (r: CliRenderer): number => {
+  const w = r.terminalWidth - 2;
+  return w - leftWidth(w) - 2;
+};
+
 
 export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   // remove() detaches without freeing the native text buffer and yoga node behind every row:
@@ -189,7 +212,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   }
 
   if (bodyH > 0) {
-    const leftW = Math.max(30, Math.floor(w * 0.4));
+    const leftW = leftWidth(w);
     const rightW = w - leftW - 1;
     const body = new BoxRenderable(r, { flexDirection: 'row', height: bodyH, flexShrink: 0, overflow: 'hidden' });
     // Two cells of padding keep the left pane's right-aligned tokens off the divider.
@@ -199,6 +222,9 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     // An empty Inbox has nothing to show, so the panel stands there: a fresh install opens on it.
     if (panel) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
+    // The form outranks Parts and MISSION: a stub is edited here, and a project row shows the new
+    // mission it has a draft for. The body cuts the end of it, the way it cuts a long graph.
+    else if (showsForm(ui, here)) formPane(right, ui, here);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global', bodyH);
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');
     else sessionPane(right, here.session);
@@ -266,7 +292,7 @@ export async function run(snap: Snapshot, live?: Live): Promise<void> {
     r.keyInput.on('paste', (e: PasteEvent) => onPaste(app, decodePasteBytes(e.bytes)));
     r.keyInput.on('keypress', (key: KeyEvent) => {
       // Typed on the input line or into a message, `q` is a letter like any other.
-      if (key.name === 'q' && !app.ui.input && !app.ui.compose) {
+      if (key.name === 'q' && !app.ui.input && !app.ui.compose && !app.ui.form) {
         watcher?.close();
         r.destroy();
         return done();

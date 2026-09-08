@@ -42,7 +42,7 @@ of it, one `work` step with no intent to shape.
 ## CLI
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
 factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset P] [--dry-run] | list [--all] | status|resume|close [name] | adopt <name> --session <id>
 factory step start|done|skip|loop <step> [--reason R] [--mission M] | add <step> --after <step> --role R --reason R

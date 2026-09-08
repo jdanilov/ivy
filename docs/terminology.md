@@ -47,7 +47,7 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 
 | File          | Written by   | Content                                                                          |
 |---------------|--------------|----------------------------------------------------------------------------------|
-| intent.md     | Orchestrator | Why, goal, done criteria, guardrails. The one file the human reads.              |
+| intent.md     | Human        | Goal, done criteria, guardrails, start from. The one file the human reads; the intent form writes it. |
 | spec.md       | Orchestrator | Steps for workers, files touched, decisions, risks, recovery per step.           |
 | acceptance.md | Orchestrator | Contract: one assertion per line — id, kind (verify or validate), claim, check, owning step. |
 | findings.md   | Gatekeepers  | Findings by assertion id with blast radius, effort, confidence. One round each.  |

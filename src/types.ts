@@ -175,7 +175,6 @@ export interface Deviation {
 
 export interface MissionState {
   name: string;
-  title: string;
   workflow: string;
   autonomy: Autonomy;
   /** A stub has intent and no branch: `mission open` promotes it. */

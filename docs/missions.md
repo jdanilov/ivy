@@ -10,7 +10,7 @@ All five act on the checkout you are standing in, never prompt (the one exceptio
 offer in `mission new` on a claimed checkout) and exit 1 with a one-line `✗ …` on a refusal.
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--title T] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
 factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
@@ -62,9 +62,20 @@ factory handoff save <step>            # reads the handoff from stdin
   them when the file is otherwise clean, and `mission close` never counts anything under
   `.factory/` as dirt: the Factory's own files cannot block the Factory.
 - A stub is a mission with `status: stub` and `branch: null`: folder, workflow copy and an
-  `intent.md` skeleton, no branch and no claim. Every command that needs a branch refuses with
+  `intent.md`, no branch and no claim. Every command that needs a branch refuses with
   `mission <name> is a stub, open it first`; `mission open` promotes it and then proceeds as usual,
   landing in the same state `mission new` would have.
+- `src/core/intent.ts` owns `intent.md`: `## Goal`, `## Done looks like`, `## Not in this mission`
+  and `## Start from`, in that order. `## Goal` is always written, empty from the CLI and filled
+  from Mission Control's intent form; the other three are written only when they hold something,
+  so a section on the page is a section somebody filled in. A save rewrites the whole file — the
+  form is the one writer — and parse and render round-trip on trimmed fields. A body runs to the
+  next heading of that set, so a `## ` line pasted into a field stays in it, and a file with no
+  `## Goal` reads the whole `## Why` body as the goal: the missions written before the form still
+  show and still open, and the first save moves that body under `## Goal`. The whole body, because
+  the save rewrites the file — a why read by halves would be a why deleted by halves.
+- Mission Control refuses `O` on a stub whose goal is empty: the Orchestrator would only ask what
+  the form is there for. The CLI's `mission open` does not — running it is a deliberate act.
 - `mission close` commits nothing and never `git add`s the mission folder, which is ignored:
   `status: closed` in its own `state.json` is the postcondition a rerun reads back. It refuses
   when anything outside `.factory/` is dirty, naming the paths, and merges the branch when the

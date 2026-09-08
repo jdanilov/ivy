@@ -27,7 +27,9 @@ repo() { mkdir -p "$1"; git -C "$1" init -q; git -C "$1" config user.email e2e@f
    git -C "$1" config user.name e2e; echo '# e2e' > "$1/README.md"
    git -C "$1" add -A; git -C "$1" commit -qm 'init'; }
 
-mkdir -p "$HOME"
+mkdir -p "$HOME/.factory"
+# The hook holds the Mac awake on a prompt under the default `auto`; a scratch run leaves none behind.
+printf 'caffeinate: "off"\n' > "$HOME/.factory/config.yaml"
 repo "$REPO"
 
 f install "$REPO" --yes

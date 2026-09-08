@@ -60,7 +60,7 @@ process.env.HOME = path.join(TMP, 'home');
 // The hook holds the Mac awake on a prompt under the default `auto`; a check has no business
 // leaving a caffeinate behind it.
 await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
-await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'caffeinate: off\n');
+await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'caffeinate: "off"\n');
 
 const { createMission, git } = await import('../src/core/mission.js');
 const { readDecisions } = await import('../src/core/decision.js');

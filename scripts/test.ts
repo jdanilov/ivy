@@ -21,8 +21,9 @@ if (!factoryHome().startsWith(TMP + path.sep)) {
 
 await mkdir(path.join(process.env.HOME, '.factory'), { recursive: true });
 // The config is read once and cached, so it lands before anything resolves a part. `codegraph` as
-// the bare command keeps the codegraph case off the network.
-await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'vars:\n  codegraph: codegraph\n');
+// the bare command keeps the codegraph case off the network; `off` keeps every hook event a case
+// fires from starting a real caffeinate this run would never stop.
+await writeFile(path.join(process.env.HOME, '.factory', 'config.yaml'), 'caffeinate: "off"\nvars:\n  codegraph: codegraph\n');
 
 const { install } = await import('../src/commands/install.js');
 const { status } = await import('../src/commands/status.js');
@@ -228,6 +229,8 @@ async function hookMission(name: string, autonomy: string): Promise<{ dir: strin
   const home = path.join(dir, 'home');
   const mission = path.join(dir, 'mission');
   await mkdir(path.join(home, '.factory'), { recursive: true });
+  // A home of its own reads `auto` by default, and a prompt event would start a real caffeinate.
+  await writeFile(path.join(home, '.factory', 'config.yaml'), 'caffeinate: "off"\n');
   await mkdir(mission, { recursive: true });
   await writeFile(path.join(mission, 'state.json'), JSON.stringify({ name, session: 'S', step: 'implement', autonomy }));
 

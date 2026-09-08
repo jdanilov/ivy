@@ -15,6 +15,8 @@ import { readdir } from 'node:fs/promises';
 import { makeRepo, run } from '../.factory/validator/repo.js';
 
 const HOME = homedir();
+// The hook runs with this scratch HOME: `off` so the real session's turns start no caffeinate here.
+await Bun.write(path.join(HOME, '.factory', 'config.yaml'), 'caffeinate: "off"\n');
 const CLI = '/opt/ed/ivy/src/cli.ts';
 const session = crypto.randomUUID();
 const REAL = process.env.REAL_HOME!;

@@ -21,7 +21,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Recipe    | A project command list in `factory.yaml`: `verify`, `e2e`, `deliver`.                                |
 | Claim     | `.factory/claim` naming the mission that owns the main checkout. Other missions are offered a worktree. |
 | Snippet   | One line a part owns in the project's `AGENTS.md`, under a section the part names.                  |
-| Roadmap   | `docs/roadmap.md`, a plain checklist of decided and unstarted work. `/retro` appends, a human prunes. |
+| Roadmap   | `docs/roadmap.md`, decided and unstarted work in the order to do it, written for the human choosing the next mission. `/retro` appends under `## Unsorted`, a human orders and prunes. |
 
 ## Things that run
 

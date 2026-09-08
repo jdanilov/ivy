@@ -36,7 +36,7 @@ The human answers the whole table in one go: `as recommended`, or per number, `1
 |-------------|------------------------------------------------------------------------------------|
 | `apply now` | held back for the batch below                                                      |
 | `stub`      | `factory mission new <slug> --stub --title "<line>"`, then write the line into the stub's `intent.md` under `## Why` |
-| `roadmap`   | append `- [ ] <line> (<mission>)` to `docs/roadmap.md`                             |
+| `roadmap`   | append `- [ ] <line> (<mission>)` under `## Unsorted` in `docs/roadmap.md`          |
 | `drop`      | nothing                                                                            |
 
 Every `apply now` item goes to one `@Worker` as a numbered batch, this checkout, no Mission spec.

@@ -9,6 +9,9 @@ export interface FactoryConfig {
   vars?: Record<string, string>;
   /** Where this machine wants each part, over what `part.yaml` recommends. `off` is nowhere. */
   parts?: Record<string, ScopeChoice>;
+  /** Whether this machine runs each manifest entry, by `<project>/<name>`. Default off, and `off`
+   *  wins over anything the project's daemon manifest says. */
+  daemons?: Record<string, 'on' | 'off'>;
   /** How Mission Control lists things: `projects`, `<project>/missions`, `<project>/sessions`, each the
    *  names in the order the human moved them into. Whatever a list does not name follows it. */
   order?: Record<string, string[]>;
@@ -60,10 +63,11 @@ export async function loadConfig(): Promise<FactoryConfig> {
   const raw = parse(await file.text());
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return (cache = {});
 
-  const { vars, parts, order } = raw as Record<string, unknown>;
+  const { vars, parts, daemons, order } = raw as Record<string, unknown>;
   return (cache = {
     vars: pairs<string>(vars, (v) => typeof v === 'string'),
     parts: pairs<ScopeChoice>(parts, (v) => CHOICES.includes(v as ScopeChoice)),
+    daemons: pairs<'on' | 'off'>(daemons, (v) => v === 'on' || v === 'off'),
     order: pairs<string[]>(order, (v) => Array.isArray(v) && v.every((s) => typeof s === 'string')),
   });
 }
@@ -78,6 +82,13 @@ export async function readCaffeinate(): Promise<Caffeinate> {
   const raw = await Bun.file(configPath()).text().catch(() => '');
   const value = raw === '' ? null : (parse(raw) as { caffeinate?: unknown } | null)?.caffeinate;
   return value === 'on' || value === 'off' ? value : 'auto';
+}
+
+/** Read fresh too: the supervisor is a second process reading what the TUI just wrote. */
+export async function readDaemonEnabled(key: string): Promise<boolean> {
+  const raw = await Bun.file(configPath()).text().catch(() => '');
+  const daemons = raw === '' ? null : (parse(raw) as { daemons?: unknown } | null)?.daemons;
+  return pairs<'on'>(daemons, (v) => v === 'on')?.[key] === 'on';
 }
 
 export async function readLaunch(): Promise<Launch> {
@@ -107,26 +118,34 @@ async function writeLine(key: string, value: string): Promise<void> {
   await Bun.write(configPath(), next.endsWith('\n') ? next : `${next}\n`);
 }
 
-/**
- * The same rule one level in: the part's line under `parts:` rewritten where it is, or inserted at
- * the end of that block, or the block appended when the file has none. Only that line moves, and
- * only inside the block — `vars` may hold a key named after a part. Quoted, because YAML reads a
- * bare `off` as false.
- */
 export async function writePartScope(name: string, choice: ScopeChoice): Promise<void> {
+  await writeBlockEntry('parts', name, choice);
+}
+
+export async function writeDaemonEnabled(key: string, mode: 'on' | 'off'): Promise<void> {
+  await writeBlockEntry('daemons', key, mode);
+}
+
+/**
+ * The same rule one level in: the entry's line under `parts:` or `daemons:` rewritten where it is,
+ * or inserted at the end of that block, or the block appended when the file has none. Only that
+ * line moves, and only inside the block — `vars` may hold a key named after a part. Quoted,
+ * because YAML reads a bare `off` as false and a bare `on` as true.
+ */
+async function writeBlockEntry(block: string, name: string, value: string): Promise<void> {
   const text = await Bun.file(configPath()).text().catch(() => '');
   const lines = text === '' ? [] : text.replace(/\n$/, '').split('\n');
-  const entry = `  ${name}: "${choice}"`;
-  const head = lines.findIndex((l) => l.startsWith('parts:'));
+  const entry = `  ${name}: "${value}"`;
+  const head = lines.findIndex((l) => l.startsWith(`${block}:`));
 
   if (head === -1) {
-    lines.push('parts:', entry);
+    lines.push(`${block}:`, entry);
   } else {
     // A flow mapping — `parts: {commit: project}` — closes on its own line, so an indented line
     // under it is not YAML: it becomes a block holding the same entries before anything is added.
-    if (lines[head]!.slice('parts:'.length).trim() !== '') {
-      const flow = (Bun.YAML.parse(lines[head]!) as { parts?: Record<string, unknown> } | null)?.parts ?? {};
-      lines.splice(head, 1, 'parts:', ...Object.entries(flow).map(([k, v]) => `  ${k}: "${v}"`));
+    if (lines[head]!.slice(block.length + 1).trim() !== '') {
+      const flow = (Bun.YAML.parse(lines[head]!) as Record<string, Record<string, unknown> | undefined> | null)?.[block] ?? {};
+      lines.splice(head, 1, `${block}:`, ...Object.entries(flow).map(([k, v]) => `  ${k}: "${v}"`));
     }
     // The block runs while the lines stay indented; the part's own line is rewritten in place.
     let end = head + 1;

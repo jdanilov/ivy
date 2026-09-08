@@ -10,7 +10,7 @@ import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
-import { AUTONOMY, AUTONOMY_FIELD, FIELDS, draftFor, formOf, showsParts, untouched, type Form } from './panes/form.js';
+import { AUTONOMY, AUTONOMY_FIELD, FIELDS, SHAPES, SHAPE_FIELD, draftFor, formOf, shapeOf, showsParts, untouched, workflowOf, type Form } from './panes/form.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
 import type { Caffeinate, Intent, Launch, Mission, Project } from './model.js';
 
@@ -99,7 +99,7 @@ function forming(app: App, key: KeyEvent): void {
   const d = draftFor(ui, here);
   // A stub's name is fixed once the folder exists, so the cursor never lands on it there.
   const first = form.create ? 0 : 1;
-  const stops = AUTONOMY_FIELD + 1 - first;
+  const stops = SHAPE_FIELD + 1 - first;
   const field = FIELDS[d.field];
 
   if (key.name === 'escape') {
@@ -114,13 +114,19 @@ function forming(app: App, key: KeyEvent): void {
   else if (key.ctrl && key.name === 'u') {
     if (field) d[field[0]] = { text: '', cursor: 0 };
   } else if (field === undefined && (key.name === 'left' || key.name === 'right')) {
-    const step = key.name === 'right' ? 1 : AUTONOMY.length - 1;
-    d.autonomy = AUTONOMY[(AUTONOMY.indexOf(d.autonomy) + step) % AUTONOMY.length]!;
+    const right = key.name === 'right';
+    if (d.field === AUTONOMY_FIELD) d.autonomy = turn(AUTONOMY, d.autonomy, right);
+    else d.shape = turn(SHAPES, d.shape, right);
   } else if (field === undefined) return;
   else if (key.ctrl && key.name === 'v') return pasteClipboard(app, d[field[0]]);
   else if (!editKey(d[field[0]], key, rightWidth(app.r))) return;
   draw(app);
 }
+
+/** The next option on a dial, or the one before; the ends wrap. */
+const turn = <T>(options: readonly T[], value: T, right: boolean): T =>
+  options[(options.indexOf(value) + (right ? 1 : options.length - 1)) % options.length]!;
+
 
 /** `^S`: what the form refuses is named on the status bar and the cursor is put on it, so the
  *  next keystroke fixes it. Nothing is written until both required fields hold something. */
@@ -143,11 +149,14 @@ function saveForm(app: App, form: Form, d: IntentDraft): void {
     return toast(app, 'goal is empty — say what the mission is for');
   }
 
-  const intent: Intent = { goal, done: d.done.text.trim(), not: d.not.text.trim(), start: d.start.text.trim() };
+  const intent: Intent = { goal, done: d.done.text.trim(), extra: d.extra.text.trim() };
   const autonomy = d.autonomy;
+  // The graph is rewritten only when the dial was turned: a stub on a workflow the dial does not
+  // list reads `auto` and keeps it, unless the human picks another.
+  const workflow = d.shape === shapeOf(form.workflow) ? null : workflowOf(d.shape);
   delete ui.intents[form.key];
   ui.form = false;
-  act(app, `saving ${name}…`, () => saveIntent(project.path, name, intent, autonomy, create));
+  act(app, `saving ${name}…`, () => saveIntent(project.path, name, intent, autonomy, workflow, create));
 }
 
 /**

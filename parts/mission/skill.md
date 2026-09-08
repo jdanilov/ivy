@@ -28,7 +28,8 @@ tokens**. Spend tokens and minutes to save a minute of the human's, never qualit
 
 A mission starts unshaped: `workflow.yaml` is the `intent` workflow, one gated step and nothing after
 it. Propose a preset and an autonomy under `## Shape` in `intent.md`; once the gate is answered,
-`factory mission shape <preset> --autonomy L` appends that preset's steps behind `intent`. `merge`
+`factory mission shape <preset> --autonomy L` appends that preset's steps behind `intent`. A stub
+shaped from the form's Shape dial arrives with its graph: gate the intent, skip the proposal. `merge`
 spawns the Summarizer first — `retro.md` is part of what the human approves — then opens the gate.
 `step add|skip|loop` customise a shaped graph, nothing reshapes it; `mission new --quick` skips all
 of it, one `work` step with no intent to shape.
@@ -38,6 +39,7 @@ of it, one `work` step with no intent to shape.
 | `story`    | research → spec → implement → review (verify ∥ validate, back to implement, max 3) → merge | a feature, anything with a contract |
 | `chore`    | implement → merge; `--verify` adds verify (back to implement, max 2) | mechanical work, a known bug with it |
 | `research` | investigate (sources ∥ transcripts) → report                        | a question, no code     |
+| `train`    | plan → implement → check (you, back to implement, max 8) → merge   | a large task in legs, no gatekeepers |
 
 ## CLI
 
@@ -65,8 +67,9 @@ and `@Summarizer`. Never commit while a Worker or gatekeeper runs: between spawn
 One Worker per step is the default, packing steps into one is the saving: a spawn costs the context
 it rereads. A step touching under ten files is ~100k tokens, a Worker holds ~300k of useful work.
 Start a new one only when the work must be verified before the next step, the pack would pass ~300k
-tokens, or the next step is a different nature or module. Split one step across serial Workers only
-when the spec partitions it as cleanly as separate files: a split breaks handoff naming and continuity.
+tokens, or the next step is a different nature or module. A step split across Workers is `train`:
+`plan` cuts legs as cleanly as separate files, each leg is a round of `implement`, and `check` is
+yours — rerun the verify recipe, read the leg's diff by hunks, hold its ids, `step loop check`.
 
 ## Gates and questions
 

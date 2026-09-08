@@ -4,6 +4,7 @@ import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
 import type { Autonomy, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
 import type { Draft } from './compose.js';
+import type { Shape } from './form.js';
 
 /**
  * What every pane shares: the Ui state it reads, the rows the left column lists — one of which the
@@ -46,10 +47,11 @@ export interface IntentDraft {
   name: Draft;
   goal: Draft;
   done: Draft;
-  not: Draft;
-  start: Draft;
+  extra: Draft;
   autonomy: Autonomy;
-  /** Indexes the editable order `name goal done not start autonomy`. */
+  /** The Shape dial: `auto` leaves the graph to the Orchestrator, a name is that preset's graph. */
+  shape: Shape;
+  /** Indexes the editable order `name goal done extra autonomy shape`. */
   field: number;
 }
 

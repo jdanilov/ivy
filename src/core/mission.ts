@@ -353,6 +353,17 @@ export function withVerify(workflow: Workflow): Workflow {
   return { ...workflow, steps };
 }
 
+/** A stub's graph is the form's Shape dial: nothing has run, so the whole copy is rewritten. */
+export async function reshapeStub(cwd: string, mission: Mission, workflowName: string): Promise<void> {
+  if (mission.state.status !== 'stub') throw new Refusal(`mission ${mission.state.name} is not a stub — shape it with: factory mission shape <preset>`);
+  const workflow = await loadWorkflow(workflowName, await mainCheckout(cwd));
+  await Bun.write(path.join(mission.dir, 'workflow.yaml'), dumpWorkflow(workflow));
+  mission.state.workflow = workflow.name;
+  mission.state.step = workflow.steps[0]!.name;
+  mission.state.updated = now();
+  await writeState(mission.dir, mission.state);
+}
+
 /**
  * Branch and folder first, state.json last: an interrupted run leaves an orphan branch,
  * which the next run detects and reuses, never a state.json naming a branch that is not there.

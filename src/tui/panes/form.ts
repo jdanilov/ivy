@@ -13,16 +13,26 @@ import type { Autonomy, Intent, Project } from '../model.js';
 
 /** The editable order `field` indexes; the last stop is the autonomy dial, which has no text. */
 export const FIELDS: [key: TextField, label: string, max: number][] = [
-  ['name', 'name · lowercase slug, fixed once the stub is made', 1],
-  ['goal', 'goal · what this mission is for', 4],
-  ['done', 'done looks like · one per line', 6],
-  ['not', 'not in this mission · guardrails, do not touch', 6],
-  ['start', 'start from · files, docs, a bug id, a prior mission', 6],
+  ['name', 'Name (lowercase slug):', 1],
+  ['goal', 'Mission Goal:', 4],
+  ['done', 'What done looks like (one per line):', 6],
+  ['extra', 'Extra (guardrails, what not to touch, start from, etc.):', 6],
 ];
-export type TextField = 'name' | 'goal' | 'done' | 'not' | 'start';
-/** `field` on the dial: past the last text field. */
+export type TextField = 'name' | 'goal' | 'done' | 'extra';
+/** In front of every label, so a label never reads as a value. */
+const MARK = '› ';
+/** `field` on the dials: past the last text field, autonomy then preset. */
 export const AUTONOMY_FIELD = FIELDS.length;
+export const SHAPE_FIELD = FIELDS.length + 1;
 export const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
+/** The Shape dial: the shipped workflows, and `auto` for the `intent` one the Orchestrator shapes. */
+export const SHAPES = ['auto', 'quick', 'chore', 'research', 'train', 'story'] as const;
+export type Shape = (typeof SHAPES)[number];
+/** A stub's workflow as the dial reads it; one the dial does not list reads `auto`, and the save
+ *  only rewrites a graph when the dial was turned, so that one is left as it is. */
+export const shapeOf = (workflow: string | null): Shape =>
+  (SHAPES as readonly string[]).includes(workflow ?? '') ? (workflow as Shape) : 'auto';
+export const workflowOf = (shape: Shape): string => (shape === 'auto' ? 'intent' : shape);
 
 /** The row the form belongs to, and everything saving it needs: one rule, stated once, so no
  *  caller has to narrow the row again to find the project or the name. */
@@ -32,14 +42,16 @@ export interface Form {
   project: Project;
   /** '' while the stub is not made: until then the name is a field of the form. */
   name: string;
+  /** A stub's own graph, null for a new mission: what the Shape dial is compared against. */
+  workflow: string | null;
   create: boolean;
 }
 
 /** A project row writes a new mission, a stub row edits its own; every other row has no form. */
 export function formOf(here: LeftItem): Form | null {
-  if (here.kind === 'project') return { key: `new ${here.project.name}`, project: here.project, name: '', create: true };
+  if (here.kind === 'project') return { key: `new ${here.project.name}`, project: here.project, name: '', workflow: null, create: true };
   if (here.kind === 'mission' && here.mission.status === 'stub') {
-    return { key: itemKey(here), project: here.project, name: here.mission.name, create: false };
+    return { key: itemKey(here), project: here.project, name: here.mission.name, workflow: here.mission.workflow, create: false };
   }
   return null;
 }
@@ -49,11 +61,12 @@ const draft = (text: string): Draft => ({ text, cursor: text.length });
 /** A form filled from the row: a stub's own files, or empty for a new mission on a project row. */
 function fresh(here: LeftItem): IntentDraft {
   const m = here.kind === 'mission' ? here.mission : null;
-  const i: Intent = m?.intent ?? { goal: '', done: '', not: '', start: '' };
+  const i: Intent = m?.intent ?? { goal: '', done: '', extra: '' };
   return {
     name: draft(m?.name ?? ''),
-    goal: draft(i.goal), done: draft(i.done), not: draft(i.not), start: draft(i.start),
+    goal: draft(i.goal), done: draft(i.done), extra: draft(i.extra),
     autonomy: m?.autonomy ?? 'partial',
+    shape: shapeOf(m?.workflow ?? null),
     // A stub's name is fixed, so the cursor starts on the goal instead.
     field: m ? 1 : 0,
   };
@@ -66,7 +79,7 @@ export const draftFor = (ui: Ui, here: LeftItem): IntentDraft => (ui.intents[for
  *  back to following `intent.md` instead of freezing against it. */
 export function untouched(d: IntentDraft, here: LeftItem): boolean {
   const f = fresh(here);
-  return d.autonomy === f.autonomy && FIELDS.every(([key]) => d[key].text === f[key].text);
+  return d.autonomy === f.autonomy && d.shape === f.shape && FIELDS.every(([key]) => d[key].text === f[key].text);
 }
 
 /**
@@ -107,14 +120,22 @@ export function formPane(p: Pane, ui: Ui, here: LeftItem): void {
   // a stub means renaming its folder, and delete-and-remake is that path.
   for (const [i, [field, label, max]] of FIELDS.entries()) {
     const active = ui.form && d.field === i;
-    p.row([[label, active ? C.accent : C.dim]]);
+    p.row([[MARK + label, active ? C.accent : C.dim]]);
     draftRows(p, d[field], p.width, active, max);
+    p.row([]); // a blank row between one input and the next label
   }
 
-  const onDial = ui.form && d.field === AUTONOMY_FIELD;
-  p.row([['autonomy', onDial ? C.accent : C.dim], ['  ', C.dim],
-    ...AUTONOMY.flatMap((a, i): Cell[] => [
+  dial(p, 'Autonomy:', AUTONOMY, d.autonomy, ui.form && d.field === AUTONOMY_FIELD);
+  p.row([]);
+  dial(p, 'Shape:', SHAPES, d.shape, ui.form && d.field === SHAPE_FIELD);
+}
+
+
+/** One row: the label, then every option with the chosen one bright and, on the dial, the cursor. */
+function dial<T extends string>(p: Pane, label: string, options: readonly T[], value: T, on: boolean): void {
+  p.row([[MARK + label, on ? C.accent : C.dim], ['  ', C.dim],
+    ...options.flatMap((option, i): Cell[] => [
       ...(i ? ([[' | ', C.rule]] as Cell[]) : []),
-      [a, a === d.autonomy ? C.bright : C.dim, onDial && a === d.autonomy],
+      [option, option === value ? C.bright : C.dim, on && option === value],
     ])]);
 }

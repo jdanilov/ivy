@@ -4,7 +4,7 @@ import { install } from '../commands/install.js';
 import { update } from '../commands/update.js';
 import { removeParts } from '../core/parts.js';
 import { readManifest } from '../core/manifest.js';
-import { archiveMission, createMission, readyToOpen, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { archiveMission, createMission, readyToOpen, reshapeStub, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { writeIntent, type Intent } from '../core/intent.js';
 import { loadPreset, openSession, stopSession } from '../core/spawn.js';
 import { inboxOf, post } from '../core/peer.js';
@@ -204,15 +204,18 @@ export async function setAutonomy(project: string, name: string, autonomy: Auton
 /**
  * What the intent form writes. A new one is `mission new --stub`: a folder and the intent it was
  * filled with, no branch, and `O` promotes it. An existing stub keeps its folder and its name —
- * the form never renames — so only `intent.md` and, when the dial moved, `state.json` are written.
+ * the form never renames — so only `intent.md` and, when a dial moved, `state.json` are written.
+ * `workflow` is the Shape dial when it was turned, null when it was not: `auto` on a new stub is
+ * the `intent` workflow, and a stub's own graph is left alone unless the dial says otherwise.
  */
-export async function saveIntent(project: string, name: string, intent: Intent, autonomy: Autonomy, create: boolean): Promise<string> {
+export async function saveIntent(project: string, name: string, intent: Intent, autonomy: Autonomy, workflow: string | null, create: boolean): Promise<string> {
   if (create) {
-    const made = await createMission(project, { name, intent, workflow: 'intent', autonomy, worktree: false, stub: true });
+    const made = await createMission(project, { name, intent, workflow: workflow ?? 'intent', autonomy, worktree: false, stub: true });
     return `stub ${made.state.name} · O opens it`;
   }
   const mission = await resolveMission(project, name);
   await writeIntent(mission.dir, name, intent);
+  if (workflow !== null) await reshapeStub(project, mission, workflow);
   if (mission.state.autonomy !== autonomy) await writeAutonomy(project, name, autonomy, 'set from the intent form');
   return `${name} intent saved`;
 }

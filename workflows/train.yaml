@@ -1,0 +1,8 @@
+name: train
+steps:
+  - intent:    { gate: human }
+  - plan                                   # spec.md: the legs, in order; acceptance.md, owner per leg
+  - implement: { role: worker }            # one Worker per leg, clean context, serial
+  - check:
+      loop: { back: implement, max: 8 }    # the Orchestrator's own review, no gatekeeper spawned
+  - merge:     { gate: human }

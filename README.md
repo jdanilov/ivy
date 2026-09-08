@@ -47,7 +47,7 @@ Everything else acts on the checkout you are standing in and never prompts.
 | `install\|uninstall\|status\|update --global`  | The same four over `~/.claude/`, on the parts marked `scope: global`        |
 | `mission new <name> [--autonomy L]`            | Create the folder, the `intent` workflow copy, `state.json`, branch, claim  |
 | `mission new <name> --stub \| --quick`         | Intent skeleton with no branch, or the one-step `quick` workflow            |
-| `mission shape <preset> [--autonomy L]`        | Append a preset's steps behind `intent`, once, after the intent gate        |
+| `mission shape <preset> [--autonomy L]`        | Append a preset's steps behind `intent`, once, after the intent gate: `story`, `chore`, `research`, `train` |
 | `mission autonomy full\|partial\|none [name]`  | Move the dial that decides which decisions wait on the human                |
 | `mission open [name]`                          | Spawn the session in a Warp tab; a stub is promoted, a bound one refused    |
 | `mission list [--all]`                         | Every mission across `~/.factory/projects`, stubs last                      |

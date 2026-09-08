@@ -188,8 +188,7 @@ const projects: Project[] = [
         intent: {
           goal: 'A per-project note store the hook recalls on prompt, so a session starts where the last one stopped instead of relearning the project.',
           done: 'the hook injects the three notes closest to the prompt\na mission\'s retro proposes memories and /retro files them',
-          not: 'embeddings: a grep index is instant and dumb, and v1 wants dumb',
-          start: '@docs/memories.md, the seed corpus',
+          extra: 'no embeddings: a grep index is instant and dumb, and v1 wants dumb\nstart from @docs/memories.md, the seed corpus',
         },
       }),
       // No goal: what `O` refuses, and what the form opens on.

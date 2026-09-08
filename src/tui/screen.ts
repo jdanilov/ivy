@@ -9,7 +9,7 @@ import { missionPane, sessionPane } from './panes/mission.js';
 import { partsPane, pending } from './panes/parts.js';
 import { footPane } from './panes/foot.js';
 import { composeHeight, composePane, targetOf } from './panes/compose.js';
-import { formOf, formPane, showsForm, showsParts } from './panes/form.js';
+import { SHAPE_FIELD, formOf, formPane, showsForm, showsParts } from './panes/form.js';
 import { helpPane } from './panes/help.js';
 import { onKey, onPaste } from './keys.js';
 import type { Mission, Session, Snapshot } from './model.js';
@@ -143,7 +143,7 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
-    ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
+    ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', ui.intents[formOf(here)?.key ?? '']?.field === SHAPE_FIELD ? 'Shape' : 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :

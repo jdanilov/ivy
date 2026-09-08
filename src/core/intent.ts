@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
 /**
- * `intent.md`, the one file a human reads, as four fields. One module owns the format so the
+ * `intent.md`, the one file a human reads, as three fields. One module owns the format so the
  * intent form, the CLI's skeleton and the screen all read and write the same headings: a section
  * the form has nothing for is left out, and `## Goal` is always there because it is the line a
  * mission is judged by and the hand-editor's prompt.
@@ -11,26 +11,27 @@ import { readFile } from 'node:fs/promises';
 export interface Intent {
   goal: string;
   done: string;
-  not: string;
-  start: string;
+  /** Guardrails, what not to touch, where to start from: one field for everything else. */
+  extra: string;
 }
 
 export const SECTIONS: [keyof Intent, string][] = [
   ['goal', '## Goal'],
   ['done', '## Done looks like'],
-  ['not', '## Not in this mission'],
-  ['start', '## Start from'],
+  ['extra', '## Extra'],
 ];
 
-export const EMPTY: Intent = { goal: '', done: '', not: '', start: '' };
+export const EMPTY: Intent = { goal: '', done: '', extra: '' };
 
 /** Where a mission's why was written before the form. Read only: the first save moves it. */
 const WHY = '## Why';
+/** The two sections `## Extra` stands for now. Read only: the first save folds them into it. */
+const LEGACY_EXTRA = ['## Not in this mission', '## Start from'];
 
-const HEADINGS = new Set([...SECTIONS.map(([, heading]) => heading), WHY]);
+const HEADINGS = new Set([...SECTIONS.map(([, heading]) => heading), WHY, ...LEGACY_EXTRA]);
 
 /** The file as its sections. A body runs to the next heading the format knows, not to the next
- *  `## ` line, so a markdown heading pasted into `## Start from` stays in the field. */
+ *  `## ` line, so a markdown heading pasted into `## Extra` stays in the field. */
 function sections(text: string): Record<string, string> {
   const found: Record<string, string> = {};
   let heading: string | null = null;
@@ -56,6 +57,10 @@ export function parseIntent(text: string): Intent {
   // because the first save rewrites the file and anything left behind here is deleted — and the
   // pane's own first-paragraph rule still draws one line of it.
   if (intent.goal === '') intent.goal = found[WHY] ?? '';
+  // The guardrails and the start-from were two sections once: read whole, one after the other,
+  // into the extra, so the first save carries them over instead of deleting them.
+  intent.extra = [intent.extra, ...LEGACY_EXTRA.map((heading) => found[heading] ?? '')]
+    .filter((body) => body !== '').join('\n\n');
   return intent;
 }
 

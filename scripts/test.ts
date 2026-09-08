@@ -35,7 +35,7 @@ const { gate } = await import('../src/commands/gate.js');
 const { decision } = await import('../src/commands/decision.js');
 const { answerDecision, readDecisions, waits } = await import('../src/core/decision.js');
 const { mission } = await import('../src/commands/mission.js');
-const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, resolveMission, writeState } = await import('../src/core/mission.js');
+const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, reshapeStub, resolveMission, writeState } = await import('../src/core/mission.js');
 const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
@@ -566,17 +566,21 @@ await check('update reinstalls a part its dependant requires', async () => {
 await git(main, 'add', '-A'); await git(main, 'commit', '-qm', 'install factory');
 
 await check('intent.md round-trips and leaves out what nothing filled', async () => {
-  const filled = { goal: 'a goal', done: 'one\ntwo', not: 'not this', start: '@docs/design.md' };
+  const filled = { goal: 'a goal', done: 'one\ntwo', extra: 'not this\n\nstart from @docs/design.md' };
   ok(JSON.stringify(parseIntent(renderIntent('n', filled))) === JSON.stringify(filled), 'the round trip lost a section');
-  const bare = renderIntent('n', { goal: '', done: '', not: '', start: '' });
+  const bare = renderIntent('n', { goal: '', done: '', extra: '' });
   ok(bare.includes('# Intent: n') && bare.includes('## Goal'), `the skeleton is missing a heading: ${JSON.stringify(bare)}`);
-  ok(!bare.includes('## Done') && !bare.includes('## Not') && !bare.includes('## Start'), `an empty section was written: ${JSON.stringify(bare)}`);
-  const only = renderIntent('n', { goal: 'g', done: 'd', not: '', start: '' });
-  ok(only.includes('## Done looks like\n\nd') && !only.includes('## Not'), `render wrote the wrong sections: ${JSON.stringify(only)}`);
-  // A field is cut by the headings the format knows and by nothing else: `## Start from` is where
-  // a human pastes a doc excerpt, headings and all.
-  const pasted = { goal: 'g', done: '', not: '', start: 'line one\n## a heading\nline three' };
-  ok(parseIntent(renderIntent('n', pasted)).start === pasted.start, 'a heading inside a field cut it');
+  ok(!bare.includes('## Done') && !bare.includes('## Extra'), `an empty section was written: ${JSON.stringify(bare)}`);
+  const only = renderIntent('n', { goal: 'g', done: 'd', extra: '' });
+  ok(only.includes('## Done looks like\n\nd') && !only.includes('## Extra'), `render wrote the wrong sections: ${JSON.stringify(only)}`);
+  // A field is cut by the headings the format knows and by nothing else: `## Extra` is where a
+  // human pastes a doc excerpt, headings and all.
+  const pasted = { goal: 'g', done: '', extra: 'line one\n## a heading\nline three' };
+  ok(parseIntent(renderIntent('n', pasted)).extra === pasted.extra, 'a heading inside a field cut it');
+  // The two sections `## Extra` replaced read into it, whole and in order, so the first save keeps them.
+  const legacy = parseIntent('# Intent: old\n\n## Goal\n\ng\n\n## Not in this mission\n\nnot this\n\n## Start from\n\n@docs\n');
+  ok(legacy.extra === 'not this\n\n@docs', `the old sections did not fold into extra: ${JSON.stringify(legacy.extra)}`);
+  ok(!renderIntent('old', legacy).includes('## Not in'), 'the save kept an old heading');
 });
 
 await check('an intent written under `## Why` reads as a goal', async () => {
@@ -590,6 +594,22 @@ await check('an intent written under `## Why` reads as a goal', async () => {
   ok(both.goal === 'the goal', `the why won over a goal that is there: ${JSON.stringify(both.goal)}`);
   // Read only: a save moves the body under `## Goal` and never writes `## Why` back.
   ok(!renderIntent('old', why).includes('## Why'), 'render wrote a `## Why` section');
+});
+
+await check('the Shape dial reshapes a stub whole, and only a stub', async () => {
+  const m = await createMission(main, { name: 'sh', workflow: 'train', autonomy: 'partial', worktree: false, stub: true });
+  ok((await missionWorkflow(m)).steps.map((s) => s.name).join() === 'intent,plan,implement,check,merge', 'train did not load');
+  await reshapeStub(main, m, 'story');
+  const again = await resolveMission(main, 'sh');
+  ok(again.state.workflow === 'story' && again.state.step === 'intent', `the reshape did not land in state: ${again.state.workflow}`);
+  ok((await missionWorkflow(again)).steps.some((s) => s.name === 'spec'), 'workflow.yaml was not rewritten');
+  await reshapeStub(main, again, 'quick');
+  ok((await resolveMission(main, 'sh')).state.step === 'work', 'quick did not move the pointer to its first step');
+  // The refusal comes before any write, so a stub read as open is enough to prove it.
+  const open = { ...again, state: { ...again.state, status: 'open' as const } };
+  const refused = await reshapeStub(main, open, 'story').then(() => null, (e: Error) => e);
+  ok(refused?.message.includes('not a stub'), 'an open mission was reshaped');
+  await rm(m.dir, { recursive: true });
 });
 
 await check('a stub takes no branch and promote gives it one', async () => {

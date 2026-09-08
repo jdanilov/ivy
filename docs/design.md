@@ -152,15 +152,20 @@ settings overlay, a hand-started one needs it in `~/.claude/settings.json`.
 
 A stub is written where it is read: `M` on any of a project's rows, or `↵` on a stub, gives the
 right pane the INTENT form, and the status bar takes nothing. A status-bar line can ask for a name;
-it cannot ask for the four sections the Orchestrator otherwise interviews the human for in the tab,
+it cannot ask for the three sections the Orchestrator otherwise interviews the human for in the tab,
 one turn late. The form is those sections, so `O` opens onto a filled `intent.md` and the session
 starts working.
 
-Six fields, in the order they are walked: `name`, a lowercase slug that is the folder and later
+Six fields, in the order they are walked: `Name`, a lowercase slug that is the folder and later
 the branch, and fixed once the folder exists — renaming a stub is delete and remake, so on a stub
-the name is drawn and never focused; `goal`, what the mission is for; `done looks like`, one per
-line; `not in this mission`, the guardrails; `start from`, the files, docs and prior work; and
-`autonomy`, the dial, `full | partial | none` with the chosen one bright.
+the name is drawn and never focused; `Mission Goal`, what the mission is for; `What done looks
+like`, one per line; `Extra`, the guardrails, what not to touch and where to start from, one field
+so the form stays short; `Autonomy`, a dial, `full | partial | none`; and `Shape`, a dial,
+`auto | quick | chore | research | train | story`, the chosen one bright on each. `auto` leaves the
+stub on the `intent` workflow for the Orchestrator to shape; a name is that preset's whole graph,
+written on `^S` only when the dial was turned, so a stub on a workflow the dial does not list keeps
+it. Every label ends in a colon behind a `›`, and a blank row follows every input, so a label never
+reads as a value.
 
 Every field is a message-box draft — the same editor, the same wrap, the same cursor — so `↵` is a
 line break inside a field and the field is changed with `⇥` and `⇧⇥`. `^S` saves: an empty goal or
@@ -320,9 +325,9 @@ keys do, and none of these three do the same thing.
 | `^V`    | message box      | paste the clipboard; `⌘V` is the terminal's own paste and lands the same |
 | `Esc`   | message box      | keep the draft, hand the keys back                               |
 | `↵`     | stub row         | edit its intent in the form, on the goal                          |
-| `⇥` `⇧⇥` | intent form     | the next field, the one before; the last stop is the autonomy dial |
-| `←→`    | intent form      | on autonomy, turn the dial; in a field, walk the text             |
-| `^S`    | intent form      | save: the stub is made, or its `intent.md` and autonomy rewritten |
+| `⇥` `⇧⇥` | intent form     | the next field, the one before; the last stops are the two dials  |
+| `←→`    | intent form      | on a dial, turn it; in a field, walk the text                     |
+| `^S`    | intent form      | save: the stub is made, or its `intent.md`, autonomy and graph rewritten |
 | `^U`    | intent form      | clear the field                                                   |
 | `Esc`   | intent form      | hand the keys back; a draft nothing changed is dropped |
 | `←`     | right            | back to the left pane                                            |

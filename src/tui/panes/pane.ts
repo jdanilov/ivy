@@ -21,7 +21,7 @@ export interface Ui {
   /** Rows the full-height foot is scrolled back from its own foot. Zero everywhere else. */
   scroll: number;
   help: boolean;
-  /** Which pane the foot draws. Decisions is what a mission is waiting to be read for. */
+  /** Which pane the foot draws. Activity is the session's own account of itself, so it comes first. */
   foot: 'decisions' | 'activity';
   /** How many rows each foot pane had when it was last opened or left, for the selection `at`:
    *  the `+N` on a tab is what came in since. `foot` is the pane the last frame drew. */
@@ -35,7 +35,7 @@ export interface Ui {
 export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
-    scroll: 0, help: false, foot: 'decisions', seen: { at: '', foot: null, decisions: 0, activity: 0 },
+    scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
     showArchived: false, toast: null, input: null,
   };
 }

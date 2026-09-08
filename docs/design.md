@@ -74,9 +74,9 @@ row 4        ──────────────────────�
              projects, missions,     │  decision each end in the command that
              sessions                │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             DECISIONS  ACTIVITY     one third of the body, all of it on F
+             ACTIVITY  DECISIONS     one third of the body, all of it on F
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Open  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  A Activity  F Full  ? Help  Q Quit
+             ↑↓ Select  ↵ Open  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  D Decisions  F Full  ? Help  Q Quit
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
@@ -86,7 +86,7 @@ last row     ──────────────────────�
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `Z` asks for them.
 - The foot keeps a third of the body, never fewer than 5 rows; `F` gives it all of it. Its header
-  is the two tabs, the drawn one bright: DECISIONS by default, ACTIVITY on `A`, `D` back.
+  is the two tabs, the drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back.
 
 ### The status bar
 

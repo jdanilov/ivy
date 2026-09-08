@@ -3,7 +3,7 @@ import { clock, len, spread, wrap, type Cell } from '../format.js';
 import { itemKey, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { Activity, Decision, Mission, Project, Snapshot } from '../model.js';
 
-/** The pane along the foot: the decisions of whatever is selected, or its sessions' activity. */
+/** The pane along the foot: the activity of whatever is selected's sessions, or its decisions. */
 
 const VERB: Record<Activity['verb'], string> = {
   user: C.error, bash: C.dim, edit: C.success, read: C.dim, sub: C.agent, agent: C.bright, ask: C.warning,
@@ -47,7 +47,7 @@ function tabs(ui: Ui, counts: Record<Ui['foot'], number>): Cell[] {
     const fresh = counts[name] - ui.seen[name];
     return [[name.toUpperCase(), ui.foot === name ? C.bright : C.dim], ...(fresh > 0 ? ([[` +${fresh}`, C.warning]] as Cell[]) : [])];
   };
-  return [...tab('decisions'), ['  ', C.dim], ...tab('activity')];
+  return [...tab('activity'), ['  ', C.dim], ...tab('decisions')];
 }
 
 /** The counts a tab's `+N` is measured from: both reset when the selection changes, since the rows
@@ -227,7 +227,7 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
   pad(p, shown.length, room);
 }
 
-/** The pane along the foot, whichever one `A` and `D` last chose. `F` gives it the whole screen. */
+/** The pane along the foot, whichever one `A` and `D` last chose, ACTIVITY to begin with. `F` gives it the whole screen. */
 export function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
   if (sep) p.rule();
   const room = Math.max(0, h - (sep ? 3 : 2));

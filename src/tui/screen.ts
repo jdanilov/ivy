@@ -128,7 +128,7 @@ const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], [
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const parts = here.kind === 'project' || here.kind === 'global';
-  const foot: string[][] = ui.foot === 'decisions' ? [['A', 'Activity'], ['F', 'Full']] : [['D', 'Decisions'], ['F', 'Full']];
+  const foot: string[][] = ui.foot === 'activity' ? [['D', 'Decisions'], ['F', 'Full']] : [['A', 'Activity'], ['F', 'Full']];
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['esc', 'Cancel']] :

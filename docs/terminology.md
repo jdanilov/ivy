@@ -65,7 +65,7 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 | Mission Control | The Factory TUI, `factory` with no arguments. Reads the files the CLI writes, writes through the CLI's own functions. |
 | Inbox           | Every open gate, waiting decision and waiting question across all projects. Each names the session command that answers it. |
 | Messages        | The right pane over the Inbox: the selected item's body and its answering command. Read-only.   |
-| Foot            | The bottom pane: DECISIONS by default, ACTIVITY on `A`, for whatever the left column has selected. |
+| Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, for whatever the left column has selected. |
 | Caffeinate      | Whether the Mac is held awake: `auto` per turn, `on` per session, `off` never. Key `caffeinate` in `~/.factory/config.yaml`. |
 | Changes         | Warp's own diff panel. The Factory does not render diffs.                                       |
 | Tab config      | Warp TOML in `~/.warp/tab_configs/`. The Factory writes one per mission and opens it by URI.    |

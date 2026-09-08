@@ -17,7 +17,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['Messages', '↑↓', 'Read what waits — every one answers in its session'],
   ['Parts', 'Space', 'Toggle a part; on Global, cycle its scope'], ['', 'Y', 'Confirm the apply'],
   ['', 'N', 'Cancel it'], ['', 'R', 'Reset the toggles'],
-  ['Foot', 'D', 'Decisions, the forks this mission took; again, full height'], ['', 'A', 'Activity, what its session did; again, full height'],
+  ['Foot', 'A', 'Activity, what its session did; again, full height'], ['', 'D', 'Decisions, the forks this mission took; again, full height'],
   ['', 'F', 'Either at full height, ↑↓ scrolls'],
 ];
 

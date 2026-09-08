@@ -71,17 +71,17 @@ Linux runs the CLI, the missions and Mission Control; only the macOS calls above
 git clone git@github.com:jdanilov/ivy.git factory
 cd factory
 bun install
-bun link           # puts `factory` on PATH via ~/.bun/bin; skip it and use `bun src/cli.ts` instead
+bun link # puts `factory` on PATH via ~/.bun/bin; skip it and use `bun src/cli.ts` instead
 ```
 
 Then point it at a project and pick what to install:
 
 ```bash
-factory install ~/src/myproject    # menu of parts, then copies them into .claude/
-factory status  ~/src/myproject    # what is installed, modified, in conflict, plus open missions
-factory install --global           # the parts that are yours, not a project's, into ~/.claude/
-factory update --all               # every registered project, then the home dir, in one run
 factory                            # Mission Control
+factory install ~/src/myproject    # menu of parts, then copies them into .claude/
+factory status  ~/src/myproject    # what is installed, modified, in conflict
+factory install --global           # the parts that are yours into ~/.claude/
+factory update --all               # every registered project, then the home dir
 ```
 
 `install` registers the project in `~/.factory/projects`. After that the path is optional: the four
@@ -215,10 +215,10 @@ vars:
   codegraph: codegraph          # a local build on PATH instead of the pinned npx default
   archify: ~/src/archify        # a local clone instead of the upstream GitHub URL
 parts:
-  commit: "project"             # the author recommends global; this machine wants it per project
+  commit: "project"             # install this part per project
   research: "off"               # installed nowhere, and update takes it back out
 caffeinate: auto                # auto per turn · on per session · off never
-launch: fg                      # fg: claude runs in the tab · bg: claude --bg, the tab attaches
+launch: fg                      # fg: claude runs in the tab · bg: claude --bg
 ```
 
 A part may also own one line in the project's `AGENTS.md` — a **snippet** — appended under a heading

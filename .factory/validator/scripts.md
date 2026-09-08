@@ -19,6 +19,7 @@ or the write lands in the Factory's own mission.
 | `repo.ts`   | One scratch git repo under `$HOME`, registered with `factory status` (or fully installed with `--install`), ready for `mission`, `step`, `gate` and `decision`. Every CLI assertion starts here. Exports `makeRepo`, `run`, which `scripts/spawn.ts` imports from here. | 2026-09-07 |
 | `scripts/hook-inject.ts` | Promoted out of here into `scripts/` and into `e2e.run`. `hook-factory`'s decision paths, fired as a child the way Claude Code fires them: `<missionDir> subagent "<final text>"` files a `Decisions:` block, `post` and `prompt` print the injection for whatever waits. With no arguments it builds its own scratch mission, walks the handoff through to the injection and exits 1 on a broken round trip. | 2026-09-07 |
 | `scripts/spawn.ts` | Promoted out of here into `scripts/` and into the `e2e.spawn` recipe, its own recipe because it spends a real model run. The one real spawn: a scratch project with the Factory installed, a mission, and a headless session told to run one `@Worker` whose handoff carries a LOW decision. Prints the `additionalContext` the parent received and the mission's `decisions.md`. | 2026-09-07 |
+| `width.ts` | A PARTS pane at an arbitrary terminal size, which `scripts/tui-keys.ts` cannot do — it hardcodes 140x42. `bun .factory/validator/width.ts <cols> [--fixture] [--row <substring>] [--height <rows>] [--keys down,down,space]` prints one frame with focus right, `Global` by default, any left-item key otherwise, so the project pane reads at the same size. `--keys` sends tui-keys' key names through `onKey` first, which is the only way to put the selection deep in the list at a size tui-keys cannot render. Written for the description column and the pane's overflow. | 2026-09-08 |
 
 ```
 HOME=$(mktemp -d /private/tmp/vhome.XXXXXX) bun .factory/validator/scratch.ts
@@ -27,6 +28,9 @@ HOME=<that> bun scripts/tui-keys.ts --row inbox --focus right --wait 700 down re
 HOME=<that> bun .factory/validator/handoff.ts <missionDir> 12 6 20   # → .md, -2, -3
 HOME=$(mktemp -d /private/tmp/vhome.XXXXXX) bun .factory/validator/repo.ts g1 --install
 HOME=<that> bun scripts/hook-inject.ts <missionDir> post
+bun .factory/validator/width.ts 100 --fixture --row ivy           # the project pane at the same width
+bun .factory/validator/width.ts 140 --row global --height 60      # live pane, no overflow at 60 rows
+bun .factory/validator/width.ts 140 --row global --height 20 --keys down,down,space,return   # apply line at 20 rows
 REAL_HOME=$HOME HOME=$(mktemp -d /private/tmp/vspawn.XXXXXX) bun scripts/spawn.ts
 ```
 

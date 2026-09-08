@@ -27,9 +27,11 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
 /** Named by what it is, not by its preset: a bare `quick` under a project reads as a mission. */
 /** Named by what the human called it, else by its id: two quick sessions must not read the same. */
 function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): void {
-  const state = s.busy ? `working${s.agent ? ` · ${s.agent}` : ''}` : `idle ${dur(Date.now() - s.idleSince)}`;
+  // A picker up is the one busy state that waits on the human: it reads as a warning, not as work.
+  const asking = s.now?.verb === 'ask';
+  const state = asking ? 'asking' : s.busy ? `working${s.agent ? ` · ${s.agent}` : ''}` : `idle ${dur(Date.now() - s.idleSince)}`;
   p.row([
-    marker(selected, focused), [' ', C.dim], s.busy ? [`${SESSION.working} `, C.accent] : [`${SESSION.idle} `, C.dim],
+    marker(selected, focused), [' ', C.dim], s.busy ? [`${SESSION.working} `, asking ? C.warning : C.accent] : [`${SESSION.idle} `, C.dim],
     [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [s.bg ? '  bg' : '', C.dim],
     ...(s.name ? ([['  ', C.dim], [id(s.id), C.dim]] as Cell[]) : []), [`  ${state}`, C.dim],
   ], selected && focused);

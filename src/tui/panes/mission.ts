@@ -84,7 +84,7 @@ export function sessionPane(p: Pane, s: Session): void {
     ...(s.busy ? ([['working', C.bright], ...(s.agent ? [DOT, [s.agent, C.dim]] : [])] as Cell[])
       : ([['idle ', C.dim], [dur(Date.now() - s.idleSince), C.bright]] as Cell[]))]);
   sfact(p, 'cwd', [[s.cwd, C.bright]]);
-  if (s.now) sfact(p, 'now', [['○ ', C.dim], [s.now.verb, s.now.verb === 'sub' ? C.agent : C.dim], [` ${s.now.text}`, C.bright], DOT, [dur(Date.now() - s.now.at), C.dim]]);
+  if (s.now) sfact(p, 'now', [['○ ', C.dim], [s.now.verb, s.now.verb === 'sub' ? C.agent : s.now.verb === 'ask' ? C.warning : C.dim], [` ${s.now.text}`, C.bright], DOT, [dur(Date.now() - s.now.at), C.dim]]);
   if (s.turn) {
     const tools = `${s.turn.tools} tool${s.turn.tools === 1 ? '' : 's'}`;
     sfact(p, 'turn', [[tools, C.bright], DOT, [dur(s.turn.wall ?? Date.now() - s.turn.at), C.dim], ...(s.turn.wall === undefined ? ([[' so far', C.dim]] as Cell[]) : [])]);

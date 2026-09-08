@@ -122,11 +122,14 @@ async function readEvents(): Promise<Map<string, Ev>> {
 const said = (ev: Ev | undefined, tail: Tail | null): string => tail?.text || ev?.said || '';
 
 /**
- * What a session is asking the human. A turn that ended is not a question by itself, most final
- * messages are statements: it asks when its last line ends in `?`, or when the turn put an
- * AskUserQuestion to the human. Nothing while a sub-agent is still out.
+ * What a session is asking the human. An AskUserQuestion picker still up is the question itself,
+ * whatever else the turn does. A turn that ended is not one by itself, most final messages are
+ * statements: it asks when its last line ends in `?`, or when the turn put a picker up. Nothing
+ * while a sub-agent is still out.
  */
 function asking(ev: Ev | undefined, tail: Tail | null): string {
+  const open = tail?.activity.find((a) => a.verb === 'ask' && a.status === 'running');
+  if (open) return open.text;
   if (ev?.asks == null || working(tail)) return '';
   const text = said(ev, tail);
   const lastLine = text.trim().split('\n').filter((l) => l.trim() !== '').at(-1) ?? '';

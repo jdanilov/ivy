@@ -57,7 +57,7 @@ interface Line {
   message?: { id?: string; content?: Block[] | string; usage?: Record<string, number> };
   /** Claude Code's own record of a result: a command sent to the background names its task, an
    *  agent launched there is `isAsync`. Either way the row is still out. */
-  toolUseResult?: { backgroundTaskId?: string; isAsync?: boolean };
+  toolUseResult?: { backgroundTaskId?: string; isAsync?: boolean; answers?: Record<string, string> };
 }
 
 const VERB: Record<string, Activity['verb']> = {
@@ -65,8 +65,8 @@ const VERB: Record<string, Activity['verb']> = {
   Agent: 'sub', AskUserQuestion: 'ask',
 };
 
-/** The rows that have a result to wait for: a command's exit, a sub-agent's report. */
-const TRACKED = new Set<Activity['verb']>(['bash', 'sub']);
+/** The rows that have a result to wait for: a command's exit, a sub-agent's report, a question's answer. */
+const TRACKED = new Set<Activity['verb']>(['bash', 'sub', 'ask']);
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
@@ -98,8 +98,8 @@ function detail(block: Block, cwd: string): string {
     case 'Read': case 'Glob': case 'Grep': return file || text(input.pattern);
     case 'Agent': return `→ ${[text(input.subagent_type), text(input.description)].filter((s) => s !== '').join(' · ')}`;
     case 'AskUserQuestion': {
-      const first = Array.isArray(input.questions) ? (input.questions[0] as { question?: string }) : undefined;
-      return sentence(text(first?.question));
+      const questions = Array.isArray(input.questions) ? (input.questions as { question?: string }[]) : [];
+      return sentence(text(questions[0]?.question)) + (questions.length > 1 ? ` · ${questions.length - 1} more` : '');
     }
     default: return text(block.name);
   }
@@ -131,6 +131,10 @@ function settle(tail: Tail, id: string, failed: boolean, background = false): vo
 /** The text of a tool result, whichever shape Claude Code wrote it in. */
 const resultText = (block: Block): string =>
   typeof block.content === 'string' ? block.content : (block.content ?? []).map((c) => text(c.text)).join(' ');
+
+/** An answered question reads `question → answer`, one pair per question the picker put. */
+const answered = (answers: Record<string, string>): string =>
+  Object.entries(answers).map(([q, a]) => `${sentence(q)} → ${a}`).join(' · ');
 
 /**
  * Everything the screen takes from one session's transcript, plus the spend of every sub-agent
@@ -183,7 +187,9 @@ async function readTail(file: string, session: string, cwd: string): Promise<Tai
       for (const block of blocks) {
         if (block.type !== 'tool_result' || !block.tool_use_id) continue;
         const body = resultText(block);
+        const asked = tail.pending.get(block.tool_use_id);
         settle(tail, block.tool_use_id, block.is_error === true, line.toolUseResult?.backgroundTaskId !== undefined || line.toolUseResult?.isAsync === true);
+        if (asked?.verb === 'ask' && line.toolUseResult?.answers) asked.text = answered(line.toolUseResult.answers);
         const role = tail.spawns.get(block.tool_use_id);
         const agent = /agentId: ([a-z0-9]+)/.exec(body)?.[1];
         if (role && agent) {

@@ -49,7 +49,7 @@ export interface Activity {
   session: string;
   verb: 'user' | 'bash' | 'edit' | 'read' | 'sub' | 'agent' | 'ask' | 'tool' | 'stop';
   text: string;
-  /** A `bash` or `sub` row: out until its result lands, then what the result said. */
+  /** A `bash`, `sub` or `ask` row: out until its result lands, then what the result said. */
   status?: 'running' | 'ok' | 'failed';
 }
 
@@ -103,7 +103,7 @@ export interface Session {
   cwd: string;
   /** When its last turn ended. Meaningless while busy. */
   idleSince: number;
-  /** The `bash` or `sub` row still out, if one is. */
+  /** The `bash`, `sub` or `ask` row still out, if one is: an `ask` is a picker waiting on the human. */
   now?: Activity;
   /** The open turn, or the last one: when it began, its tool count, and its length once it ended. */
   turn?: { at: number; tools: number; wall?: number };

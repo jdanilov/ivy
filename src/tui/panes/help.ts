@@ -12,7 +12,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', '?', 'This panel'], ['', 'Q', 'Quit'],
   ['Projects', 'O', 'Start the mission\'s session and open its Warp tab'], ['', 'X', 'Stop its session; a hand-started one is signalled, again within 5s to SIGKILL'],
   ['', 'T', 'Autonomy full → partial → none'], ['', 'H', 'Archive a closed mission or a stub, or bring it back'],
-  ['', 'Z', 'Show the archived ones'], ['', 'N', 'Rename: a mission\'s title, a session\'s name'],
+  ['', 'Z', 'Show the archived ones'], ['', 'R', 'Rename: a mission\'s title, a session\'s name'],
   ['', 'M', 'A new stub mission in the project'], ['', '⇧↑↓', 'Move the row up or down; the order is kept'],
   ['Messages', '↑↓', 'Read what waits — every one answers in its session'],
   ['Parts', 'Space', 'Toggle a part; on Global, cycle its scope'], ['', 'Y', 'Confirm the apply'],
@@ -20,7 +20,6 @@ const HELP: [group: string, key: string, does: string][] = [
   ['Message', '⇧↵ ^S', 'Send it; the session reads it as yours'], ['', '↵', 'A line break'],
   ['', '^U', 'Clear the draft'], ['', 'esc', 'Keep the draft, hand the keys back'],
   ['Foot', 'A', 'Activity, what its session did; again, full height'], ['', 'D', 'Decisions, the forks this mission took; again, full height'],
-  ['', 'F', 'Either at full height, ↑↓ scrolls'],
 ];
 
 /** The words the screen uses, in the colours it draws them in — the four step families first,

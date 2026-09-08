@@ -74,11 +74,11 @@ row 4        ──────────────────────�
              projects, missions,     │  decision each end in the command that
              sessions                │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             ACTIVITY  DECISIONS     one third of the body, all of it on F
+             ACTIVITY  DECISIONS     one third of the body, all of it on a second A or D
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Tab  X Kill  T Autonomy  H Archive  Z Archived  C Caffeinate  D Decisions  F Full  ? Help  Q Quit
+             ↑↓ Select  ↵ Message  O Tab  X Kill  T Autonomy  H Archive  R Rename  M New Mission  Z Archived  C Caffeinate  D Decisions  ? Help  Q Quit
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
@@ -87,7 +87,7 @@ last row     ──────────────────────�
   Two cells of padding on the left pane keep its right-aligned tokens off the divider.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `Z` asks for them.
-- The foot keeps a third of the body, never fewer than 5 rows; `F` gives it all of it. Its header
+- The foot keeps a third of the body, never fewer than 5 rows; `A` or `D` pressed on the tab already drawn gives it all of it. Its header
   is the two tabs, the drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back.
 
 ### The status bar
@@ -115,21 +115,22 @@ turn's; `spend`, the session's own tokens in and out and `context`, what its las
 the one figure that says how full the window is. Its last word is the log's last row, and the
 pane does not repeat it.
 
-The bar is also the one line the screen takes a name on. `N` and `M` ask for a name or a title
+The bar is also the one line the screen takes a name on. `R` and `M` ask for a name or a title
 there — the label, what has been typed, a cursor — and while the line is open every key is a
 character but `↵`, `esc` and backspace, `q` included. Nothing is written until `↵`; an empty line
 writes nothing.
 
 ### The message box
 
-`↵` on a session row, or a mission row with a session, opens a box under the foot: `to <name>`,
-then the message, wrapped at the width and grown to six rows before it scrolls to keep the cursor
-in view. It is a small editor, because a reply is rarely one line: `↵` breaks a line, the arrows
+`↵` on a session row, or a mission row with a session, opens a box under the foot: the message,
+wrapped at the width and grown to six rows before it scrolls to keep the cursor in view, with no
+header naming the session, because the selected row already does. It is a small editor, because a reply is rarely one line: `↵` breaks a line, the arrows
 walk the text, `home` `end` `^A` `^E` take the line's ends, `^U` clears, and `⇧↵` or `^S` sends —
 two chords because a terminal that does not speak the kitty keyboard protocol sends `⇧↵` as `↵`.
 `esc` hands the keys back and keeps the draft: there is one per row, kept while the selection
 moves, so a half-written answer survives a look at another session, and the box stays drawn, dim,
-wherever a draft is waiting. Sent, the draft goes.
+wherever a draft is waiting. Sent, the draft goes. The key bar names `⇧↵` and `^U` and nothing
+else: line breaks, arrows and `esc` are what any editor does.
 
 The message goes into the session's inbox, the Unix socket Claude Code binds per session under
 `/tmp/cc-socks/` and lists in `~/.claude/sessions/<pid>.json`: one JSON line in the
@@ -283,21 +284,20 @@ keys do, and none of these three do the same thing.
 | `T`     | mission, MISSION | autonomy full → partial → none                                   |
 | `H`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
 | `Z`     | left             | show the archived missions                                       |
-| `N`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
+| `R`     | mission, session | rename: a mission's title, a session's name; the mission's name is its branch and stays |
 | `M`     | project's rows   | a new stub mission in that project, name then title; `O` promotes it |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
 | `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
 | `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |
-| `F`     | any              | the foot at full height; header and status bar hidden            |
 | `?`     | any              | the KEYS panel                                                   |
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
-would be a toast: a mission row answers `O X T H N`, a session row `X N`, a project `M`, the Inbox
+would be a toast: a mission row answers `O X T H R`, a session row `X R`, a project `M`, the Inbox
 and `Global` none of them; `↵` reads `Message` on a row with a session behind it and `Open` on the rest.
 
-A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `N`
+A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `R`
 keeps the Factory's word on the session's own events file: one `Rename` line carrying what the
 last hook line carried, because the pid and the cwd the screen reads come off the last line. The
 screen's name outranks the transcript's; it is the later word. The order `⇧↑↓` leaves is an

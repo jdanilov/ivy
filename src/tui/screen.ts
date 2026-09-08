@@ -31,11 +31,11 @@ function awake(snap: Snapshot): boolean {
 
 function caffeinateCells(snap: Snapshot): Cell[] {
   const on = awake(snap);
-  return [['caffeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
+  return [['Caffeinate ', C.dim], [snap.caffeinate.toUpperCase(), C.bright], [` [${on ? 'ON' : 'OFF'}]`, on ? C.accent : C.dim]];
 }
 
 function header(p: Pane, here: LeftItem, snap: Snapshot): void {
-  const where = here.kind === 'inbox' ? 'all projects' : here.project.path;
+  const where = here.kind === 'inbox' ? '' : here.project.path;
   const left: Cell[] = [[`${BRAND} `, C.accent], ['FACTORY', C.accent], ['  ', C.dim], [where, C.dim]];
   p.row(spread(left, caffeinateCells(snap), p.width));
 }
@@ -112,7 +112,7 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   if (here.kind === 'global') {
     const on = here.project.parts.filter((part) => part.status !== 'not-installed').length;
     return p.row([[`${on}/${here.project.parts.length} `, C.bright], ['installed in ', C.dim],
-      [path.join(here.project.path, '.claude'), C.bright], ['  ·  the user\'s own parts, in every project', C.dim]]);
+      [path.join(here.project.path, '.claude'), C.bright]]);
   }
   return summary(p, here.project.missions);
 }
@@ -120,22 +120,22 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: ['M'], mission: ['O', 'X', 'T', 'H', 'N'], session: ['X', 'N'],
+  inbox: [], global: [], project: ['M'], mission: ['O', 'X', 'T', 'H', 'R'], session: ['X', 'R'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], ['H', 'Archive'], ['N', 'Rename'], ['M', 'New']];
+const ROW_PAIRS: string[][] = [['O', 'Tab'], ['X', 'Kill'], ['T', 'Autonomy'], ['H', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. */
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const parts = here.kind === 'project' || here.kind === 'global';
-  const foot: string[][] = ui.foot === 'activity' ? [['D', 'Decisions'], ['F', 'Full']] : [['A', 'Activity'], ['F', 'Full']];
+  const foot: string[][] = ui.foot === 'activity' ? [['D', 'Decisions']] : [['A', 'Activity']];
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['esc', 'Cancel']] :
-    ui.compose ? [['⇧↵ ^S', 'Send'], ['↵', 'Newline'], ['↑↓←→', 'Cursor'], ['^U', 'Clear'], ['esc', 'Keep']] :
+    ui.compose ? [['⇧↵', 'Send'], ['^U', 'Clear']] :
     ui.help ? [['? esc', 'Back'], ['Q', 'Quit']] :
-    ui.full ? [['↑↓', 'Scroll'], ['↵ f esc', 'Back'], ['Q', 'Quit']] :
+    ui.full ? [['↑↓', 'Scroll'], ['↵ esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
       ['Z', 'Archived'], ['C', 'Caffeinate'], ...foot, ['?', 'Help'], ['Q', 'Quit']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['←esc', 'Back'], ...foot, ['?', 'Help'], ['Q', 'Quit']]

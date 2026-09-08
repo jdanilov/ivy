@@ -113,7 +113,7 @@ function handleKey(app: App, key: KeyEvent): void {
   if (ui.full) {
     if (key.name === 'up' || key.name === 'k') ui.scroll += 1;
     else if (key.name === 'down' || key.name === 'j') ui.scroll = Math.max(0, ui.scroll - 1);
-    else if (key.name === 'return' || key.name === 'f' || key.name === 'escape') ui.full = false;
+    else if (key.name === 'return' || key.name === 'escape') ui.full = false;
     // The tab's own key: switch to it, or, pressed on the tab already drawn, hand the screen back.
     else if (key.name === 'a' || key.name === 'd') footKey(ui, key.name === 'a' ? 'activity' : 'decisions');
     else return;
@@ -188,14 +188,6 @@ function handleKey(app: App, key: KeyEvent): void {
       if (!right) ui.focus = 'right';
       break;
     }
-    case 'r':
-      if (inParts) ui.toggles = {};
-      break;
-    case 'f':
-      // The foot opens at its own foot, wherever the last visit left the scroll.
-      ui.full = true;
-      ui.scroll = 0;
-      break;
     case 'a':
       footKey(ui, 'activity');
       break;
@@ -229,7 +221,12 @@ function handleKey(app: App, key: KeyEvent): void {
       if (right) break;
       if (here.kind !== 'mission') return toast(app, 'select a mission to open its tab');
       return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
-    case 'n': {
+    case 'r': {
+      // In Parts the toggles are what `r` resets; on a row it is the name.
+      if (inParts) {
+        ui.toggles = {};
+        break;
+      }
       if (right) break;
       if (here.kind === 'mission') {
         const { project, mission } = here;
@@ -267,7 +264,7 @@ function handleKey(app: App, key: KeyEvent): void {
 /** A key must never take the screen down: the toast says what broke, the log says where. */
 
 /** `A` and `D` each name a foot tab: the first press draws it, the second gives it the screen,
- *  the third hands the screen back — the same toggle `F` is, with the tab chosen on the way. */
+ *  the third hands the screen back. */
 function footKey(ui: Ui, tab: Ui['foot']): void {
   if (ui.foot !== tab) ui.foot = tab;
   else ui.full = !ui.full;

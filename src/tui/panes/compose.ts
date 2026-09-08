@@ -5,7 +5,7 @@ import { itemKey, type LeftItem, type Pane, type Ui } from './pane.js';
 
 /**
  * COMPOSE: a message to the selected row's session, written under the foot and posted to the
- * session's inbox. One draft per row, kept while the selection moves and while `esc` hands the
+ * session's inbox. No header names the session: the selected row already does. One draft per row, kept while the selection moves and while `esc` hands the
  * keys back, so a half-written reply survives a look at another session.
  */
 
@@ -82,11 +82,11 @@ export function editKey(d: Draft, key: KeyEvent, width: number): boolean {
 
 // ── drawing ───────────────────────────────────────────────────────────────────
 
-/** Rows the box takes, rule and header included; none while the row has nothing to write to or say. */
+/** Rows the box takes, its rule included; none while the row has nothing to write to or say. */
 export function composeHeight(ui: Ui, here: LeftItem, width: number): number {
   const draft = ui.drafts[itemKey(here)];
   if (!targetOf(here) || (!ui.compose && !draft?.text)) return 0;
-  return 2 + Math.min(MAX_ROWS, rows(draft?.text ?? '', width).length);
+  return 1 + Math.min(MAX_ROWS, rows(draft?.text ?? '', width).length);
 }
 
 export function composePane(p: Pane, ui: Ui, here: LeftItem): void {
@@ -97,7 +97,6 @@ export function composePane(p: Pane, ui: Ui, here: LeftItem): void {
   const at = rowOf(all, d.cursor);
 
   p.rule();
-  p.row([['to ', C.dim], [target.name, C.bright], [ui.compose ? '' : '  · ↵ to write', C.dim]]);
   // The cursor's row stays in view: the box shows the last rows up to it, never the first ones.
   const from = Math.max(0, at - MAX_ROWS + 1);
   for (const [i, row] of all.slice(from, from + MAX_ROWS).entries()) {

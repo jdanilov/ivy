@@ -228,7 +228,7 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
   pad(p, shown.length, room);
 }
 
-/** The pane along the foot, whichever one `A` and `D` last chose, ACTIVITY to begin with. `F` gives it the whole screen. */
+/** The pane along the foot, whichever one `A` and `D` last chose, ACTIVITY to begin with; the same key again gives it the whole screen. */
 export function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
   if (sep) p.rule();
   const room = Math.max(0, h - (sep ? 3 : 2));

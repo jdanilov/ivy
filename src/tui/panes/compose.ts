@@ -28,7 +28,7 @@ export function targetOf(here: LeftItem): { session: string; name: string } | nu
 /** One screen row of the text: a hard break ends a row, a full width starts the next. */
 interface Row { start: number; end: number }
 
-export function rows(text: string, width: number): Row[] {
+function rows(text: string, width: number): Row[] {
   const out: Row[] = [];
   let start = 0;
   for (const para of text.split('\n')) {

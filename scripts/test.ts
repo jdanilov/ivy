@@ -573,6 +573,19 @@ await check('intent.md round-trips and leaves out what nothing filled', async ()
   ok(!bare.includes('## Done') && !bare.includes('## Not') && !bare.includes('## Start'), `an empty section was written: ${JSON.stringify(bare)}`);
   const only = renderIntent('n', { goal: 'g', done: 'd', not: '', start: '' });
   ok(only.includes('## Done looks like\n\nd') && !only.includes('## Not'), `render wrote the wrong sections: ${JSON.stringify(only)}`);
+  // A field is cut by the headings the format knows and by nothing else: `## Start from` is where
+  // a human pastes a doc excerpt, headings and all.
+  const pasted = { goal: 'g', done: '', not: '', start: 'line one\n## a heading\nline three' };
+  ok(parseIntent(renderIntent('n', pasted)).start === pasted.start, 'a heading inside a field cut it');
+});
+
+await check('an intent written under `## Why` reads as a goal', async () => {
+  const why = parseIntent('# Intent: old\n\n## Why\n\nthe old missions say it here.\n\na second paragraph.\n');
+  ok(why.goal === 'the old missions say it here.', `the why did not stand in for the goal: ${JSON.stringify(why.goal)}`);
+  const both = parseIntent('# Intent: old\n\n## Why\n\nthe why\n\n## Goal\n\nthe goal\n');
+  ok(both.goal === 'the goal', `the why won over a goal that is there: ${JSON.stringify(both.goal)}`);
+  // Read only: a save moves the line under `## Goal` and never writes `## Why` back.
+  ok(!renderIntent('old', why).includes('## Why'), 'render wrote a `## Why` section');
 });
 
 await check('a stub takes no branch and promote gives it one', async () => {

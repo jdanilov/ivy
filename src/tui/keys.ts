@@ -10,14 +10,13 @@ import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
-import { AUTONOMY_FIELD, FIELDS, draftFor, formOf, hasText } from './panes/form.js';
+import { AUTONOMY, AUTONOMY_FIELD, FIELDS, draftFor, formOf, showsForm, untouched } from './panes/form.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
-import type { Autonomy, Caffeinate, Intent, Launch, Mission, Project } from './model.js';
+import type { Caffeinate, Intent, Launch, Mission, Project } from './model.js';
 
 /** What every key does. The screen draws; this is the only place a keypress changes anything. */
 
 const CAFFEINATE: Caffeinate[] = ['auto', 'on', 'off'];
-const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 const LAUNCH: Launch[] = ['fg', 'bg'];
 
 /** The one focusable value in the MISSION pane. Turned at once and written behind that: the
@@ -106,9 +105,10 @@ function forming(app: App, key: KeyEvent): void {
 
   if (key.name === 'escape') {
     ui.form = false;
-    // A new mission nobody typed anything into leaves nothing behind: the project row goes back
-    // to its parts. A draft with text is kept, and the pane keeps showing it.
-    if (create && !hasText(d)) delete ui.intents[formKey];
+    // A draft still equal to what it was made from leaves nothing behind: the project row goes
+    // back to its parts, a stub's pane back to following its file. A changed one is kept, and
+    // the pane keeps showing it.
+    if (untouched(d, here)) delete ui.intents[formKey];
   } else if (key.name === 'tab') {
     d.field = first + (((d.field - first + (key.shift ? -1 : 1)) % stops) + stops) % stops;
   } else if (key.ctrl && key.name === 's') return saveForm(app, here, formKey, create);
@@ -143,7 +143,7 @@ function saveForm(app: App, here: LeftItem, formKey: string, create: boolean): v
   }
   if (goal === '') {
     d.field = 1;
-    return toast(app, 'the goal is what the mission is for — fill it in');
+    return toast(app, 'goal is empty — say what the mission is for');
   }
 
   const intent: Intent = { goal, done: d.done.text.trim(), not: d.not.text.trim(), start: d.start.text.trim() };
@@ -207,7 +207,9 @@ function handleKey(app: App, key: KeyEvent): void {
   const right = ui.focus === 'right';
   const inMessages = right && here.kind === 'inbox';
   const inGlobal = here.kind === 'global';
-  const inParts = right && (here.kind === 'project' || inGlobal);
+  // The form outranks Parts on a project row, so the Parts keys go where the pane went: `space`
+  // must never toggle a part nobody can see.
+  const inParts = right && (inGlobal || (here.kind === 'project' && !showsForm(ui, here)));
   // A stub has no graph and no dial in the pane: its right pane is the intent form.
   const inMission = right && here.kind === 'mission' && here.mission.status !== 'stub';
   const move = (i: number, n: number, delta: number) => clamp(i + delta, n);
@@ -302,6 +304,9 @@ function handleKey(app: App, key: KeyEvent): void {
     }
     case 't':
       if (here.kind !== 'mission') break;
+      // A stub's autonomy is the form's dial, and a kept draft would write its own value back
+      // over anything `T` did here: one writer per value.
+      if (here.mission.status === 'stub') return toast(app, '↵ edits the intent, autonomy is in the form');
       return cycleAutonomy(app, here.project, here.mission);
     case 'c': {
       snap.caffeinate = CAFFEINATE[(CAFFEINATE.indexOf(snap.caffeinate) + 1) % CAFFEINATE.length]!;

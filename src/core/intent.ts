@@ -24,13 +24,37 @@ export const SECTIONS: [keyof Intent, string][] = [
 
 export const EMPTY: Intent = { goal: '', done: '', not: '', start: '' };
 
-/** A section's body is everything up to the next heading, trimmed; one it has none of reads ''. */
-export function parseIntent(text: string): Intent {
-  const intent: Intent = { ...EMPTY };
-  for (const [key, heading] of SECTIONS) {
-    const after = text.split(new RegExp(`^${heading}\\s*$`, 'm'))[1];
-    if (after !== undefined) intent[key] = after.split(/^## /m)[0]!.trim();
+/** Where a mission's why was written before the form. Read only: the first save moves it. */
+const WHY = '## Why';
+
+const HEADINGS = new Set([...SECTIONS.map(([, heading]) => heading), WHY]);
+
+/** The file as its sections. A body runs to the next heading the format knows, not to the next
+ *  `## ` line, so a markdown heading pasted into `## Start from` stays in the field. */
+function sections(text: string): Record<string, string> {
+  const found: Record<string, string> = {};
+  let heading: string | null = null;
+  let body: string[] = [];
+  const flush = (): void => { if (heading !== null) found[heading] = body.join('\n').trim(); };
+  for (const line of text.split('\n')) {
+    if (!HEADINGS.has(line.trim())) { body.push(line); continue; }
+    flush();
+    heading = line.trim();
+    body = [];
   }
+  flush();
+  return found;
+}
+
+/** A section the file has none of reads ''. */
+export function parseIntent(text: string): Intent {
+  const found = sections(text);
+  const intent: Intent = { ...EMPTY };
+  for (const [key, heading] of SECTIONS) intent[key] = found[heading] ?? '';
+  // Half the missions written before the form say what they are for under `## Why`, and a stub
+  // with no goal cannot be opened from Mission Control. Read the why as the goal — the first
+  // paragraph, which is the line a human would have written into the field — and a save migrates it.
+  if (intent.goal === '') intent.goal = (found[WHY] ?? '').split(/\n\s*\n/)[0]!.trim();
   return intent;
 }
 

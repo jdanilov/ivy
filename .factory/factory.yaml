@@ -14,8 +14,9 @@ recipes:
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row global right space return escape escape
       # The intent form: `m` opens it on a project row, and both refusals happen before any write,
-      # so the fixture pointing at this very repo is safe to drive.
-      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' m type:x C-s --expect goal
+      # so the fixture pointing at this very repo is safe to drive. Each `--expect` is the toast's
+      # own words and no field label, so the line fails the moment a guard stops refusing.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' m type:x C-s --expect 'goal is empty'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/recall' o --expect 'no goal'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.

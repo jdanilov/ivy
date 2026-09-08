@@ -34,7 +34,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', 'Q', 'Quit'],
   ['Projects', 'O', 'Open the mission\'s tab, /mission as its first prompt'],
   ['', 'K', 'Kill: claude stop under bg, else a signal, again for SIGKILL'],
-  ['', 'T', 'Autonomy full → partial → none'],
+  ['', 'T', 'Autonomy full → partial → none; a stub\'s is in the form'],
   ['', 'E', 'Archive a closed mission or a stub, or bring it back'],
   ['', 'S', 'Show the archived ones'],
   ['', 'R', 'Rename a session; a mission\'s name is its branch and stays'],
@@ -53,7 +53,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', '^S', 'Save: the stub is made, or its intent rewritten'],
   ['', '←→', 'On autonomy, turn the dial; in a field, walk the text'],
   ['', '^U', 'Clear the field'],
-  ['', 'Esc', 'Hand the keys back; the draft is kept'],
+  ['', 'Esc', 'Hand the keys back; a draft you changed is kept'],
   ['Foot', 'A', 'Activity, what its session did; again, full height'],
   ['', 'D', 'Decisions, the forks this mission took; again, full height'],
 ];

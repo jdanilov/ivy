@@ -22,7 +22,7 @@ export const FIELDS: [key: TextField, label: string, max: number][] = [
 export type TextField = 'name' | 'goal' | 'done' | 'not' | 'start';
 /** `field` on the dial: past the last text field. */
 export const AUTONOMY_FIELD = FIELDS.length;
-const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
+export const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 
 /** The row's form key: one draft per project for a new mission, one per stub for an edit. */
 export function formOf(here: LeftItem): string | null {
@@ -49,8 +49,15 @@ function fresh(here: LeftItem): IntentDraft {
 /** The row's draft, made on demand: from here on the pane shows it and not the file. */
 export const draftFor = (ui: Ui, here: LeftItem): IntentDraft => (ui.intents[formOf(here)!] ??= fresh(here));
 
-export const hasText = (d: IntentDraft | undefined): boolean =>
+const hasText = (d: IntentDraft | undefined): boolean =>
   d !== undefined && FIELDS.some(([key]) => d[key].text.trim() !== '');
+
+/** A draft nobody has changed yet: still the row's own files. `Esc` drops one, so the pane goes
+ *  back to following `intent.md` instead of freezing against it. */
+export function untouched(d: IntentDraft, here: LeftItem): boolean {
+  const f = fresh(here);
+  return d.autonomy === f.autonomy && FIELDS.every(([key]) => d[key].text === f[key].text);
+}
 
 /**
  * When the right pane is the form. A stub is edited in it, so it always is; a project row shows a

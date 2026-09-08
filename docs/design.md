@@ -166,9 +166,15 @@ Every field is a message-box draft — the same editor, the same wrap, the same 
 line break inside a field and the field is changed with `⇥` and `⇧⇥`. `^S` saves: an empty goal or
 a name that is not a slug, taken, or empty is refused with a toast naming the field and the cursor
 put on it, and nothing is written. `Esc` hands the keys back and keeps the draft, one per row, so
-`↑↓` between two stubs keeps what was typed into each; a new mission's draft belongs to its project
-row and is shown there, dim, until it is saved. What `^S` writes is the whole of `intent.md`: the
-form owns the file, `## Goal` is always there and a section with nothing in it is left out.
+`↑↓` between two stubs keeps what was typed into each; a draft nothing was changed in is dropped
+instead, so the pane goes back to following `intent.md`. A new mission's draft belongs to its
+project row and is shown there, dim, until it is saved, and while it shows, that row's pane is the
+form and not Parts — the key bar lists the pane on screen. What `^S` writes is the whole of
+`intent.md`: the form owns the file, `## Goal` is always there and a section with nothing in it is
+left out.
+
+A stub's autonomy is the form's dial and nothing else: `T` on a stub row says so rather than
+writing beside a draft that would put its own value back on the next `^S`.
 
 `O` on a stub whose goal is empty is refused — the session would only ask what the form is for.
 The CLI's own `mission open` is not: running it is a deliberate act, and a bare stub is a fair
@@ -316,7 +322,7 @@ keys do, and none of these three do the same thing.
 | `←→`    | intent form      | on autonomy, turn the dial; in a field, walk the text             |
 | `^S`    | intent form      | save: the stub is made, or its `intent.md` and autonomy rewritten |
 | `^U`    | intent form      | clear the field                                                   |
-| `Esc`   | intent form      | keep the draft, hand the keys back                                |
+| `Esc`   | intent form      | hand the keys back; a draft nothing changed is dropped |
 | `←`     | right            | back to the left pane                                            |
 | `Esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
 | `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
@@ -325,7 +331,7 @@ keys do, and none of these three do the same thing.
 | `R`     | Parts            | reset the toggles                                                |
 | `O`     | mission row      | open the mission's Warp tab with `/mission` as the session's first prompt: `claude` in the tab, or under `claude --bg` with the tab attached when `launch: bg`; a bound mission is refused |
 | `K`     | mission, session | kill: `claude stop` for a session started under `--bg`, which keeps its conversation; SIGTERM for any other, SIGKILL on a second press |
-| `T`     | mission, MISSION | autonomy full → partial → none                                   |
+| `T`     | mission, MISSION | autonomy full → partial → none; on a stub the form's dial is the writer |
 | `E`     | mission row      | archive a closed mission or a stub, or bring an archived one back |
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |

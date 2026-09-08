@@ -69,7 +69,10 @@ factory handoff save <step>            # reads the handoff from stdin
   and `## Start from`, in that order. `## Goal` is always written, empty from the CLI and filled
   from Mission Control's intent form; the other three are written only when they hold something,
   so a section on the page is a section somebody filled in. A save rewrites the whole file — the
-  form is the one writer — and parse and render round-trip on trimmed fields.
+  form is the one writer — and parse and render round-trip on trimmed fields. A body runs to the
+  next heading of that set, so a `## ` line pasted into a field stays in it, and a file with no
+  `## Goal` reads the first paragraph of `## Why` as the goal: the missions written before the
+  form still show and still open, and the first save writes the line under `## Goal`.
 - Mission Control refuses `O` on a stub whose goal is empty: the Orchestrator would only ask what
   the form is there for. The CLI's `mission open` does not — running it is a deliberate act.
 - `mission close` commits nothing and never `git add`s the mission folder, which is ignored:

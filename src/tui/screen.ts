@@ -131,12 +131,13 @@ const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy
  *  and `D` are not here: the header and the foot tabs carry them as their bright first letter. */
 function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
-  const parts = here.kind === 'project' || here.kind === 'global';
+  // The bar lists the pane that is drawn: a project row showing the intent form is not Parts.
+  const parts = here.kind === 'global' || (here.kind === 'project' && !showsForm(ui, here));
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
     ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
-    ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', ' Word'], ['^K', 'Line'], ['^U', 'Clear']] :
+    ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', formOf(here) && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),

@@ -127,11 +127,11 @@ function statusBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
   inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E', 'R'], session: ['K', 'R'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
+const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. `L`, `C`, `A`
- *  and `D` are not here: the header and the foot tabs carry them as their accented letter. */
+ *  and `D` are not here: the header and the foot tabs carry them as their accented first letter. */
 function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
   const right = ui.focus === 'right';
   const parts = here.kind === 'project' || here.kind === 'global';
@@ -142,23 +142,18 @@ function keyBar(p: Pane, here: LeftItem, ui: Ui): void {
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => ROW_KEYS[here.kind].includes(key!)),
-      ['S', 'Show Archived'], ['?', 'Help'], ['Q', 'Quit']]
-    : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']]
+      ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
+    : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
     // Space picks the scope on the global row and the install on a project's: one key, two panes.
     : parts ? [['↑↓', 'Select'], ['Space', here.kind === 'global' ? 'Scope' : 'Toggle'], ['↵', 'Apply'],
-      ...(pending(here.project, ui, here.kind === 'global').length ? [['R', 'Reset'], ['Esc', 'Discard']] : [['← Esc', 'Back']]), ['?', 'Help'], ['Q', 'Quit']]
+      ...(pending(here.project, ui, here.kind === 'global').length ? [['R', 'Reset'], ['Esc', 'Discard']] : [['← Esc', 'Back']]), ['Q', 'Quit'], ['?', 'Help']]
     // The mission pane has one thing to focus, and the row it sits on is the autonomy dial.
     : [...(here.kind === 'mission' ? [['→ T', 'Autonomy']] : []),
-      ['← Esc', 'Back'], ['?', 'Help'], ['Q', 'Quit']];
+      ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']];
 
-  // A key that is a letter of its own label is that letter, accented, inside the word: `Rename`,
-  // `Kill`. The rest keep the pair, the key bright before the label: `↑↓ Select`, `O Tab`.
-  const cells = (list: string[][]): Cell[] => list.flatMap(([key, label]): Cell[] => {
-    const at = /^[A-Z]$/.test(key!) ? label!.toUpperCase().indexOf(key!) : -1;
-    return at === -1 ? [[`${key} `, C.bright], [`${label}  `, C.dim]]
-      : [[label!.slice(0, at), C.dim], [label![at]!, C.accent], [`${label!.slice(at + 1)}  `, C.dim]];
-  });
+  const cells = (list: string[][]): Cell[] =>
+    list.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]);
   const full = cells(pairs);
   p.row(len(full) <= p.width ? full : cells(pairs.filter(([key]) => key !== '?')));
 }

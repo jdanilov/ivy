@@ -52,10 +52,9 @@ undershoots these values on screen but the hierarchy holds.
   narrower for a list or a log. Each pane has its own bright heading, a thin rule, then rows. No
   vertical box-drawing rule between columns, a column gap does the separating.
 - Bottom key bar: `Key Label` pairs, key in bright value color, label in dim label color, two spaces
-  between pairs, pinned to the last line, thin rule above. A key that is a letter of its own label
-  is that letter in the accent inside the word — `Rename`, `Kill`, `Show Archived` — and the
-  header's `Launch` and `Caffeinate` and the foot's `ACTIVITY` and `DECISIONS` carry theirs the
-  same way, so the bar does not list `L`, `C`, `A` or `D`.
+  between pairs, pinned to the last line, thin rule above. The header's `Launch` and `Caffeinate`
+  and the foot's `ACTIVITY` and `DECISIONS` carry their key as an accented first letter, so the
+  bar does not list `L`, `C`, `A` or `D`.
 - Spacing: one blank line between a pane heading and its first row is not used, rows start right
   after the rule. No blank lines between consecutive log rows. CLI output keeps the 3-space `I`
   indent from `src/ui/theme.ts` to match the `@clack/prompts` gutter; the TUI has no gutter to match
@@ -81,7 +80,7 @@ row 4        ──────────────────────�
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Tab  Kill  Autonomy  Archive  Rename  New Mission  Show Archived  ? Help  Quit
+             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  S Show Archived  Q Quit  ? Help
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the

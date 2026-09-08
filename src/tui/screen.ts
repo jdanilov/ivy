@@ -1,6 +1,6 @@
 import { BoxRenderable, createCliRenderer, type CliRenderer, type KeyEvent } from '@opentui/core';
 import path from 'node:path';
-import { C, GLYPH, stateColor } from './theme.js';
+import { C, GLYPH, SESSION, stateColor } from './theme.js';
 import { dur, id, len, spread, tokens, type Cell } from './format.js';
 import { column, newUi, select, type LeftItem, type Pane, type Ui } from './panes/pane.js';
 import { leftPane } from './panes/left.js';
@@ -95,7 +95,7 @@ function missionBar(p: Pane, m: Mission): void {
 /** A session has no steps to bar: its state word, then whose tab it is and how long it has waited. */
 function sessionBar(p: Pane, s: Session): void {
   const word = s.busy ? 'WORKING' : 'IDLE';
-  const left: Cell[] = [s.busy ? [`${GLYPH.running} `, C.accent] : [`${GLYPH.pending} `, C.dim], [word.padEnd(STATE_W), C.bright],
+  const left: Cell[] = [s.busy ? [`${SESSION.working} `, C.accent] : [`${SESSION.idle} `, C.dim], [word.padEnd(STATE_W), C.bright],
     ['  ', C.dim], [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [' · ', C.rule], [s.cwd, C.dim]];
   const right: Cell[] = s.busy ? (s.agent ? [[s.agent, C.bright]] : []) : [['since ', C.dim], [dur(Date.now() - s.idleSince), C.bright]];
   p.row(spread(left, right, p.width));

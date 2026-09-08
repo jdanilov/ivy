@@ -1,4 +1,4 @@
-import { C, GLYPH, stateColor } from '../theme.js';
+import { C, GLYPH, SESSION, stateColor } from '../theme.js';
 import { ago, dur, id, spread, tokens, type Cell } from '../format.js';
 import { marker, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { Mission, Session, Snapshot } from '../model.js';
@@ -30,7 +30,7 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
 function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): void {
   const state = s.busy ? `working${s.agent ? ` · ${s.agent}` : ''}` : `idle ${dur(Date.now() - s.idleSince)}`;
   p.row([
-    marker(selected, focused), [' ', C.dim], s.busy ? ['● ', C.accent] : ['○ ', C.dim],
+    marker(selected, focused), [' ', C.dim], s.busy ? [`${SESSION.working} `, C.accent] : [`${SESSION.idle} `, C.dim],
     [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim],
     ...(s.name ? ([['  ', C.dim], [id(s.id), C.dim]] as Cell[]) : []), [`  ${state}`, C.dim],
   ], selected && focused);
@@ -56,7 +56,7 @@ export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): vo
     // Nothing under a heading reads as a screen that failed to load: the hint names the way out,
     // indented where the row it stands in for would be. A session row is something under it.
     if (item.kind === 'project' && item.project.missions.length === 0 && item.project.sessions.length === 0) {
-      p.row([['   no missions · factory mission new <name>', C.dim]]);
+      p.row([['   no missions · create one with M', C.dim]]);
     }
   });
   if (snap.projects.length === 0) {

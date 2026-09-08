@@ -23,6 +23,9 @@ export const GLYPH: Record<RunState, string> = {
   pending: '○', running: '●', done: '✓', blocked: '⊘', skipped: '·',
 };
 
+/** A session is a place you type into, so its mark is a prompt, not a mission's circle. */
+export const SESSION = { working: '▸', idle: '▹' };
+
 export function stateColor(state: RunState): string {
   if (state === 'running') return C.accent;
   if (state === 'done') return C.success;

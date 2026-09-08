@@ -37,7 +37,9 @@ factory handoff save <step>            # reads the handoff from stdin
   event the session emits already finds a mission bound to it, and the tab holds a `claude`, which
   is what Warp's badge reads. A daemon's child inherits nothing from the command line, so the
   mission dir reaches the hook as `FACTORY_MISSION` through the mission's own `settings.json`, the
-  preset's overlay plus that `env` and `crossSessionInbound: accept`, written beside its state.
+  preset's overlay plus that `env` and `crossSessionInbound: accept`, written beside its state. The
+  command ends in `/mission` as the first prompt, so the session is reading the intent by the time
+  the tab attaches; the system prompt only says what an Orchestrator is.
 - `hook-factory` never fails a hook: every step is guarded and the script always exits 0.
 - A decision is one row in the mission's `decisions.md`, `id | step | by | confidence | summary |
   status | note`, written temp plus rename by `src/core/decision.ts` and, standalone, by the hook.

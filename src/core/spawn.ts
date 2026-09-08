@@ -52,6 +52,10 @@ const quote = (value: string): string =>
 /** The session is the human's own, so it runs the way they run `claude` by hand. */
 const HUMAN_FLAGS = ['--permission-mode', 'acceptEdits', '--dangerously-skip-permissions'];
 
+/** The first prompt, so the session opens already reading the intent and nobody has to type it:
+ *  the system prompt says what an Orchestrator is, the skill is the manual it runs from. */
+const KICKOFF = '/mission';
+
 /** The preset's overlay with what only this mission knows, written beside its state. */
 const settingsPath = (mission: Mission): string => path.join(mission.dir, 'settings.json');
 
@@ -71,6 +75,7 @@ export function assembleArgs(preset: Preset, mission: Mission): string[] {
     '--settings', settingsPath(mission),
     '--mcp-config', path.join(preset.dir, 'mcp.json'),
     '--strict-mcp-config',
+    KICKOFF,
   ];
 }
 

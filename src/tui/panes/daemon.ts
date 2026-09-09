@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { C } from '../theme.js';
-import { ago, spread, wrap, type Cell } from '../format.js';
+import { ago, spans, spread, wrapCells, type Cell } from '../format.js';
 import { readLogTail } from '../../core/daemons.js';
 import { short } from '../../commands/daemon.js';
 import type { Pane, Ui } from './pane.js';
@@ -54,7 +54,7 @@ const GLYPH = { ok: '✓', skip: '○', fail: '✗' };
 const STATUS = { ok: C.success, skip: C.dim, fail: C.warning };
 
 /** The last `room` rows, and none at all where there is no room: `slice(-0)` is the whole log. */
-const lastRows = (rows: string[], room: number): string[] => (room <= 0 ? [] : rows.slice(-room));
+const lastRows = <T>(rows: T[], room: number): T[] => (room <= 0 ? [] : rows.slice(-room));
 
 const fact = (label: string, cells: Cell[]): Cell[] => [[label.padEnd(LABEL), C.dim], ...cells];
 
@@ -100,8 +100,8 @@ export function daemonPane(p: Pane, row: DaemonRow, ui: Ui, h: number): void {
     const lines = linesOf(row, READ_LINES);
     p.row(spread([['LOG', C.bright], [`  ${title}`, C.dim]], [[`${lines.length} lines`, C.dim]], p.width));
     p.rule();
-    const rows = lines.flatMap((l) => wrap(l, p.width, WRAP_ROWS));
-    for (const l of lastRows(rows, h - 2)) p.row([[l, C.dim]]);
+    const rows = lines.flatMap((l) => wrapCells(spans(l, C.dim), p.width, WRAP_ROWS));
+    for (const cells of lastRows(rows, h - 2)) p.row(cells);
     return;
   }
 
@@ -117,7 +117,7 @@ export function daemonPane(p: Pane, row: DaemonRow, ui: Ui, h: number): void {
 
   // Whatever the facts left: the newest lines, the way a tail reads.
   const room = h - lines.length;
-  const log = linesOf(row, LOG_LINES).flatMap((l) => wrap(l, p.width, WRAP_ROWS));
+  const log = linesOf(row, LOG_LINES).flatMap((l) => wrapCells(spans(l, C.dim), p.width, WRAP_ROWS));
   if (log.length === 0 && room > 0) return p.row([['nothing logged yet', C.dim]]);
-  for (const l of lastRows(log, room)) p.row([[l, C.dim]]);
+  for (const cells of lastRows(log, room)) p.row(cells);
 }

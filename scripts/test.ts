@@ -1122,8 +1122,9 @@ await check('the daemon contract is the exit code plus one optional JSON line', 
 });
 
 await check('a log line reads back the way a terminal would have shown it', async () => {
+  // Colour stays: a shell renders it and the pane parses it. Only what moves the cursor goes.
   const colour = plainLine('\x1b[32m✓\x1b[0m built in 412ms');
-  ok(colour === '✓ built in 412ms', `a coloured line read back as ${JSON.stringify(colour)}`);
+  ok(colour === '\x1b[32m✓\x1b[0m built in 412ms', `a coloured line read back as ${JSON.stringify(colour)}`);
 
   // A progress line rewritten in place: only what followed the last carriage return was on screen.
   const progress = plainLine('transforming (12)\rtransforming (48)\r\x1b[2Ktransforming (301)');
@@ -1134,6 +1135,20 @@ await check('a log line reads back the way a terminal would have shown it', asyn
 
   const header = plainLine('── 2026-09-09T08:00:00.000Z run');
   ok(header === '── 2026-09-09T08:00:00.000Z run', `the run header came back as ${JSON.stringify(header)}`);
+});
+
+await check('a coloured log line is cells in the pane, and keeps its colours through a wrap', async () => {
+  const { spans, wrapCells } = await import('../src/tui/format.js');
+  const { C } = await import('../src/tui/theme.js');
+  const cells = spans('\x1b[32m✓\x1b[0m built \x1b[1min\x1b[22m \x1b[38;5;196m412ms\x1b[39m \x1b[38;2;1;2;3mx', C.dim);
+  const want = JSON.stringify([['✓', C.success], [' built ', C.dim], ['in', C.bright], [' ', C.dim], ['412ms', '#ff0000'], [' ', C.dim], ['x', '#010203']]);
+  ok(JSON.stringify(cells) === want, `spans read back as ${JSON.stringify(cells)}`);
+  ok(JSON.stringify(spans('plain', C.dim)) === JSON.stringify([['plain', C.dim]]), 'a plain line is one cell');
+
+  const rows = wrapCells(spans('\x1b[33mwarn\x1b[0m chunk   larger than \x1b[31m500 kB\x1b[0m', C.dim), 14, 3);
+  ok(rows.length === 3, `wrapped to ${rows.length} rows`);
+  ok(JSON.stringify(rows[0]) === JSON.stringify([['warn', C.warning], [' chunk', C.dim]]), `row 0 was ${JSON.stringify(rows[0])}`);
+  ok(JSON.stringify(rows[2]) === JSON.stringify([['500 kB', C.error]]), `row 2 was ${JSON.stringify(rows[2])}`);
 });
 
 await check('daemon enablement is one line in the machine config, default off, and off wins', async () => {

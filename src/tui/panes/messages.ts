@@ -1,5 +1,5 @@
 import { C, COMMAND } from '../theme.js';
-import { ago, spread, wrap, type Cell } from '../format.js';
+import { type Cell, ago, spans, spread, wrap } from '../format.js';
 import { logTail } from './daemon.js';
 import { marker, type Pane, type Ui } from './pane.js';
 import type { InboxItem, Snapshot } from '../model.js';
@@ -41,7 +41,7 @@ function messageDetail(p: Pane, item: InboxItem, h: number): void {
     // the tail is read behind the frame; the fixture has no log on disk and carries its lines.
     for (const l of wrap(item.text ?? '', p.width, 2)) p.row([[l, C.warning]]);
     const log = item.body ?? logTail(`${item.project}/${item.origin}`, LOG_LINES);
-    for (const l of log.slice(0, Math.max(0, room - 3))) p.row([[l, C.dim]]);
+    for (const l of log.slice(0, Math.max(0, room - 3))) p.row(spans(l, C.dim));
   } else {
     for (const text of (item.text ?? '').split('\n')) for (const l of wrap(text, p.width, room)) p.row([[l, C.bright]]);
   }

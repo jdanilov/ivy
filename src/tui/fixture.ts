@@ -1,7 +1,7 @@
 import { stepRole } from '../core/workflow.js';
 import type { WorkflowStep } from '../types.js';
 import { stepKind } from './model.js';
-import type { Activity, Decision, InboxItem, Mission, PartRow, Project, Scope, ScopeChoice, Snapshot, StepRow } from './model.js';
+import type { Activity, DaemonRow, Decision, InboxItem, Mission, PartRow, Project, Scope, ScopeChoice, Snapshot, StepRow } from './model.js';
 
 /** Fake data for the look-and-feel prototype. Every age is an offset from `now`, so the screen keeps its shape. */
 
@@ -156,6 +156,62 @@ const globalParts: PartRow[] = [
   part('research', 'tool', 'web research via Grok', 'not-installed', 'off', 'global'),
 ];
 
+// A daemon's tails are all relative — `last ✓ 2h ago`, `next 1h` — so they are stamped from the
+// clock and not from the fixed `now` above: a fixed stamp reads `next 0s` the day after.
+const iso = (back: number): string => new Date(Date.now() - back).toISOString();
+
+/** The four states a row can be in, one row each: on and idle, failed with an alert waiting in the
+ *  Inbox, running with a port, and off. The log lines are the fixture's own — there is no
+ *  `~/.factory/daemons/ivy/` behind them. */
+const ivyDaemons: DaemonRow[] = [
+  {
+    key: 'ivy/cws-reviews', project: '/opt/ed/ivy',
+    entry: {
+      kind: 'daemon', name: 'cws-reviews', description: 'reply to Chrome Web Store reviews',
+      cmd: 'bun support/tools/cws-run.ts', every: 3 * H, atMost: { n: 1, window: 24 * H }, when: 'active', timeout: 20 * M,
+    },
+    state: {
+      enabled: true, lastStart: iso(2 * H + 4 * M), lastEnd: iso(2 * H), lastStatus: 'ok',
+      lastSummary: 'posted 3/5', nextDue: iso(-(1 * H + M)), successes: [iso(2 * H)],
+    },
+    log: [
+      '── 2026-09-09T08:00:00.000Z run',
+      'collect: 12 reviews, 5 unanswered',
+      'draft: 5 replies, 2 held back by the tone check',
+      'post: 3 posted, 2 skipped',
+      '{"summary":"posted 3/5"}',
+    ],
+  },
+  {
+    key: 'ivy/nightly', project: '/opt/ed/ivy',
+    entry: { kind: 'daemon', name: 'nightly', description: 'nightly build and typecheck', cmd: 'bun run build', every: 1 * D, when: 'any' },
+    state: {
+      enabled: true, lastStart: iso(9 * H), lastEnd: iso(9 * H - 40 * 1000), lastStatus: 'fail',
+      lastSummary: 'build: exit 2', nextDue: iso(-15 * H), alert: 'run failed: build: exit 2',
+    },
+    log: [
+      '── 2026-09-09T01:00:00.000Z run',
+      'src/index.ts:41:12 - error TS2551: Property "tail" does not exist on type "Row"',
+      'build failed with 1 error',
+      '{"summary":"build: exit 2"}',
+    ],
+  },
+  {
+    key: 'ivy/api', project: '/opt/ed/ivy',
+    entry: {
+      kind: 'service', name: 'api', cmd: 'npm run dev', cwd: 'inssist-api',
+      env: { PORT: '3061', NODE_ENV: 'development' }, run: 'detached', restart: 'on-failure', port: 3061,
+    },
+    state: { enabled: true, wanted: true, pid: 4123, startedAt: iso(3 * H) },
+    log: ['listening on http://localhost:3061', 'GET /health 200 3ms'],
+  },
+  {
+    key: 'ivy/web', project: '/opt/ed/ivy',
+    entry: { kind: 'service', name: 'web', cmd: 'npm start', cwd: 'web', run: 'detached', restart: 'never', port: 3060 },
+    state: { enabled: false },
+  },
+];
+
 /** Everything a mission needs but a fixture rarely varies. */
 function mission(m: Partial<Mission> & Pick<Mission, 'name' | 'workflow'>): Mission {
   return {
@@ -172,6 +228,7 @@ const projects: Project[] = [
     path: '/opt/ed/ivy',
     parts: ivyParts,
     sessions: [],
+    daemons: ivyDaemons,
     missions: [
       mission({
         name: 'refit', workflow: 'story', state: 'running', step: 'implement', round: 2, session: '75cb46e1',
@@ -199,6 +256,7 @@ const projects: Project[] = [
     name: 'igs',
     path: '~/dev/igs',
     parts: ivyParts.filter((p) => ['commit', 'mission', 'verify', 'permissions'].includes(p.name)),
+    daemons: [],
     sessions: [
       {
         id: 'b3f21c07', name: 'recall', busy: false, preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
@@ -219,6 +277,9 @@ const projects: Project[] = [
     path: '~/dev/cut',
     parts: ivyParts.filter((p) => ['commit', 'mission'].includes(p.name)),
     sessions: [],
+    // A manifest nobody can read: one dim line under the project and no rows for it.
+    daemons: [],
+    daemonError: 'ext: cmd is required',
     missions: [
       mission({
         name: 'intro', workflow: 'chore', status: 'closed', state: 'done', autonomy: 'partial', wall: 41 * M,
@@ -270,8 +331,15 @@ const inbox: InboxItem[] = [
     answer: 'factory gate answer merge accept|amend|reject',
     file: 'retro.md', lines: 41, body: retroBody,
   },
+  // Stamped from the clock, like the row it belongs to: the two must not read different ages.
+  {
+    kind: 'daemon', project: 'ivy', origin: 'nightly', label: 'alert', at: Date.now() - 9 * H,
+    answer: 'factory daemon log ivy/nightly', text: 'run failed: build: exit 2',
+    body: ivyDaemons[1]!.log,
+  },
 ];
 
 export const snapshot: Snapshot = {
-  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog], caffeinate: 'auto', launch: 'fg',
+  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog],
+  caffeinate: 'auto', launch: 'fg', supervisor: 8821,
 };

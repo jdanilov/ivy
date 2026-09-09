@@ -238,3 +238,11 @@ export async function archive(project: string, name: string, back: boolean): Pro
   const log = await archiveMission(project, name, back);
   return log.length > 0 ? log.join(' · ') : `${name} is already ${back ? 'in missions' : 'archived'}`;
 }
+
+// ── daemons ──────────────────────────────────────────────────────────────────
+
+/** `space`, `r`, `x` and `l` are their CLI twins and nothing more: the same four functions
+ *  `factory daemon on|off|run|stop|log` calls, three returning the line the toast shows and `log`
+ *  the lines it read — reading them is what acknowledges the alert, there as here. The screen
+ *  writes no request and no config of its own — one writer, and the CLI owns it. */
+export { readLog, runNow, setEnabled, stopRow } from '../commands/daemon.js';

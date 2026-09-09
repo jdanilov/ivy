@@ -2,7 +2,7 @@ import { BoxRenderable, TextRenderable, type CliRenderer } from '@opentui/core';
 import { C } from '../theme.js';
 import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
-import type { Autonomy, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
+import type { Autonomy, DaemonRow, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
 import type { Draft } from './compose.js';
 import type { Shape } from './form.js';
 
@@ -35,6 +35,8 @@ export interface Ui {
   /** The keys are the message box's; the drafts stay by row whether or not they are. */
   compose: boolean;
   drafts: Record<string, Draft>;
+  /** `l` on a daemon row: the right pane is that row's log and nothing else, until `Esc` or `←`. */
+  daemonLog: boolean;
   /** The keys are the intent form's. */
   form: boolean;
   /** One intent draft per row, kept like a message draft: a stub row by its own key, a new
@@ -59,7 +61,8 @@ export function newUi(): Ui {
   return {
     focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
-    showArchived: false, toast: null, input: null, compose: false, drafts: {}, form: false, intents: {},
+    showArchived: false, toast: null, input: null, compose: false, drafts: {}, daemonLog: false,
+    form: false, intents: {},
   };
 }
 
@@ -69,11 +72,12 @@ export type LeftItem =
   | { kind: 'global'; project: Project }
   | { kind: 'project'; project: Project }
   | { kind: 'mission'; project: Project; mission: Mission }
-  | { kind: 'session'; project: Project; session: Session };
+  | { kind: 'session'; project: Project; session: Session }
+  | { kind: 'daemon'; project: Project; daemon: DaemonRow };
 
 /** The user's own parts as a project row: one PARTS pane, one apply path, the home dir as its root. */
 const globalRow = (snap: Snapshot): LeftItem =>
-  ({ kind: 'global', project: { name: 'Global', path: home(), missions: [], sessions: [], parts: snap.global } });
+  ({ kind: 'global', project: { name: 'Global', path: home(), missions: [], sessions: [], daemons: [], parts: snap.global } });
 
 export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
   return [
@@ -85,6 +89,7 @@ export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
         .filter((mission) => showArchived || !mission.archived)
         .map((mission): LeftItem => ({ kind: 'mission', project, mission })),
       ...project.sessions.map((session): LeftItem => ({ kind: 'session', project, session })),
+      ...project.daemons.map((daemon): LeftItem => ({ kind: 'daemon', project, daemon })),
     ]),
   ];
 }
@@ -105,6 +110,7 @@ export function itemKey(item: LeftItem): string {
     : item.kind === 'global' ? 'global'
     : item.kind === 'project' ? `p ${item.project.name}`
     : item.kind === 'mission' ? `m ${item.project.name}/${item.mission.name}`
+    : item.kind === 'daemon' ? `d ${item.daemon.key}`
     : `s ${item.session.id}`;
 }
 

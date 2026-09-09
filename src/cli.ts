@@ -9,6 +9,8 @@ import { I, colors, setNameCol } from './ui/theme.js';
 
 // Mission work happens in the checkout you are standing in; only the part commands pick a project.
 const MISSION_COMMANDS = ['mission', 'step', 'gate', 'decision', 'handoff'];
+// The machine's own background work: every project at once, so neither a cwd nor a picker.
+const MACHINE_COMMANDS = ['daemon', 'supervisor'];
 
 async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(argv);
@@ -39,6 +41,18 @@ async function runMissionCommand(cmd: string, argv: string[]): Promise<void> {
   }
 }
 
+async function runMachineCommand(cmd: string, argv: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(argv);
+  const [sub, ...rest] = positionals;
+
+  if (cmd === 'daemon') {
+    const { daemon } = await import('./commands/daemon.js');
+    return daemon(sub!, rest);
+  }
+  const { supervisor } = await import('./commands/supervisor.js');
+  return supervisor(sub!, flags);
+}
+
 async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<void> {
   switch (cmd) {
     case 'install': {
@@ -60,7 +74,7 @@ async function dispatch(cmd: string, targetDir: string, flags: Flags): Promise<v
       return update(targetDir, skip ? skip.split(',') : []);
     }
     default:
-      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, decision, handoff, control`);
+      throw new Refusal(`unknown command: ${cmd} — menu, install, uninstall, status, update, mission, step, gate, decision, handoff, daemon, supervisor, control`);
   }
 }
 
@@ -68,6 +82,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args[0] && MISSION_COMMANDS.includes(args[0])) return runMissionCommand(args[0], args.slice(1));
+  if (args[0] && MACHINE_COMMANDS.includes(args[0])) return runMachineCommand(args[0], args.slice(1));
 
   const { positionals, flags } = parseArgs(args);
   const first = positionals[0];

@@ -41,12 +41,16 @@ const { resolvePart } = await import('../src/core/recipes.js');
 const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { parseIntent, renderIntent } = await import('../src/core/intent.js');
-const { loadConfig, resetConfig, writePartScope } = await import('../src/core/config.js');
+const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
+const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
+const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
+const { readLog, runNow, setEnabled, stopRow } = await import('../src/commands/daemon.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
 const exists = (p: string): Promise<boolean> => Bun.file(p).exists();
 const alive = (pid: number): boolean => { try { return process.kill(pid, 0); } catch { return false; } };
+const HOUR = 3_600_000;
 const branchGone = async (dir: string, b: string): Promise<boolean> => (await git(dir, 'branch', '--list', b)) === '';
 
 /** What a command printed, for a case that asserts on the report and not only on the disk. */
@@ -1027,6 +1031,283 @@ await check('writePartScope makes a block out of a flow-style parts line and kee
     ok(parts?.commit === 'project' && parts.research === 'off', `the choices read back as ${JSON.stringify(parts)}`);
   });
 });
+
+await check('a manifest reads a daemon and a service, durations in ms and env as strings', async () => {
+  const dir = await repo('bots');
+  await mkdir(path.join(dir, '.factory'), { recursive: true });
+  await writeFile(path.join(dir, '.factory', 'daemons.yaml'),
+    'cws-reviews:\n  kind: daemon\n  description: reply to reviews\n  cmd: bun support/tools/cws-run.ts\n  every: 3h\n  atMost: 1/24h\n  when: active\n  timeout: 20m\n' +
+    'api:\n  kind: service\n  cmd: npm run dev\n  cwd: inssist-api\n  env: { PORT: 3061, NODE_ENV: development }\n  run: detached\n  restart: always\n  port: 3061\n');
+
+  const manifest = await readDaemons(dir);
+  ok(manifest.error === undefined, `the manifest refused: ${manifest.error}`);
+  const [daemon, service] = manifest.entries;
+  ok(daemon?.kind === 'daemon' && daemon.name === 'cws-reviews' && daemon.every === 3 * HOUR && daemon.timeout === 20 * 60_000 && daemon.when === 'active',
+    `the daemon read as ${JSON.stringify(daemon)}`);
+  ok(daemon?.kind === 'daemon' && daemon.atMost?.n === 1 && daemon.atMost.window === 24 * HOUR, `atMost read as ${JSON.stringify(daemon?.kind === 'daemon' ? daemon.atMost : null)}`);
+  ok(service?.kind === 'service' && service.cwd === 'inssist-api' && service.run === 'detached' && service.restart === 'always' && service.port === 3061,
+    `the service read as ${JSON.stringify(service)}`);
+  ok(service?.kind === 'service' && service.env?.PORT === '3061' && service.env.NODE_ENV === 'development', `env read as ${JSON.stringify(service?.env)}`);
+});
+
+await check('a manifest that does not parse is one error line and no entries', async () => {
+  const dir = await repo('bots-bad');
+  const file = path.join(dir, '.factory', 'daemons.yaml');
+  await mkdir(path.dirname(file), { recursive: true });
+
+  await writeFile(file, 'api:\n  kind: service\n   cmd: oops\n');
+  const broken = await readDaemons(dir);
+  ok(broken.entries.length === 0 && (broken.error ?? '').split('\n').length === 1, `bad YAML read as ${JSON.stringify(broken)}`);
+
+  await writeFile(file, 'api:\n  kind: service\n  cmd: npm start\n  restart: sometimes\n');
+  ok((await readDaemons(dir)).error === 'api: restart must be never, on-failure or always', `a bad field read as ${JSON.stringify(await readDaemons(dir))}`);
+
+  await writeFile(file, 'tick:\n  kind: daemon\n  cmd: "true"\n');
+  ok((await readDaemons(dir)).error === 'tick: every is required on a daemon', `a missing every read as ${JSON.stringify(await readDaemons(dir))}`);
+
+  await writeFile(file, 'api:\n  kind: service\n  cmd: npm start\n  env:\n    PORT: [3061]\n');
+  ok((await readDaemons(dir)).error === 'api: env: PORT must be a string, a number or a boolean', `a list in env read as ${JSON.stringify(await readDaemons(dir))}`);
+
+  // The project keeps a manifest the rest of the run can list: one bad entry, one error, no rows.
+  await writeFile(file, 'tick:\n  kind: daemon\n  cmd: "true"\n  every: 5x\n');
+  ok((await readDaemons(dir)).error === 'tick: every: "5x" is not a duration like 90s, 20m, 3h or 1d', `a bad duration read as ${JSON.stringify(await readDaemons(dir))}`);
+});
+
+await check('durations and windows parse the four units and refuse anything else', async () => {
+  ok(parseDuration('90s') === 90_000 && parseDuration('20m') === 20 * 60_000 && parseDuration('3h') === 3 * HOUR && parseDuration('1d') === 24 * HOUR,
+    'a unit did not read back in ms');
+  for (const bad of ['3', 'h', '3w', '1.5h', '']) {
+    ok(((): boolean => { try { parseDuration(bad); return false; } catch { return true; } })(), `"${bad}" parsed as a duration`);
+  }
+  const window = parseAtMost('1/24h');
+  ok(window.n === 1 && window.window === 24 * HOUR, `1/24h read as ${JSON.stringify(window)}`);
+  ok(((): boolean => { try { parseAtMost('24h'); return false; } catch { return true; } })(), '24h parsed as a limit');
+});
+
+await check('due gates on every, atMost, idle and a run in flight, off nothing but its arguments', async () => {
+  const now = Date.parse('2026-09-09T12:00:00Z');
+  const at = (ms: number): string => new Date(now - ms).toISOString();
+  const tick = { kind: 'daemon' as const, name: 'tick', cmd: 'true', every: 3 * HOUR, when: 'any' as const };
+
+  ok(due(tick, { enabled: true }, now, 0).due, 'a daemon that never ran is not due');
+  ok(!due(tick, { enabled: true, lastEnd: at(HOUR) }, now, 0).due, 'an hour into a 3h cadence it was due');
+  ok(due(tick, { enabled: true, lastEnd: at(4 * HOUR) }, now, 0).due, 'four hours into a 3h cadence it was not due');
+  ok(due(tick, { enabled: true, lastEnd: at(40 * HOUR) }, now, 0).due, 'a tick missed to sleep did not come due at once');
+  ok(!due(tick, { enabled: true, pid: 4123 }, now, 0).due, 'a run in flight was due again');
+  ok(due(tick, { enabled: true, lastEnd: at(HOUR) }, now, 0).next === now + 2 * HOUR, 'next is not the end of the cadence');
+
+  const capped = { ...tick, atMost: { n: 1, window: 24 * HOUR } };
+  const once = { enabled: true, lastEnd: at(4 * HOUR), successes: [at(4 * HOUR)] };
+  ok(!due(capped, once, now, 0).due, 'atMost let a second run inside its window');
+  ok(due(capped, once, now, 0).next === now + 20 * HOUR, 'next is not when the window frees up');
+  ok(due(capped, { ...once, successes: [at(30 * HOUR)] }, now, 0).due, 'a success outside the window still gated');
+
+  const idle = 2 * HOUR / 1000;
+  ok(due({ ...tick, when: 'active' }, { enabled: true }, now, 60).due, 'when: active refused while the user was here');
+  ok(!due({ ...tick, when: 'active' }, { enabled: true }, now, idle).due, 'when: active ran on an idle machine');
+  ok(due({ ...tick, when: 'idle' }, { enabled: true }, now, idle).due, 'when: idle refused on an idle machine');
+});
+
+await check('the daemon contract is the exit code plus one optional JSON line', async () => {
+  const ok0 = verdict(0, 'working\nposted\n');
+  ok(ok0.status === 'ok' && ok0.summary === 'posted', `a plain run read as ${JSON.stringify(ok0)}`);
+  const skipped = verdict(0, '{"skip":"nothing to reply to"}\n');
+  ok(skipped.status === 'skip' && skipped.summary === 'nothing to reply to', `a skip read as ${JSON.stringify(skipped)}`);
+  const summarised = verdict(0, 'noise\n{"summary":"posted 2/3"}\n');
+  ok(summarised.status === 'ok' && summarised.summary === 'posted 2/3', `a summary read as ${JSON.stringify(summarised)}`);
+  const failed = verdict(1, '{"summary":"post: 403"}\n');
+  ok(failed.status === 'fail' && failed.summary === 'post: 403', `a failure read as ${JSON.stringify(failed)}`);
+  ok(verdict(0, '{oops}').summary === '{oops}', 'a line that only looks like JSON was not the summary');
+  ok(verdict(0, 'x'.repeat(200)).summary.length === 80, `a long last line clipped to ${verdict(0, 'x'.repeat(200)).summary.length}`);
+});
+
+await check('a log line reads back the way a terminal would have shown it', async () => {
+  const colour = plainLine('\x1b[32m✓\x1b[0m built in 412ms');
+  ok(colour === '✓ built in 412ms', `a coloured line read back as ${JSON.stringify(colour)}`);
+
+  // A progress line rewritten in place: only what followed the last carriage return was on screen.
+  const progress = plainLine('transforming (12)\rtransforming (48)\r\x1b[2Ktransforming (301)');
+  ok(progress === 'transforming (301)', `a rewritten line read back as ${JSON.stringify(progress)}`);
+
+  const titled = plainLine('\x1b]0;vite dev\x07VITE v5.4.2  ready in 300 ms');
+  ok(titled === 'VITE v5.4.2  ready in 300 ms', `a line setting the window title read back as ${JSON.stringify(titled)}`);
+
+  const header = plainLine('── 2026-09-09T08:00:00.000Z run');
+  ok(header === '── 2026-09-09T08:00:00.000Z run', `the run header came back as ${JSON.stringify(header)}`);
+});
+
+await check('daemon enablement is one line in the machine config, default off, and off wins', async () => {
+  await withConfig(BASE_CONFIG, async () => {
+    ok(!(await enabledOf('bots/api')), 'a key nobody enabled read as on');
+
+    await writeDaemonEnabled('bots/api', 'on');
+    await writeDaemonEnabled('bots/cws-reviews', 'on');
+    await writeDaemonEnabled('bots/api', 'off');
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text.startsWith(BASE_CONFIG), `the rewrite moved what was already there: ${JSON.stringify(text)}`);
+    ok(text.endsWith('daemons:\n  bots/api: "off"\n  bots/cws-reviews: "on"\n'), `the block reads ${JSON.stringify(text)}`);
+    ok((await enabledOf('bots/cws-reviews')) && !(await enabledOf('bots/api')), 'the block did not read back');
+
+    resetConfig();
+    ok((await loadConfig()).daemons?.['bots/api'] === 'off', `loadConfig read ${JSON.stringify((await loadConfig()).daemons)}`);
+
+    const { rows, errors } = await listRows();
+    ok(rows.find((r) => r.key === 'bots/cws-reviews')?.state.enabled === true, 'an on row did not mirror the config');
+    ok(rows.find((r) => r.key === 'bots/api')?.state.enabled === false, 'an off row listed as enabled, over its manifest');
+    ok(!rows.some((r) => r.key.startsWith('bots-bad/')) && (errors['bots-bad'] ?? '') !== '', `a broken manifest listed ${JSON.stringify(errors)}`);
+  });
+});
+
+// ── the supervisor, on the scratch HOME and one scratch project ──────────────
+
+const PIDFILE = path.join(process.env.HOME!, '.factory', 'supervisor', 'pid');
+const runner = await repo('runner');
+await mkdir(path.join(runner, '.factory'), { recursive: true });
+await writeFile(path.join(runner, '.factory', 'daemons.yaml'),
+  'tick:\n  kind: daemon\n  cmd: echo \'{"summary":"hi"}\'\n  every: 1s\n  when: any\n' +
+  'sleep:\n  kind: service\n  cmd: "echo up; sleep 30"\n  restart: never\n' +
+  'boom:\n  kind: daemon\n  cmd: "echo trouble; exit 1"\n  every: 1h\n' +
+  'slow:\n  kind: daemon\n  cmd: sleep 30\n  every: 1h\n  timeout: 1s\n' +
+  'flap:\n  kind: service\n  cmd: "echo nope; exit 3"\n  restart: on-failure\n' +
+  'quit:\n  kind: service\n  cmd: "exit 0"\n  restart: never\n' +
+  'stream:\n  kind: daemon\n  cmd: echo first; sleep 2; echo \'{"summary":"done"}\'\n  every: 1h\n');
+
+/** The supervisor is a second process: a case says what it is waiting for, not how long. */
+async function until(what: string, ready: () => Promise<boolean>, ms = 8000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (await ready()) return;
+    await Bun.sleep(100);
+  }
+  throw new Error(what);
+}
+
+const pgidOf = async (pid: number): Promise<number> => {
+  const proc = Bun.spawn(['ps', '-o', 'pgid=', '-p', String(pid)], { stdout: 'pipe', stderr: 'ignore' });
+  return Number((await new Response(proc.stdout).text()).trim());
+};
+
+try {
+  await check('one supervisor per machine: a second start refuses and a stale pid file is not one', async () => {
+    const pid = await startSupervisor();
+    ok(alive(pid), `the supervisor it started (${pid}) is not alive`);
+
+    const second = await startSupervisor().then(() => null, (e: Error) => e);
+    ok(second?.message.includes(String(pid)), `a second start said ${second?.message ?? 'nothing'}`);
+
+    await stopSupervisor();
+    ok(!(await exists(PIDFILE)), 'the pid file outlived the supervisor');
+    await writeFile(PIDFILE, '999999\n');
+    ok((await supervisorPid()) === null && !(await exists(PIDFILE)), 'a stale pid file read as a live supervisor');
+    ok((await startSupervisor()) > 0, 'a stale pid file blocked the next start');
+  });
+
+  await check('a due daemon runs through the login shell and files its pid, verdict and next', async () => {
+    await setEnabled('runner/tick', true);
+    await until('the tick daemon never ran', async () => (await readRow('runner/tick')).lastStatus !== undefined);
+
+    const state = await readRow('runner/tick');
+    ok(state.lastStatus === 'ok' && state.lastSummary === 'hi', `the run filed ${JSON.stringify(state)}`);
+    ok(state.pid === undefined && !!state.lastStart && !!state.lastEnd && !!state.nextDue, `a finished run left ${JSON.stringify(state)}`);
+    ok((state.successes ?? []).length > 0, 'an ok run pushed no success');
+
+    const log = await readLogTail('runner/tick', 10);
+    ok(log.some((l) => / run echo /.test(l)) && log.includes('{"summary":"hi"}'), `the log holds ${JSON.stringify(log)}`);
+  });
+
+  await check('a service runs in its own process group, and a stop holds wanted down', async () => {
+    await setEnabled('runner/sleep', true);
+    await until('the service never started', async () => (await readRow('runner/sleep')).pid !== undefined);
+
+    const pid = (await readRow('runner/sleep')).pid!;
+    ok(alive(pid), `the service pid ${pid} is not alive`);
+    ok((await pgidOf(pid)) === pid, `the service is not its own group leader: pgid ${await pgidOf(pid)} for pid ${pid}`);
+    await until('the service wrote no log', async () => (await readLogTail('runner/sleep', 5)).includes('up'));
+
+    await stopRow('runner/sleep');
+    await until('the service outlived its stop', async () => !alive(pid) && (await readRow('runner/sleep')).pid === undefined);
+    ok((await readRow('runner/sleep')).wanted === false, 'a stopped service is still wanted');
+  });
+
+  await check('a failed run alerts, a timeout kills the group, and reading the log acknowledges', async () => {
+    const off = await runNow('runner/boom').then(() => null, (e: Error) => e);
+    ok(off?.message.includes('is off'), `a run on an off row said ${off?.message ?? 'nothing'}`);
+
+    await setEnabled('runner/boom', true);
+    await runNow('runner/boom');
+    await until('the failed run raised no alert', async () => (await readRow('runner/boom')).alert !== undefined);
+    ok((await readRow('runner/boom')).lastSummary === 'trouble', `the failure filed ${JSON.stringify(await readRow('runner/boom'))}`);
+    await readLog('runner/boom', 5);
+    ok((await readRow('runner/boom')).alert === undefined, 'reading the log did not clear the alert');
+
+    await setEnabled('runner/slow', true);
+    await runNow('runner/slow');
+    await until('the slow run never started', async () => (await readRow('runner/slow')).pid !== undefined);
+    const pid = (await readRow('runner/slow')).pid!;
+    await until('the timeout never fired', async () => (await readRow('runner/slow')).lastStatus === 'fail');
+    ok((await readRow('runner/slow')).lastSummary === 'timeout', `the timed-out run filed ${JSON.stringify(await readRow('runner/slow'))}`);
+    ok(!alive(pid), `the timed-out run left its group alive at ${pid}`);
+  });
+
+  await check('a service that ended on its own is an inbox row, whatever its exit code', async () => {
+    await setEnabled('runner/quit', true);
+    await until('a service that exited on its own was never noticed', async () => (await readRow('runner/quit')).alert !== undefined);
+
+    const state = await readRow('runner/quit');
+    ok(state.alert === 'died 0', `a service that exited 0 unasked filed ${JSON.stringify(state.alert)}`);
+    ok(state.wanted === false && state.pid === undefined, `a service that died is still ${JSON.stringify(state)}`);
+  });
+
+  await check('a daemon writes its output to the log while the run is still in flight', async () => {
+    await setEnabled('runner/stream', true);
+    await runNow('runner/stream');
+    await until('the first line only reached the log when the run ended', async () => {
+      const state = await readRow('runner/stream');
+      return state.pid !== undefined && (await readLogTail('runner/stream', 20)).includes('first');
+    });
+
+    await until('the streaming run never finished', async () => (await readRow('runner/stream')).lastStatus !== undefined);
+    const done = await readRow('runner/stream');
+    ok(done.lastStatus === 'ok' && done.lastSummary === 'done', `the streamed run filed ${JSON.stringify(done)}`);
+  });
+
+  await check('a service that keeps dying backs off and gives up after five restarts', async () => {
+    const now = Date.now();
+    await writeRow('runner/flap', { enabled: false, wanted: true, restarts: [1, 2, 3, 4, 5].map((i) => new Date(now - i * 30_000).toISOString()) });
+    await setEnabled('runner/flap', true);
+
+    await until('the flapping service never gave up', async () => (await readRow('runner/flap')).alert !== undefined);
+    const state = await readRow('runner/flap');
+    ok(state.alert === 'gave up after 5 restarts', `it gave up with ${JSON.stringify(state.alert)}`);
+    ok(state.wanted === false && state.pid === undefined, `a service that gave up is still ${JSON.stringify(state)}`);
+  });
+
+  await check('a supervisor restart leaves a wanted service alive and re-adopts its pid', async () => {
+    await runNow('runner/sleep');
+    await until('the service never came back', async () => (await readRow('runner/sleep')).pid !== undefined);
+    const pid = (await readRow('runner/sleep')).pid!;
+
+    await stopSupervisor();
+    ok(!(await exists(PIDFILE)), 'the pid file outlived the supervisor');
+    ok(alive(pid), 'stopping the supervisor took its service with it');
+
+    await startSupervisor();
+    await until('the service was never re-adopted', async () => (await readRow('runner/sleep')).pid === pid);
+    ok(alive(pid), 'the re-adopted service is not the one that was running');
+  });
+} finally {
+  // Nothing this walk started may outlive it: the supervisor first, then every group it spawned.
+  const pid = Number(await Bun.file(PIDFILE).text().catch(() => ''));
+  if (pid > 0) try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+  await unlink(PIDFILE).catch(() => {});
+  for (const row of (await listRows()).rows) {
+    const child = row.state.pid;
+    if (child) try { process.kill(-child, 'SIGKILL'); } catch { /* already gone */ }
+  }
+  await writeFile(CONFIG, BASE_CONFIG);
+  resetConfig();
+}
 
 await check('a config YAML cannot read is no config at all, and says so once', async () => {
   await withConfig('parts: {commit: project\nvars:\n  a: b\n', async () => {

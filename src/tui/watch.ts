@@ -19,6 +19,9 @@ function watched(snap: Snapshot): [dir: string, recursive: boolean][] {
   return [
     [path.join(factoryHome(), 'events'), false],
     [path.join(factoryHome(), 'caffeinate'), false],
+    // A daemon's state.json sits two folders down, one per row; the supervisor's pid file is flat.
+    [path.join(factoryHome(), 'daemons'), true],
+    [path.join(factoryHome(), 'supervisor'), false],
     ...snap.projects.map((p): [string, boolean] => [path.join(p.path, '.factory', 'missions'), true]),
     ...openTranscripts().map((file): [string, boolean] => [file, false]),
   ];

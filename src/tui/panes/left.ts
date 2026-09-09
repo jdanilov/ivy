@@ -1,7 +1,8 @@
 import { C, GLYPH, SESSION, stateColor } from '../theme.js';
 import { ago, dur, id, spread, type Cell } from '../format.js';
+import { rowTail } from '../../commands/daemon.js';
 import { marker, type LeftItem, type Pane, type Ui } from './pane.js';
-import type { Mission, Session, Snapshot } from '../model.js';
+import type { DaemonRow, Mission, Session, Snapshot } from '../model.js';
 
 /** The left column: the Inbox, the user's own parts, then every project with its missions and sessions. */
 
@@ -37,6 +38,25 @@ function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): v
   ], selected && focused);
 }
 
+/** Dim while it is off, warning once something failed, accent while it runs: the colour is the
+ *  state, the glyph the kind — the same reading `factory daemon list` gives the same row. */
+function daemonColor(row: DaemonRow): string {
+  const s = row.state;
+  if (!s.enabled) return C.dim;
+  if (s.alert !== undefined || s.lastStatus === 'fail') return C.warning;
+  return s.pid === undefined ? C.bright : C.accent;
+}
+
+/** A daemon sits in the project's list beside its missions: the kind in the glyph, what it does
+ *  and what it last did in the tail — `rowTail` is the CLI's, so neither surface drifts. */
+function daemonRow(p: Pane, row: DaemonRow, selected: boolean, focused: boolean): void {
+  const color = daemonColor(row);
+  p.row([
+    marker(selected, focused), [' ', C.dim], [`${row.entry.kind === 'daemon' ? '↻' : '▶'} `, color],
+    [row.entry.name, color], [`  ${rowTail(row)}`, C.dim],
+  ], selected && focused);
+}
+
 export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): void {
   const hidden = ui.showArchived
     ? 0 : snap.projects.reduce((n, project) => n + project.missions.filter((m) => m.archived).length, 0);
@@ -48,6 +68,7 @@ export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): vo
     const selected = i === ui.left;
     if (item.kind === 'mission') return missionRow(p, item.mission, selected, focused);
     if (item.kind === 'session') return sessionRow(p, item.session, selected, focused);
+    if (item.kind === 'daemon') return daemonRow(p, item.daemon, selected, focused);
     const open = snap.inbox.length;
     if (i > 1) p.row([]); // a blank line between the Inbox, the global row and each project
     const head: Cell[] = item.kind === 'inbox'
@@ -56,8 +77,14 @@ export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui): vo
     p.row([marker(selected, focused), ...head], selected && focused);
     // Nothing under a heading reads as a screen that failed to load: the hint names the way out,
     // indented where the row it stands in for would be. A session row is something under it.
-    if (item.kind === 'project' && item.project.missions.length === 0 && item.project.sessions.length === 0) {
+    const empty = item.kind === 'project'
+      && item.project.missions.length === 0 && item.project.sessions.length === 0 && item.project.daemons.length === 0;
+    if (empty) {
       p.row([['   no missions · create one with M', C.dim]]);
+    }
+    // A manifest nobody can read costs the project its daemons and nothing else: one line, no rows.
+    if (item.kind === 'project' && item.project.daemonError) {
+      p.row([[`   daemons.yaml: ${item.project.daemonError}`, C.dim]]);
     }
   });
   if (snap.projects.length === 0) {

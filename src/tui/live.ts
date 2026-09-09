@@ -4,6 +4,8 @@ import { existingProjects, factoryHome, home } from '../core/projects.js';
 import { loadConfig, readCaffeinate, readLaunch } from '../core/config.js';
 import { isBackground } from '../core/spawn.js';
 import { readDecisions, type Decision } from '../core/decision.js';
+import { listRows, type Row } from '../core/daemons.js';
+import { supervisorPid } from '../core/supervisor.js';
 import { stepRole } from '../core/workflow.js';
 import { git, listArchived, listMissions, missionRowState, missionWorkflow, sessionLive, trunkBranch } from '../core/mission.js';
 import { readIntent } from '../core/intent.js';
@@ -203,6 +205,16 @@ async function waitItems(project: string, m: CoreMission, decisions: Decision[])
     });
   }
   return items;
+}
+
+/** A failed run or a service that died on its own. `factory daemon log` is what clears the alert,
+ *  so it is the command the row names and the reason the row goes. */
+function alertItem(project: string, row: Row): InboxItem {
+  return {
+    kind: 'daemon', project, origin: row.entry.name, label: 'alert',
+    at: Date.parse(row.state.lastEnd ?? row.state.startedAt ?? '') || Date.now(),
+    answer: `factory daemon log ${row.key}`, text: row.state.alert ?? '',
+  };
 }
 
 function question(project: string, origin: string, tab: string, text: string, at: number): InboxItem {
@@ -429,6 +441,8 @@ export async function buildSnapshot(): Promise<Snapshot> {
   const order = (await loadConfig()).order ?? {};
   const dirs = ordered(await projectDirs(), order.projects, (d) => path.basename(d.dir));
   const events = await readEvents();
+  // Every row on the machine at once: the manifests are read per project, the states per row.
+  const { rows: daemonRows, errors: daemonErrors } = await listRows();
   const found = new Map<string, [mission: CoreMission, archived: boolean][]>();
   for (const { dir } of dirs) {
     const live = await listMissions(dir).catch(() => []);
@@ -457,8 +471,12 @@ export async function buildSnapshot(): Promise<Snapshot> {
       if (!(await sessionLive(ev.session))) continue;
       sessions.push(await sessionRow(ctx, name, ev));
     }
+    const daemons = daemonRows.filter((row) => row.project === dir);
+    for (const row of daemons) if (row.state.alert !== undefined) ctx.inbox.push(alertItem(name, row));
+
     projects.push({
-      name, path: dir, parts: await parts(dir),
+      name, path: dir, parts: await parts(dir), daemons,
+      ...(daemonErrors[name] ? { daemonError: daemonErrors[name] } : {}),
       missions: ordered(missions, order[`${name}/missions`], (m) => m.name),
       sessions: ordered(sessions, order[`${name}/sessions`], (s) => s.id),
     });
@@ -466,5 +484,8 @@ export async function buildSnapshot(): Promise<Snapshot> {
 
   ctx.inbox.sort((a, b) => a.at - b.at);
   ctx.activity.sort((a, b) => a.at - b.at);
-  return { projects, global: await globalParts(), inbox: ctx.inbox, activity: ctx.activity, caffeinate: await readCaffeinate(), launch: await readLaunch() };
+  return {
+    projects, global: await globalParts(), inbox: ctx.inbox, activity: ctx.activity,
+    caffeinate: await readCaffeinate(), launch: await readLaunch(), supervisor: await supervisorPid(),
+  };
 }

@@ -19,6 +19,11 @@ recipes:
       # goal guard writes a mission into `.factory/missions/` here and fails after the write.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' m type:x C-s --expect 'goal is empty'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/recall' o --expect 'no goal'
+      # The daemon rows: `↵` opens the DAEMON pane, `l` gives the log the pane, `Esc` goes back.
+      # `space` writes nothing here — the fixture's rows are in no project's manifest, so the CLI
+      # verb behind the key refuses, and the refusal is the assertion. It is given room to land.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/cws-reviews' return escape l escape --expect 'LOG'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'ivy/api' space --expect 'no daemon'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

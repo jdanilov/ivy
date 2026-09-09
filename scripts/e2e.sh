@@ -130,6 +130,16 @@ f uninstall "$REPO" --yes
 [ ! -e "$REPO/.claude/settings.json" ] || die 'uninstall left an empty settings.json'
 [ ! -e "$REPO/.claude/.factory-manifest.json" ] || die 'uninstall left the manifest'
 
+# The machine's own commands: every registered project at once, no positional and no picker. The
+# supervisor is never started here — a black-box run must leave no process behind.
+printf 'tick:\n  kind: daemon\n  cmd: "true"\n  every: 1h\n' > "$REPO/.factory/daemons.yaml"
+says "$REPO" daemon list | grep -q 'repo/tick' || die 'daemon list does not show the manifest row'
+says "$REPO" daemon list | grep -q 'supervisor not running' || die 'daemon list does not head with the missing supervisor'
+says "$REPO" supervisor status | grep -q 'not running' || die 'supervisor status does not say it is not running'
+says "$REPO" supervisor status | grep -q 'not installed' || die 'supervisor status does not say the unit is not installed'
+refuses "$REPO" 'is off' daemon run repo/tick
+rm "$REPO/.factory/daemons.yaml"
+
 # The user's own parts: home dir, one settings.json for hooks and allow list, no project involved.
 fin "$TMP" install --global --yes
 [ -f "$HOME/.claude/skills/commit/skill.md" ] || die 'install --global left no file'

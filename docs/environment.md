@@ -43,6 +43,14 @@ A Claude release that renames one of these breaks three files quietly. Nothing c
 | `open <uri>`, `open -Ra Warp`, `/Applications/Warp.app` | @src/core/spawn.ts:148       | ◈ never true         |
 | `ps -o ppid=,comm=`, `nohup`, `/bin/sh` | @parts/hook-factory/hook-factory.ts:124      | POSIX only           |
 | `process.kill`, Unix domain sockets     | @src/tui/actions.ts:75, @src/core/peer.ts    | POSIX only           |
+| `ioreg -c IOHIDSystem` for idle time    | @src/core/platform.ts:24                     | ○ `xprintidle`, else `loginctl IdleSinceHint` |
+| `launchctl bootstrap`, `bootout`, the user agent plist | @src/core/platform.ts:47, @src/commands/supervisor.ts:70 | ○ `systemctl --user enable --now` on a `systemd --user` unit |
+
+The last two are the daemons' adapters, and the only two the Factory already shims: `idleSeconds()`
+and `unitFile()` in `src/core/platform.ts`, called by the supervisor's loop and by `supervisor
+install` and `uninstall`, which are the one place the OS scheduler is touched. An OS with neither
+idle tool reads 0 — always active, so `when: active` never blocks a run — and one with no unit
+adapter refuses `supervisor install` with a line, leaving `factory supervisor start` by hand.
 
 ### ○ Warp
 
@@ -80,8 +88,9 @@ Claude, and every hook errors. `install` never checks.
 
 ## Levers, highest gain per effort first
 
-1. **Platform shim, one module.** `src/core/platform.ts` owning `keepAwake()`, `playSound()`,
-   `openUri()`, `parentCommand(pid)`. mac → `caffeinate` / `afplay` / `open`; linux →
+1. **Platform shim, one module.** `src/core/platform.ts` exists, with the daemons' `idleSeconds()`
+   and `unitFile()`; the lever is `keepAwake()`, `playSound()`, `openUri()` and `parentCommand(pid)`
+   moving in beside them. mac → `caffeinate` / `afplay` / `open`; linux →
    `systemd-inhibit` / `paplay` or `aplay` / `xdg-open`; unknown → no-op, logged once. Every
    `darwin` assumption leaves the callers. Half a day.
 2. **Terminal adapter instead of Warp.** `launch:` already exists in `~/.factory/config.yaml`;

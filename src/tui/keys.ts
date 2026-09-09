@@ -2,13 +2,15 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, openTab, renameSession, saveIntent, sendMessage, setAutonomy, setCaffeinate, setLaunch,
+  applyParts, applyScopes, archive, killSession, openTab, readLog, renameSession, runNow, saveIntent,
+  sendMessage, setAutonomy, setCaffeinate, setEnabled, setLaunch, stopRow,
 } from './actions.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
+import { LOG_LINES, seedTail } from './panes/daemon.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
 import { AUTONOMY, AUTONOMY_FIELD, FIELDS, SHAPES, SHAPE_FIELD, draftFor, formOf, shapeOf, showsParts, untouched, workflowOf, type Form } from './panes/form.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
@@ -240,7 +242,11 @@ function handleKey(app: App, key: KeyEvent): void {
       if (key.shift && !right) return moveRow(app, here, d);
       if (inMessages) ui.msg = move(ui.msg, snap.inbox.length, d);
       else if (inParts) ui.part = move(ui.part, here.project.parts.length, d);
-      else ui.left = move(ui.left, items.length, d);
+      else {
+        // The log view belongs to the row it was opened on, and the selection is leaving it.
+        ui.daemonLog = false;
+        ui.left = move(ui.left, items.length, d);
+      }
       break;
     }
     case 'right':
@@ -249,14 +255,22 @@ function handleKey(app: App, key: KeyEvent): void {
       ui.focus = 'right';
       break;
     case 'left':
+      ui.daemonLog = false;
       ui.focus = 'left';
       break;
     case 'escape':
       // Esc is the way out of a set of toggles nobody applied; a second one leaves the pane.
       if (inParts && pending(here.project, ui, inGlobal).length > 0) ui.toggles = {};
-      else ui.focus = 'left';
+      else {
+        ui.daemonLog = false;
+        ui.focus = 'left';
+      }
       break;
     case 'space':
+      if (here.kind === 'daemon') {
+        const { key, state } = here.daemon;
+        return act(app, `${key} ${state.enabled ? 'off' : 'on'}…`, () => setEnabled(key, !state.enabled));
+      }
       if (inParts) {
         const part = here.project.parts[ui.part];
         // The global row picks where a part lives, a project row whether it is installed here.
@@ -320,6 +334,13 @@ function handleKey(app: App, key: KeyEvent): void {
       return act(app, `caffeinate ${mode.toUpperCase()}…`, () => setCaffeinate(mode));
     }
     case 'l': {
+      // On a daemon row `l` is the Log and Launch is not pressed: the key bar there says so.
+      if (here.kind === 'daemon') {
+        ui.daemonLog = true;
+        ui.focus = 'right';
+        showLog(app, here.daemon.key);
+        break;
+      }
       snap.launch = LAUNCH[(LAUNCH.indexOf(snap.launch) + 1) % LAUNCH.length]!;
       const mode = snap.launch;
       return act(app, `launch ${mode.toUpperCase()}…`, () => setLaunch(mode));
@@ -332,6 +353,11 @@ function handleKey(app: App, key: KeyEvent): void {
       if (here.mission.status === 'stub' && !here.mission.intent?.goal) return toast(app, `${here.mission.name} has no goal — ↵ fills the intent`);
       return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
     case 'r': {
+      // A daemon is run now, a service is started: `runNow` refuses an off row with its cure.
+      if (here.kind === 'daemon') {
+        const { key, entry } = here.daemon;
+        return act(app, `${key} ${entry.kind === 'daemon' ? 'run' : 'start'}…`, () => runNow(key));
+      }
       // In Parts the toggles are what `r` resets; on a row it is the name.
       if (inParts) {
         ui.toggles = {};
@@ -355,6 +381,9 @@ function handleKey(app: App, key: KeyEvent): void {
       draftFor(ui, items[ui.left]!).field = 0;
       break;
     }
+    case 'x':
+      if (here.kind !== 'daemon') return toast(app, 'select a daemon or a service to stop it');
+      return act(app, `${here.daemon.key} stop…`, () => stopRow(here.daemon.key));
     case 'k': {
       if (right) break;
       const session = here.kind === 'mission' ? here.mission.session : here.kind === 'session' ? here.session.id : null;
@@ -365,6 +394,18 @@ function handleKey(app: App, key: KeyEvent): void {
       return;
   }
   draw(app);
+}
+
+/**
+ * `l`'s CLI twin is `factory daemon log`: the same call, once, as the view opens — which is what
+ * acknowledges an alert and drops its Inbox row. The view is opened first and the refusal is
+ * swallowed, because only a fixture row can refuse: a live one came from `listRows`.
+ */
+function showLog(app: App, key: string): void {
+  void readLog(key, LOG_LINES).then((lines) => {
+    seedTail(key, lines);
+    draw(app);
+  }, () => {});
 }
 
 /** A key must never take the screen down: the toast says what broke, the log says where. */

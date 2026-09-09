@@ -107,29 +107,27 @@ export function composeHeight(ui: Ui, here: LeftItem, width: number): number {
 }
 
 /**
- * A draft's text as rows, at most `max` of them, wrapped at the width the caller edits it at. The
- * cursor's row stays in view — the last rows up to it, never the first ones — and carries the
- * cursor while the keys are the draft's; a draft nobody is typing into draws dim and whole.
- * The intent form draws its fields through this too: one editor, one wrap, one cursor.
+ * A draft's text as rows, at most `max` of them, wrapped at the width the caller edits it at, and
+ * which of them the cursor is on. The box keeps the cursor in view itself — the last rows up to
+ * it, never the first ones; the intent form asks for every row instead and scrolls the pane
+ * around `at`. The cursor is drawn while the keys are the draft's; a draft nobody is typing into
+ * draws dim and whole. One editor, one wrap, one cursor, for both.
  */
-export function draftRows(p: Pane, d: Draft, width: number, active: boolean, max: number): void {
+export function draftCells(d: Draft, width: number, active: boolean, max: number): { rows: Cell[][]; at: number } {
   const all = rows(d.text, width);
-  const at = rowOf(all, d.cursor);
-  const from = Math.max(0, at - max + 1);
-  for (const [i, row] of all.slice(from, from + max).entries()) {
+  const cursor = rowOf(all, d.cursor);
+  const from = Math.max(0, cursor - max + 1);
+  const out = all.slice(from, from + max).map((row, i): Cell[] => {
     const text = d.text.slice(row.start, row.end);
-    if (!active || from + i !== at) {
-      p.row([[text, active ? C.bright : C.dim]]);
-      continue;
-    }
+    if (!active || from + i !== cursor) return [[text, active ? C.bright : C.dim]];
     const col = d.cursor - row.start;
-    const cells: Cell[] = [[text.slice(0, col), C.bright], [text[col] ?? ' ', C.bright, true], [text.slice(col + 1), C.bright]];
-    p.row(cells);
-  }
+    return [[text.slice(0, col), C.bright], [text[col] ?? ' ', C.bright, true], [text.slice(col + 1), C.bright]];
+  });
+  return { rows: out, at: cursor - from };
 }
 
 export function composePane(p: Pane, ui: Ui, here: LeftItem): void {
   if (!targetOf(here)) return;
   p.rule();
-  draftRows(p, draftOf(ui, here), p.width, ui.compose, MAX_ROWS);
+  for (const cells of draftCells(draftOf(ui, here), p.width, ui.compose, MAX_ROWS).rows) p.row(cells);
 }

@@ -1,9 +1,11 @@
 import { C } from '../theme.js';
-import { clock, len, spread, wrap, type Cell } from '../format.js';
+import { clock, len, spans, spread, wrap, wrapCells, type Cell } from '../format.js';
+import { readLogTail } from '../../core/daemons.js';
 import { itemKey, type LeftItem, type Pane, type Ui } from './pane.js';
-import type { Activity, Decision, Mission, Project, Snapshot } from '../model.js';
+import type { Activity, DaemonRow, Decision, Mission, Project, Snapshot } from '../model.js';
 
-/** The pane along the foot: the activity of whatever is selected's sessions, or its decisions. */
+/** The pane along the foot: the activity of whatever is selected's sessions, its decisions, or —
+ *  on a daemon or a service row, which has no session and so no activity — the tail of its log. */
 
 const VERB: Record<Activity['verb'], string> = {
   user: C.error, bash: C.dim, edit: C.success, read: C.dim, sub: C.agent, agent: C.bright, ask: C.warning,
@@ -41,12 +43,14 @@ function gap(ms: number): string {
 }
 
 /** The two panes name each other: the foot is a pair of tabs, and `A` and `D` are how they switch.
- *  Each carries what came in since it was last open, so the hidden one says whether to look. */
-function tabs(ui: Ui, counts: Record<Ui['foot'], number>): Cell[] {
+ *  Each carries what came in since it was last open, so the hidden one says whether to look.
+ *  On a daemon row the first tab is that row's log, whose word does not start with its key, so
+ *  the key stands before it: the bright first letter is always the key that opens the tab. */
+function tabs(ui: Ui, counts: Record<Ui['foot'], number>, log: boolean): Cell[] {
   const tab = (name: Ui['foot']): Cell[] => {
     const fresh = counts[name] - ui.seen[name];
-    // The first letter is the key that opens the tab, drawn bright as the key bar draws a key.
-    return [[name[0]!.toUpperCase(), C.bright], [name.slice(1).toUpperCase(), ui.foot === name ? C.bright : C.dim],
+    const word = log && name === 'activity' ? 'A LOG' : name.toUpperCase();
+    return [[word[0]!, C.bright], [word.slice(1), ui.foot === name ? C.bright : C.dim],
       ...(fresh > 0 ? ([[` +${fresh}`, C.warning]] as Cell[]) : [])];
   };
   return [...tab('activity'), ['  ', C.dim], ...tab('decisions')];
@@ -67,7 +71,7 @@ function markSeen(ui: Ui, here: LeftItem, counts: Record<Ui['foot'], number>): v
  *  walk back through them while the foot is full. The clamp lives here because only this knows
  *  the room, and the pad below keeps the rule under the pane on its own row. */
 function visible<T>(rows: T[], room: number, ui: Ui): T[] {
-  ui.scroll = ui.full ? Math.max(0, Math.min(ui.scroll, rows.length - room)) : 0;
+  ui.scroll = ui.size === 'full' ? Math.max(0, Math.min(ui.scroll, rows.length - room)) : 0;
   const end = rows.length - ui.scroll;
   return rows.slice(Math.max(0, end - room), end);
 }
@@ -127,7 +131,7 @@ function decisionsPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui
   const waiting = rows.filter(([, d]) => d.status === 'waiting').length;
   const many = missionsOf(snap, here).length > 1;
 
-  p.row(spread(tabs(ui, counts), [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
+  p.row(spread(tabs(ui, counts, here.kind === 'daemon'), [[waiting ? `${waiting} waiting  ` : '', C.warning], [`${rows.length}`, C.dim]], p.width));
   p.rule();
   // A wrapped row is more lines than rows, so the scroll and the room are counted in lines.
   const lines = rows.flatMap(([name, d]) => decisionLines(many ? name : null, d, p.width));
@@ -161,8 +165,9 @@ function subCells(text: string): Cell[] {
 }
 
 /** A `code` span in prose is a name the reader can go open: drawn blue, the backticks dropped. A
- *  span cut by the wrap carries into the next line through `open`; a new source line closes it. */
-function spans(line: string, tone: string, open: boolean): { cells: Cell[]; open: boolean } {
+ *  span cut by the wrap carries into the next line through `open`; a new source line closes it.
+ *  Backticks, not the log's own escapes, which are `format.ts`'s `spans`. */
+function codeSpans(line: string, tone: string, open: boolean): { cells: Cell[]; open: boolean } {
   const cells: Cell[] = [];
   for (const part of line.split('`')) {
     if (part !== '') cells.push([part, open ? C.agent : tone]);
@@ -182,7 +187,7 @@ function prose(text: string, room: number, tone: string, full: boolean): Cell[][
     if (full && source.trim() === '') { if (out.at(-1)?.length !== 0) out.push([]); continue; }
     open = false;
     for (const line of wrap(source, room, full ? WHOLE_ROWS - out.length : ACTIVITY_ROWS)) {
-      const next = spans(line, tone, open);
+      const next = codeSpans(line, tone, open);
       out.push(next.cells);
       open = next.open;
     }
@@ -212,7 +217,7 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
   const owners = sessionsOf(snap, here);
   const rows = activityRows(snap, owners);
 
-  p.row(spread(tabs(ui, counts), [[`${rows.length}`, C.dim]], p.width));
+  p.row(spread(tabs(ui, counts, false), [[`${rows.length}`, C.dim]], p.width));
   p.rule();
   // The scroll walks lines, not rows: a wrapped row is two of them. The gap on a tooling row is
   // measured from the last word of its own session, so merged logs do not time each other, and
@@ -230,12 +235,73 @@ function activityPane(p: Pane, snap: Snapshot, here: LeftItem, room: number, ui:
   pad(p, shown.length, room);
 }
 
-/** The pane along the foot, whichever one `A` and `D` last chose, ACTIVITY to begin with; the same key again gives it the whole screen. */
+// ── the log of a daemon row ────────────────────────────────────────────
+
+/** What the foot can draw of a log: it fills the screen when the foot is full, and a tall
+ *  terminal holds more than a screenful of scrollback. The read costs the same either way —
+ *  `readLogTail` reads the last 64 KB whatever it is asked for. */
+const READ_LINES = 500;
+/** A long line wraps, but a stack trace must not push the newest lines off the pane. */
+const WRAP_ROWS = 2;
+
+const tails = new Map<string, string[]>();
+const reading = new Set<string>();
+
+/**
+ * The log from behind the frame: `render` is synchronous, so the read is started here and lands
+ * on a later frame — the screen redraws every second, so the tail is never more than that old.
+ */
+export function logTail(key: string, n: number): string[] {
+  if (!reading.has(key)) {
+    reading.add(key);
+    void readLogTail(key, READ_LINES)
+      .then((lines) => tails.set(key, lines))
+      .catch(() => tails.set(key, []))
+      .finally(() => reading.delete(key));
+  }
+  return (tails.get(key) ?? []).slice(-n);
+}
+
+/** What `A` already read on its way through the CLI's own `daemon log`: the first frame after the
+ *  key has the lines, and the refresh above takes over from there. It never shortens a tail that
+ *  is already longer — the ack reads thirty lines and the pane draws more than that. */
+export const seedTail = (key: string, lines: string[]): void => {
+  if ((tails.get(key) ?? []).length < lines.length) tails.set(key, lines);
+};
+
+/** The fixture has no `~/.factory/daemons/` behind it and carries the lines it wants shown. */
+const linesOf = (row: DaemonRow, n: number): string[] => (row.log ? row.log.slice(-n) : logTail(row.key, n));
+
+/** The tail as the terminal wrote it, colours and all, newest at the foot: what `factory daemon
+ *  log` prints, in the pane the same key acknowledged the row's alert from. */
+function logPane(p: Pane, lines: string[], room: number, ui: Ui, counts: Record<Ui['foot'], number>): void {
+  p.row(spread(tabs(ui, counts, true), [[`${lines.length}`, C.dim]], p.width));
+  p.rule();
+  const rows = lines.flatMap((l) => wrapCells(spans(l, C.dim), p.width, WRAP_ROWS));
+  const shown = visible(rows, room, ui);
+  for (const cells of shown) p.row(cells);
+  if (rows.length === 0) p.row([['nothing logged yet', C.dim]]);
+  pad(p, Math.max(shown.length, 1), room);
+}
+
+/**
+ * The pane along the foot, whichever one `A` and `D` last chose, ACTIVITY to begin with; the same
+ * key again gives it the whole screen, and once more leaves the tab row alone — a foot minimised
+ * is still the row that says whether anything came in.
+ */
 export function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
-  if (sep) p.rule();
+  // Minimised the foot is one line, its tab row: a rule over a single row is a second foot.
+  const min = ui.size === 'min';
+  if (sep && !min) p.rule();
+  const log = here.kind === 'daemon' ? linesOf(here.daemon, READ_LINES) : null;
   const room = Math.max(0, h - (sep ? 3 : 2));
-  const counts = { decisions: decisionRows(snap, here).length, activity: activityRows(snap, sessionsOf(snap, here)).length };
+  const counts = {
+    decisions: decisionRows(snap, here).length,
+    activity: log ? log.length : activityRows(snap, sessionsOf(snap, here)).length,
+  };
   markSeen(ui, here, counts);
-  if (ui.foot === 'activity') return activityPane(p, snap, here, room, ui, counts);
-  decisionsPane(p, snap, here, room, ui, counts);
+  if (min) return p.row(spread(tabs(ui, counts, log !== null), [[`${counts[ui.foot]}`, C.dim]], p.width));
+  if (ui.foot === 'decisions') return decisionsPane(p, snap, here, room, ui, counts);
+  if (log) return logPane(p, log, room, ui, counts);
+  activityPane(p, snap, here, room, ui, counts);
 }

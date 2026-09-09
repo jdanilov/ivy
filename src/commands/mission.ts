@@ -52,7 +52,7 @@ export async function mission(sub: string, args: string[], flags: Flags, cwd: st
 }
 
 async function create(name: string | undefined, flags: Flags, cwd: string): Promise<void> {
-  if (!name) throw new Refusal('mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree]');
+  if (!name) throw new Refusal('mission new <name> [--stub] [--session] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree]');
 
   const autonomy = autonomyOf(flags, 'partial');
 
@@ -74,7 +74,7 @@ async function create(name: string | undefined, flags: Flags, cwd: string): Prom
   const created = await createMission(cwd, {
     name,
     // Nobody knows the shape before the intent gate: `mission shape` appends a preset after it.
-    workflow: str(flags, 'workflow') ?? (flags.quick === true ? 'quick' : 'intent'),
+    workflow: str(flags, 'workflow') ?? (flags.session === true ? 'session' : 'intent'),
     autonomy,
     worktree,
     stub,

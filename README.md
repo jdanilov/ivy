@@ -91,7 +91,7 @@ Without `bun link`, every command here is `bun src/cli.ts <command>`, and `bun s
 ## How a mission runs
 
 ```
-◇ intent gate → ≋ spec.md + acceptance.md → ● implement → ↻ review → ⊘ merge gate → close
+◇ intent gate → ≋ spec.md + acceptance.md → ● implement ↻ check → ● review → ● fix → ⊘ merge gate → close
 ```
 
 Every mission starts unshaped: one gated `intent` step and nothing behind it. You write the goal,
@@ -100,11 +100,11 @@ shape <preset>` appends the rest of the graph.
 
 | Preset     | Steps after `intent`                                                                       |
 |------------|--------------------------------------------------------------------------------------------|
-| `story`    | research → spec → implement → review (verify ∥ validate, back to implement, max 3) → merge |
+| `story`    | research → plan → implement → check (loop to implement, max 8) → review (verify ∥ validate, once) → fix → merge |
 | `research` | investigate (sources ∥ transcripts) → report                                               |
 | `train`    | plan → implement → check (the Orchestrator's own review, max 8) → merge                    |
 | `chore`    | implement → merge; `--verify` adds a verify loop (max 2)                                   |
-| `--quick`  | one `work` step, no intent gate                                                            |
+| `--session`| one `work` step, no intent gate                                                            |
 
 The autonomy dial says which decisions stop for you. Gates reach you in every mode.
 

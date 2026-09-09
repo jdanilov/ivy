@@ -15,6 +15,9 @@ export interface FactoryConfig {
   /** How Mission Control lists things: `projects`, `<project>/missions`, `<project>/sessions`, each the
    *  names in the order the human moved them into. Whatever a list does not name follows it. */
   order?: Record<string, string[]>;
+  /** What a project is called on this machine, by its absolute path. A path with no entry here is
+   *  its folder's own name. */
+  names?: Record<string, string>;
 }
 
 const CHOICES: ScopeChoice[] = ['project', 'global', 'off'];
@@ -63,12 +66,13 @@ export async function loadConfig(): Promise<FactoryConfig> {
   const raw = parse(await file.text());
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return (cache = {});
 
-  const { vars, parts, daemons, order } = raw as Record<string, unknown>;
+  const { vars, parts, daemons, order, names } = raw as Record<string, unknown>;
   return (cache = {
     vars: pairs<string>(vars, (v) => typeof v === 'string'),
     parts: pairs<ScopeChoice>(parts, (v) => CHOICES.includes(v as ScopeChoice)),
     daemons: pairs<'on' | 'off'>(daemons, (v) => v === 'on' || v === 'off'),
     order: pairs<string[]>(order, (v) => Array.isArray(v) && v.every((s) => typeof s === 'string')),
+    names: pairs<string>(names, (v) => typeof v === 'string'),
   });
 }
 
@@ -89,6 +93,14 @@ export async function readDaemonEnabled(key: string): Promise<boolean> {
   const raw = await Bun.file(configPath()).text().catch(() => '');
   const daemons = raw === '' ? null : (parse(raw) as { daemons?: unknown } | null)?.daemons;
   return pairs<'on'>(daemons, (v) => v === 'on')?.[key] === 'on';
+}
+
+/** Fresh as well: a project is named on every rebuild, and Mission Control's `R` rewrites the
+ *  file underneath it. Undefined is "no entry", which is the folder's own name. */
+export async function readName(projectPath: string): Promise<string | undefined> {
+  const raw = await Bun.file(configPath()).text().catch(() => '');
+  const names = raw === '' ? null : (parse(raw) as { names?: unknown } | null)?.names;
+  return pairs<string>(names, (v) => typeof v === 'string')?.[projectPath];
 }
 
 export async function readLaunch(): Promise<Launch> {
@@ -126,6 +138,11 @@ export async function writeDaemonEnabled(key: string, mode: 'on' | 'off'): Promi
   await writeBlockEntry('daemons', key, mode);
 }
 
+/** The key is the project's absolute path — a plain YAML scalar, slashes and all. */
+export async function writeName(projectPath: string, name: string): Promise<void> {
+  await writeBlockEntry('names', projectPath, name);
+}
+
 /**
  * The same rule one level in: the entry's line under `parts:` or `daemons:` rewritten where it is,
  * or inserted at the end of that block, or the block appended when the file has none. Only that
@@ -150,13 +167,39 @@ async function writeBlockEntry(block: string, name: string, value: string): Prom
     // The block runs while the lines stay indented; the part's own line is rewritten in place.
     let end = head + 1;
     while (end < lines.length && /^\s+\S/.test(lines[end]!)) end++;
-    const own = lines.slice(head + 1, end).findIndex((l) => l.trim().startsWith(`${name}:`));
+    // The whole key, never a prefix of one: `names:` is keyed by path, and `/opt/ed/ivy` must not
+    // rewrite the line `/opt/ed/ivy-two` holds.
+    const own = lines.slice(head + 1, end).findIndex((l) => l.trim().slice(0, name.length + 1) === `${name}:`);
     if (own === -1) lines.splice(end, 0, entry);
     else lines[head + 1 + own] = entry;
   }
 
   await mkdir(factoryHome(), { recursive: true });
   await Bun.write(configPath(), lines.join('\n') + '\n');
+}
+
+/**
+ * A project's name is inside its keys — `daemons:` and `order:` are keyed `<project>/<name>` and
+ * the `projects` order lists the names themselves — so a rename rewrites those keys where they
+ * stand. A new key written beside the old one would leave the row's flag and its place behind.
+ */
+export async function renameProjectKeys(from: string, to: string): Promise<void> {
+  const text = await Bun.file(configPath()).text().catch(() => '');
+  if (text === '') return;
+  let block = '';
+  const lines = text.replace(/\n$/, '').split('\n').map((line) => {
+    const head = /^(\w+):/.exec(line);
+    if (head) { block = head[1]!; return line; }
+    if (block !== 'daemons' && block !== 'order') return line;
+    const entry = /^(\s+)(.*)$/.exec(line);
+    if (!entry) return line;
+    const rest = entry[2]!;
+    // The `projects` list holds the names as values; every other key is prefixed by one.
+    if (block === 'order' && rest.startsWith('projects:')) return entry[1]! + rest.replace(`"${from}"`, `"${to}"`);
+    return rest.startsWith(`${from}/`) ? entry[1]! + to + rest.slice(from.length) : line;
+  });
+  await Bun.write(configPath(), lines.join('\n') + '\n');
+  resetConfig();
 }
 
 /**

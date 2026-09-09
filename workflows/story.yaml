@@ -1,10 +1,12 @@
 name: story
 steps:
   - intent:    { gate: human }
-  - research:  { role: investigator }      # recovery or research pass, gates the spec
-  - spec                                   # spec.md, acceptance.md
-  - implement: { role: worker }
+  - research:  { role: investigator }   # skip when nothing to read
+  - plan                                # spec.md: legs; acceptance.md, owner per leg
+  - implement: { role: worker }         # one Worker per leg, clean context, serial
+  - check:
+      loop: { back: implement, max: 8 } # the Orchestrator's own review, no gatekeeper spawned
   - review:
-      parallel: [verify, validate]
-      loop: { back: implement, max: 3 }
-  - merge:     { gate: human }             # the Summarizer runs first, then the gate opens
+      parallel: [verify, validate]      # once, over the whole train
+  - fix:       { role: worker }         # one round over the accepted findings; skip when clean
+  - merge:     { gate: human }          # the Summarizer runs first, then the gate opens

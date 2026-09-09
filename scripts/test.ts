@@ -13,7 +13,7 @@ const TMP = await realpath(await mkdtemp(path.join(tmpdir(), 'factory-test-')));
 process.env.HOME = path.join(TMP, 'home');
 
 // The whole run writes under this home. If it does not resolve here, nothing else may happen.
-const { factoryHome, loadProjects, saveProject } = await import('../src/core/projects.js');
+const { factoryHome, loadProjects, projectName, removeProject, saveProject } = await import('../src/core/projects.js');
 if (!factoryHome().startsWith(TMP + path.sep)) {
   console.log(`✗ refusing to write: factoryHome() is ${factoryHome()}, not under ${TMP}`);
   process.exit(1);
@@ -42,9 +42,9 @@ const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
-const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
+const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeEntry, writeState: writeRow } = await import('../src/core/daemons.js');
 const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
-const { readLog, runNow, setEnabled, stopRow } = await import('../src/commands/daemon.js');
+const { colourOf, readLog, runNow, stopRow } = await import('../src/commands/daemon.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
@@ -386,7 +386,7 @@ await check('a step is coloured by what kind of work it is', async () => {
   const story = await loadWorkflow('story', TMP);
   // The story workflow names all four kinds; the runner decides, the human's gates are their own.
   const kinds = story.steps.map((step) => `${step.name}:${stepKind(step)}`);
-  const want = 'intent:human,research:agent,spec:technical,implement:agent,review:gatekeeper,merge:human';
+  const want = 'intent:human,research:agent,plan:technical,implement:agent,check:technical,review:gatekeeper,fix:agent,merge:human';
   ok(kinds.join() === want, `story reads ${kinds.join()}`);
   ok(stepKind({ name: 'verify' }) === 'gatekeeper' && stepKind({ name: 'validate' }) === 'gatekeeper',
     'a parallel gatekeeper row is not gatekeeping');
@@ -606,9 +606,9 @@ await check('the Shape dial reshapes a stub whole, and only a stub', async () =>
   await reshapeStub(main, m, 'story');
   const again = await resolveMission(main, 'sh');
   ok(again.state.workflow === 'story' && again.state.step === 'intent', `the reshape did not land in state: ${again.state.workflow}`);
-  ok((await missionWorkflow(again)).steps.some((s) => s.name === 'spec'), 'workflow.yaml was not rewritten');
-  await reshapeStub(main, again, 'quick');
-  ok((await resolveMission(main, 'sh')).state.step === 'work', 'quick did not move the pointer to its first step');
+  ok((await missionWorkflow(again)).steps.some((s) => s.name === 'plan'), 'workflow.yaml was not rewritten');
+  await reshapeStub(main, again, 'session');
+  ok((await resolveMission(main, 'sh')).state.step === 'work', 'session did not move the pointer to its first step');
   // The refusal comes before any write, so a stub read as open is enough to prove it.
   const open = { ...again, state: { ...again.state, status: 'open' as const } };
   const refused = await reshapeStub(main, open, 'story').then(() => null, (e: Error) => e);
@@ -661,7 +661,7 @@ await check('a mission starts unshaped and shape appends a preset once', async (
 
   await mission('shape', ['story'], { autonomy: 'partial' }, dir);
   const shaped = await resolveMission(dir, 's');
-  ok((await graph(dir, 's')).join() === 'intent,research,spec,implement,review,merge', `shape gave ${(await graph(dir, 's')).join()}`);
+  ok((await graph(dir, 's')).join() === 'intent,research,plan,implement,check,review,fix,merge', `shape gave ${(await graph(dir, 's')).join()}`);
   ok(shaped.state.workflow === 'story' && shaped.state.autonomy === 'partial', 'shape recorded neither the preset nor the dial');
   ok(shaped.state.steps.research?.status === 'pending', 'an appended step has no pending entry');
   ok(shaped.state.step === 'intent', `the pointer left an unfinished intent for ${shaped.state.step}`);
@@ -672,11 +672,43 @@ await check('a mission starts unshaped and shape appends a preset once', async (
   await mission('shape', ['story'], {}, dir);
   ok((await Bun.file(file).text()) === before, 'a second shape story rewrote state.json');
 
-  const refused = await mission('shape', ['quick'], {}, dir).then(() => null, (e: Error) => e);
-  ok(refused?.name === 'Refusal', 'shape quick was not refused');
+  const refused = await mission('shape', ['session'], {}, dir).then(() => null, (e: Error) => e);
+  ok(refused?.name === 'Refusal', 'shape session was not refused');
 
-  await mission('new', ['q'], { quick: true, 'no-open': true, 'no-worktree': true }, dir);
-  ok((await graph(dir, 'q')).join() === 'work', `--quick took ${(await graph(dir, 'q')).join()}`);
+  await mission('new', ['q'], { session: true, 'no-open': true, 'no-worktree': true }, dir);
+  ok((await graph(dir, 'q')).join() === 'work', `--session took ${(await graph(dir, 'q')).join()}`);
+});
+
+await check('story loops on check, reviews once, and a skipped fix reaches merge', async () => {
+  const dir = await repo('story');
+  await mission('new', ['s'], { workflow: 'story', 'no-open': true }, dir);
+  const m = { mission: 's' };
+  const at = async (): Promise<string> => (await resolveMission(dir, 's')).state.step;
+  await step('start', ['intent'], m, dir);
+  await gate('open', ['intent'], { ...m, file: 'intent.md' }, dir);
+  await gate('answer', ['intent', 'accept'], m, dir);
+  await step('done', ['intent'], m, dir);
+  await step('skip', ['research'], { ...m, reason: 'nothing to read' }, dir);
+  for (const s of ['plan', 'implement']) {
+    await step('start', [s], m, dir);
+    await step('done', [s], m, dir);
+  }
+
+  // `check` is the Orchestrator's own leg review: it returns to implement with no gatekeeper spawned.
+  await step('start', ['check'], m, dir);
+  await step('loop', ['check'], { ...m, reason: 'the next leg' }, dir);
+  ok((await at()) === 'implement', `the check loop landed on ${await at()}`);
+
+  // The gatekeepers run once, over the whole train, and what they find is the spec for `fix`.
+  for (const s of ['implement', 'check', 'review', 'verify', 'validate']) {
+    await step('start', [s], m, dir);
+    if (s !== 'review') await step('done', [s], m, dir);
+  }
+  await step('done', ['review'], m, dir);
+  ok((await at()) === 'fix', `the one review round left the mission at ${await at()}`);
+
+  await step('skip', ['fix'], { ...m, reason: 'nothing found' }, dir);
+  ok((await at()) === 'merge', `a skipped fix left the mission at ${await at()}`);
 });
 
 await check('an insert past a finished step takes the pointer with it', async () => {
@@ -1050,6 +1082,43 @@ await check('a manifest reads a daemon and a service, durations in ms and env as
   ok(service?.kind === 'service' && service.env?.PORT === '3061' && service.env.NODE_ENV === 'development', `env read as ${JSON.stringify(service?.env)}`);
 });
 
+await check('P appends an entry to the manifest, keeps what a human wrote and refuses a name twice', async () => {
+  const dir = await repo('added');
+  const file = path.join(dir, '.factory', 'daemons.yaml');
+  await mkdir(path.dirname(file), { recursive: true });
+  // What the form is writing into: a human's own file, comment and all.
+  await writeFile(file, '# the ones we already had\nold:\n  kind: daemon\n  cmd: "true"\n  every: 1h\n');
+
+  await writeEntry(dir, { name: 'nightly', kind: 'daemon', description: 'the build', cmd: 'bun run build', cwd: '', every: '1d' });
+  await writeEntry(dir, { name: 'web', kind: 'service', cmd: 'npm run dev', cwd: 'site', restart: 'always', port: '3000' });
+
+  const text = await Bun.file(file).text();
+  ok(text.startsWith('# the ones we already had\nold:\n'), `the file was rewritten:\n${text}`);
+  ok(!text.includes('cwd: ""'), `an empty field was written anyway:\n${text}`);
+
+  const { entries } = await readDaemons(dir);
+  const [, nightly, web] = entries;
+  ok(entries.length === 3 && nightly?.kind === 'daemon' && nightly.every === 24 * HOUR && nightly.description === 'the build',
+    `the daemon read back as ${JSON.stringify(nightly)}`);
+  ok(web?.kind === 'service' && web.cmd === 'npm run dev' && web.cwd === 'site' && web.restart === 'always' && web.port === 3000,
+    `the service read back as ${JSON.stringify(web)}`);
+
+  // The entry arrives off: `R` is the key that says a command typed into a form may run.
+  const keys = (await listRows()).rows.filter((r) => r.key.startsWith('added/'));
+  ok(keys.length === 3 && keys.every((r) => !r.state.enabled), `the rows listed as ${JSON.stringify(keys.map((r) => [r.key, r.state.enabled]))}`);
+
+  const twice = await writeEntry(dir, { name: 'web', kind: 'service', cmd: 'npm start' }).then(() => null, (e: Error) => e);
+  ok(twice?.name === 'Refusal' && twice.message.includes('web'), `a name the manifest has said ${twice?.message ?? 'nothing'}`);
+});
+
+await check('a manifest the Factory makes gets its header, and the entry lands under it', async () => {
+  const dir = await repo('added-fresh', false);
+  await writeEntry(dir, { name: 'tick', kind: 'daemon', cmd: 'bun x tick', every: '90s' });
+  const text = await Bun.file(path.join(dir, '.factory', 'daemons.yaml')).text();
+  ok(text.startsWith('# ') && text.includes('tick:\n  kind: daemon\n  cmd: "bun x tick"\n  every: 90s\n'), `the new manifest reads\n${text}`);
+  ok((await readDaemons(dir)).entries[0]?.name === 'tick', `it did not read back: ${JSON.stringify(await readDaemons(dir))}`);
+});
+
 await check('a manifest that does not parse is one error line and no entries', async () => {
   const dir = await repo('bots-bad');
   const file = path.join(dir, '.factory', 'daemons.yaml');
@@ -1174,6 +1243,34 @@ await check('daemon enablement is one line in the machine config, default off, a
   });
 });
 
+await check('an alert is answered by reading the log and by nothing a redraw does', async () => {
+  await withConfig(BASE_CONFIG, async () => {
+    await writeRow('bots/cws-reviews', { enabled: true, alert: 'run failed: exit 2' });
+
+    // The screen rebuilds its snapshot every second and draws the row every frame: neither may
+    // count as having seen why it is there. Only `daemon log`, the key's own twin, does.
+    const { rows } = await listRows();
+    ok(rows.find((r) => r.key === 'bots/cws-reviews')?.state.alert === 'run failed: exit 2', 'listing the rows lost the alert');
+    ok((await readRow('bots/cws-reviews')).alert !== undefined, 'drawing a row acknowledged its alert');
+
+    await readLog('bots/cws-reviews', 5);
+    ok((await readRow('bots/cws-reviews')).alert === undefined, 'reading the log left the alert standing');
+  });
+});
+
+await check('a row that failed reads warning on both surfaces, off or not', async () => {
+  const { daemonColor } = await import('../src/tui/panes/left.js');
+  const { C } = await import('../src/tui/theme.js');
+  const { colors } = await import('../src/ui/theme.js');
+  const entry = { kind: 'service' as const, name: 'api', cmd: 'true', run: 'detached' as const, restart: 'never' as const };
+  const dead = { key: 'bots/api', project: '/tmp/bots', entry, state: { enabled: false, alert: 'died 1' } };
+  ok(daemonColor(dead) === C.warning, `the TUI drew a dead row ${daemonColor(dead)}, not warning`);
+  ok(colourOf(dead) === colors.yellow, 'the CLI drew a dead row dim, not warning');
+
+  const quiet = { ...dead, state: { enabled: false } };
+  ok(daemonColor(quiet) === C.dim && colourOf(quiet) === colors.dim, 'an off row with nothing to say is not dim');
+});
+
 // ── the supervisor, on the scratch HOME and one scratch project ──────────────
 
 const PIDFILE = path.join(process.env.HOME!, '.factory', 'supervisor', 'pid');
@@ -1219,7 +1316,8 @@ try {
   });
 
   await check('a due daemon runs through the login shell and files its pid, verdict and next', async () => {
-    await setEnabled('runner/tick', true);
+    await runNow('runner/tick');
+    ok(await enabledOf('runner/tick'), 'run left the row off');
     await until('the tick daemon never ran', async () => (await readRow('runner/tick')).lastStatus !== undefined);
 
     const state = await readRow('runner/tick');
@@ -1231,8 +1329,8 @@ try {
     ok(log.some((l) => / run echo /.test(l)) && log.includes('{"summary":"hi"}'), `the log holds ${JSON.stringify(log)}`);
   });
 
-  await check('a service runs in its own process group, and a stop holds wanted down', async () => {
-    await setEnabled('runner/sleep', true);
+  await check('a service runs in its own process group, and a stop kills it and turns it off', async () => {
+    await runNow('runner/sleep');
     await until('the service never started', async () => (await readRow('runner/sleep')).pid !== undefined);
 
     const pid = (await readRow('runner/sleep')).pid!;
@@ -1242,21 +1340,16 @@ try {
 
     await stopRow('runner/sleep');
     await until('the service outlived its stop', async () => !alive(pid) && (await readRow('runner/sleep')).pid === undefined);
-    ok((await readRow('runner/sleep')).wanted === false, 'a stopped service is still wanted');
+    ok(!(await enabledOf('runner/sleep')), 'a stopped service is still enabled');
   });
 
   await check('a failed run alerts, a timeout kills the group, and reading the log acknowledges', async () => {
-    const off = await runNow('runner/boom').then(() => null, (e: Error) => e);
-    ok(off?.message.includes('is off'), `a run on an off row said ${off?.message ?? 'nothing'}`);
-
-    await setEnabled('runner/boom', true);
     await runNow('runner/boom');
     await until('the failed run raised no alert', async () => (await readRow('runner/boom')).alert !== undefined);
     ok((await readRow('runner/boom')).lastSummary === 'trouble', `the failure filed ${JSON.stringify(await readRow('runner/boom'))}`);
     await readLog('runner/boom', 5);
     ok((await readRow('runner/boom')).alert === undefined, 'reading the log did not clear the alert');
 
-    await setEnabled('runner/slow', true);
     await runNow('runner/slow');
     await until('the slow run never started', async () => (await readRow('runner/slow')).pid !== undefined);
     const pid = (await readRow('runner/slow')).pid!;
@@ -1265,17 +1358,18 @@ try {
     ok(!alive(pid), `the timed-out run left its group alive at ${pid}`);
   });
 
-  await check('a service that ended on its own is an inbox row, whatever its exit code', async () => {
-    await setEnabled('runner/quit', true);
+  await check('a service that ended on its own is an inbox row and an off row, whatever its exit code', async () => {
+    await runNow('runner/quit');
     await until('a service that exited on its own was never noticed', async () => (await readRow('runner/quit')).alert !== undefined);
 
     const state = await readRow('runner/quit');
     ok(state.alert === 'died 0', `a service that exited 0 unasked filed ${JSON.stringify(state.alert)}`);
-    ok(state.wanted === false && state.pid === undefined, `a service that died is still ${JSON.stringify(state)}`);
+    ok(state.pid === undefined, `a service that died is still ${JSON.stringify(state)}`);
+    // `restart: never` and the row still on would be started again by the very next tick.
+    await until('a service that died under restart: never is still enabled', async () => !(await enabledOf('runner/quit')));
   });
 
   await check('a daemon writes its output to the log while the run is still in flight', async () => {
-    await setEnabled('runner/stream', true);
     await runNow('runner/stream');
     await until('the first line only reached the log when the run ended', async () => {
       const state = await readRow('runner/stream');
@@ -1289,16 +1383,17 @@ try {
 
   await check('a service that keeps dying backs off and gives up after five restarts', async () => {
     const now = Date.now();
-    await writeRow('runner/flap', { enabled: false, wanted: true, restarts: [1, 2, 3, 4, 5].map((i) => new Date(now - i * 30_000).toISOString()) });
-    await setEnabled('runner/flap', true);
+    await writeRow('runner/flap', { enabled: false, restarts: [1, 2, 3, 4, 5].map((i) => new Date(now - i * 30_000).toISOString()) });
+    await runNow('runner/flap');
 
     await until('the flapping service never gave up', async () => (await readRow('runner/flap')).alert !== undefined);
     const state = await readRow('runner/flap');
     ok(state.alert === 'gave up after 5 restarts', `it gave up with ${JSON.stringify(state.alert)}`);
-    ok(state.wanted === false && state.pid === undefined, `a service that gave up is still ${JSON.stringify(state)}`);
+    ok(state.pid === undefined, `a service that gave up is still ${JSON.stringify(state)}`);
+    await until('a service that gave up is still enabled', async () => !(await enabledOf('runner/flap')));
   });
 
-  await check('a supervisor restart leaves a wanted service alive and re-adopts its pid', async () => {
+  await check('a supervisor restart leaves a running service alive and re-adopts its pid', async () => {
     await runNow('runner/sleep');
     await until('the service never came back', async () => (await readRow('runner/sleep')).pid !== undefined);
     const pid = (await readRow('runner/sleep')).pid!;
@@ -1375,6 +1470,78 @@ await check('uninstall --yes leaves nothing behind', async () => {
   ok(!(await exists(path.join(main, '.claude/skills/mission/skill.md'))), 'a skill was left behind');
   ok(!(await exists(path.join(main, '.claude/.factory-manifest.json'))), 'the manifest was left behind');
   ok(!(await exists(path.join(main, '.mcp.json'))), 'an empty .mcp.json was left behind');
+});
+
+// ── projects from the screen ─────────────────────────────────────────────────
+
+await check('a project is its folder, or the name `names:` gives it', async () => {
+  const dir = await repo('named');
+  ok((await projectName(dir)) === 'named', `an unnamed project read as ${await projectName(dir)}`);
+  await withConfig(`${BASE_CONFIG}names:\n  ${dir}: "renamed"\n`, async () => {
+    ok((await projectName(dir)) === 'renamed', 'the names: entry never reached projectName');
+    ok((await projectName(`${dir}/`)) === 'renamed', 'a trailing slash read as another project');
+  });
+  ok((await projectName(dir)) === 'named', 'the name outlived the config that gave it');
+});
+
+await check('a rename takes the daemon keys, the order and the state folder with it', async () => {
+  const { renameProject } = await import('../src/tui/actions.js');
+  const dir = await repo('rowdy');
+  const taken = await repo('spoken');
+  await mkdir(path.join(dir, '.factory'), { recursive: true });
+  await writeFile(path.join(dir, '.factory', 'daemons.yaml'), 'tick:\n  kind: daemon\n  cmd: "true"\n  every: 1h\n');
+  const state = path.join(process.env.HOME!, '.factory', 'daemons', 'rowdy');
+  await mkdir(state, { recursive: true });
+  await writeFile(path.join(state, 'log'), 'a line\n');
+
+  await withConfig(`${BASE_CONFIG}daemons:\n  rowdy/tick: "on"\n  rowdyish/tick: "on"\norder:\n  projects: ["rowdy", "spoken"]\n  rowdy/missions: ["one"]\n`, async () => {
+    ok((await renameProject(dir, 'quiet')) === 'rowdy is now quiet', 'the rename did not say what it did');
+    ok((await projectName(dir)) === 'quiet', `the renamed project reads as ${await projectName(dir)}`);
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text.includes('  quiet/tick: "on"') && !text.includes('  rowdy/tick'), `the daemons block reads\n${text}`);
+    ok(text.includes('  rowdyish/tick: "on"'), 'a key that only starts with the old name was rewritten too');
+    ok(text.includes('projects: ["quiet", "spoken"]'), `the projects order reads\n${text}`);
+    ok(text.includes('  quiet/missions: ["one"]'), `the missions order kept the old name:\n${text}`);
+    ok(text.includes(`  ${dir}: "quiet"`), `the name never landed in names::\n${text}`);
+
+    ok(await exists(path.join(process.env.HOME!, '.factory', 'daemons', 'quiet', 'log')),
+      'the state folder stayed under the old name');
+    ok((await listRows()).rows.some((r) => r.key === 'quiet/tick'), 'listRows still keys the row by the folder');
+
+    const slug = await renameProject(dir, 'Quiet Down').then(() => null, (e: Error) => e);
+    ok(slug?.name === 'Refusal', `a name that is not a slug said ${slug?.message ?? 'nothing'}`);
+    const twice = await renameProject(dir, 'spoken').then(() => null, (e: Error) => e);
+    ok(twice?.name === 'Refusal' && twice.message.includes(taken), `a name another project holds said ${twice?.message ?? 'nothing'}`);
+  });
+});
+
+await check('removeProject drops the one line and leaves the rest of the list', async () => {
+  const keeper = await repo('keeper');
+  const goner = await repo('goner');
+  await removeProject(goner);
+  const list = await loadProjects();
+  ok(!list.includes(goner) && list.includes(keeper), `the list reads ${list.join(', ')}`);
+});
+
+await check('N installs a git checkout and registers it, U takes both back', async () => {
+  const { newProject, uninstallProject } = await import('../src/tui/actions.js');
+  const dir = path.join(TMP, 'typed');
+  await mkdir(dir, { recursive: true });
+
+  const missing = await newProject(path.join(TMP, 'nowhere')).then(() => null, (e: Error) => e);
+  ok(missing?.name === 'Refusal', `a path that is not there said ${missing?.message ?? 'nothing'}`);
+  const plain = await newProject(dir).then(() => null, (e: Error) => e);
+  ok(plain?.name === 'Refusal' && plain.message.includes('git'), `a directory git does not track said ${plain?.message ?? 'nothing'}`);
+
+  await git(dir, 'init', '-q', '-b', 'main');
+  ok((await newProject(dir)).startsWith('typed installed'), 'the install never named the project');
+  ok((await loadProjects()).includes(dir), 'the project never reached ~/.factory/projects');
+  ok(await exists(path.join(dir, '.claude', '.factory-manifest.json')), 'no parts reached the project');
+
+  ok((await uninstallProject(dir)) === 'typed uninstalled', 'the uninstall never named the project');
+  ok(!(await loadProjects()).includes(dir), 'an uninstalled project is still registered');
+  ok(!(await exists(path.join(dir, '.claude', '.factory-manifest.json'))), 'the manifest was left behind');
 });
 
 await rm(TMP, { recursive: true, force: true });

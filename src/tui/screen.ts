@@ -10,7 +10,8 @@ import { partsPane, pending } from './panes/parts.js';
 import { daemonPane } from './panes/daemon.js';
 import { footPane } from './panes/foot.js';
 import { composeHeight, composePane, targetOf } from './panes/compose.js';
-import { SHAPE_FIELD, formOf, formPane, showsForm, showsParts } from './panes/form.js';
+import { focused, formPane, showsForm, showsParts } from './panes/form.js';
+import { intentForm } from './panes/intent.js';
 import { helpPane } from './panes/help.js';
 import { onKey, onPaste } from './keys.js';
 import { rowTail } from '../commands/daemon.js';
@@ -20,7 +21,7 @@ import type { Mission, Session, Snapshot } from './model.js';
 /** Chrome rows: blank, header, rule — rule, key bar. The key bar sits on the last terminal row:
  *  a row left undrawn under it reads as a gap the screen forgot to fill. */
 const CHROME = 5;
-/** Full activity keeps the blank row, the rule and the key bar, and gives the log everything else. */
+/** A full foot keeps the blank row, the rule and the key bar, and gives the pane everything else. */
 const FULL_CHROME = 3;
 /** Factory's own mark. Single-width in a monospace font, unlike most of the geometric glyphs. */
 const BRAND = '⌬';
@@ -131,10 +132,10 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
-  daemon: ['Space', 'R', 'X', 'L'],
+  inbox: [], global: [], project: ['M', 'R', 'U', 'P'], mission: ['O', 'K', 'T', 'E', 'P'], session: ['K', 'R', 'P'],
+  daemon: ['R', 'X', 'P'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
+const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission'], ['U', 'Uninstall'], ['P', 'New Service']];
 
 /** A stub's autonomy is the form's dial, so `T` there answers with a toast and nothing else: the
  *  bar drops it, the way it lists Parts only where Parts is the pane. */
@@ -143,14 +144,18 @@ const rowKeys = (here: LeftItem): string[] =>
     ? ROW_KEYS.mission.filter((key) => key !== 'T')
     : ROW_KEYS[here.kind];
 
-/** A daemon row's own labels: `R` is Run on a daemon and Start on a service, and `L` is the Log
- *  here where every other row still turns Launch. */
+/** A daemon row's own labels: `R` is Run on a daemon and Start on a service — both turn the row
+ *  on — and `X` is Stop and off. The log is the foot's, so `A` carries it and the bar does not. */
 function rowPairs(here: LeftItem): string[][] {
   if (here.kind !== 'daemon') return ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!));
-  const label: Record<string, string> = {
-    Space: 'On/Off', R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', L: 'Log',
-  };
+  const label: Record<string, string> = { R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', P: 'New Service' };
   return ROW_KEYS.daemon.map((key) => [key, label[key]!]);
+}
+
+/** The `←→` pair while a form has the keys: the dial's own word, or nothing on a text field. */
+function dialPair(ui: Ui, here: LeftItem): string[][] {
+  const field = focused(ui, here);
+  return field?.options ? [['←→', field.label.replace(/:$/, '')]] : [];
 }
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
@@ -163,12 +168,16 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
-    ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', ui.intents[formOf(here)?.key ?? '']?.field === SHAPE_FIELD ? 'Shape' : 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
+    // `←→` turns the dial the cursor is on and walks the text everywhere else, so the bar offers
+    // it only where it is a dial, and names that dial rather than a key the form may not have.
+    ui.form ? [['⇥ ⇧↵', 'Field'], ['^S', 'Save'], ...dialPair(ui, here), ['^U', 'Clear'], ['Esc', 'Leave']] :
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
-    ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
-    !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
-      ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
+    ui.size === 'full' ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
+    // `N` is on every left row and last of them: it is the one key that answers with a project
+    // the list does not hold yet, so it reads after whatever the selected row itself does.
+    !right ? [['↑↓', 'Select'], ['↵', intentForm(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
+      ['N', 'New Project'], ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
     // Space picks the scope on the global row and the install on a project's: one key, two panes.
@@ -183,11 +192,20 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
     list.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]);
   // The two settings sit at the bar's right end: what `L` and `C` turn, beside the keys that turn it.
   const settings: Cell[] = [...launchCells(snap), ...caffeinateCells(snap)];
-  const full = cells(pairs);
-  p.row(spread(len(full) + len(settings) <= p.width ? full : cells(pairs.filter(([key]) => key !== '?')), settings, p.width));
+  // The bar narrows as a row's own keys grow, and only ever loses the two it can: `?`, whose
+  // panel lists every key anyway, then `S`, which only hides rows. What the row answers and what
+  // the settings say are why the bar is there, so neither is ever the thing that goes.
+  const room = p.width - len(settings);
+  const fit = (drop: string[]): Cell[] => cells(pairs.filter(([key]) => !drop.includes(key!)));
+  const narrow = [[], ['?'], ['?', 'S']].map(fit);
+  p.row(spread(narrow.find((row) => len(row) <= room) ?? narrow.at(-1)!, settings, p.width));
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
+
+/** A minimised foot is its tab row and nothing else — no rule over one line — so what came in is
+ *  still counted and the body keeps every row the foot gave up. */
+const MIN_FOOT = 1;
 
 /** The left column takes two fifths, never under this. */
 const LEFT_MIN = 30;
@@ -211,14 +229,17 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const { items, here } = select(snap, ui);
 
   // Everything under the status rule and above the key-bar rule. The foot keeps a third of it,
-  // the columns take the rest — and either one takes all of it: `f` gives the foot the screen,
-  // `?` gives the body to the panel, which needs the height to say anything worth reading.
+  // the columns take the rest — and either one takes all of it: the drawn tab's own key gives the
+  // foot the screen or leaves it its tab row alone, `?` gives the body to the panel, which needs
+  // the height to say anything worth reading.
   // The message box takes its rows off the top of the region, and the foot keeps its share of the rest.
-  const composeH = Math.min(composeHeight(ui, here, w), Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - 5));
-  const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - composeH);
+  const full = ui.size === 'full';
+  const composeH = Math.min(composeHeight(ui, here, w), Math.max(0, r.terminalHeight - (full ? FULL_CHROME : CHROME) - 5));
+  const region = Math.max(0, r.terminalHeight - (full ? FULL_CHROME : CHROME) - composeH);
   // The panel wants the whole body, on `?` and on an Inbox with nothing in it alike.
   const panel = ui.help || (here.kind === 'inbox' && snap.inbox.length === 0);
-  const actH = ui.full ? region : panel ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
+  const actH = full ? region : panel ? 0 : ui.size === 'min' ? Math.min(region, MIN_FOOT)
+    : Math.min(region, Math.max(5, Math.floor(region / 3)));
   const bodyH = region - actH;
 
   // Two blank columns down the left and none anywhere else: the key bar sits on the last row and
@@ -226,7 +247,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 2, paddingRight: 0 });
   root.row([]);
   // A full-height foot is that pane and nothing else: the header and the status bar are rows it can have.
-  if (!ui.full) {
+  if (!full) {
     header(root, snap, here, ui);
     root.rule();
   }
@@ -238,15 +259,16 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     // Two cells of padding keep the left pane's right-aligned tokens off the divider.
     const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
-    leftPane(left, items, snap, ui);
+    leftPane(left, items, snap, ui, bodyH);
     // An empty Inbox has nothing to show, so the panel stands there: a fresh install opens on it.
     if (panel) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
     // The form outranks Parts and MISSION: a stub is edited here, and a project row shows the new
-    // mission it has a draft for. The body cuts the end of it, the way it cuts a long graph.
-    else if (showsForm(ui, here)) formPane(right, ui, here);
+    // mission it has a draft for. It scrolls inside the body rather than being cut by it: what is
+    // being typed into has to stay on screen, where a graph only has to be read from the top.
+    else if (showsForm(ui, here)) formPane(right, ui, here, bodyH);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global', bodyH);
-    else if (here.kind === 'daemon') daemonPane(right, here.daemon, ui, bodyH);
+    else if (here.kind === 'daemon') daemonPane(right, here.daemon, bodyH);
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');
     else sessionPane(right, here.session);
     body.add(left.box);

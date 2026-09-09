@@ -34,16 +34,18 @@ src/           CLI source (entry: src/cli.ts)
 │              archive), decision (decisions.md table, waits, first answer wins),
 │              spawn (preset, the mission's settings overlay, the Warp tab: `claude` in it, or `claude --bg` and attach),
 │              daemons (the daemons.yaml manifest, durations, cadence, the contract's verdict, state
-│              and log files, rows), supervisor (the one loop per machine: due runs, services,
+│              and log files, rows, the one entry `P` appends), supervisor (the one loop per machine: due runs, services,
 │              requests, adopt, watch, rotate), platform (the two OS adapters: idle time, the unit file)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys
 │              (what a keypress does), panes/ (pane scaffolding plus left, messages, mission,
-│              parts, foot, compose, daemon, help — one file each, none over 400 lines), actions (what a key
-│              writes, through the CLI's own functions), notify, frames, format, theme
+│              parts, foot, compose, daemon, help, form — the engine both forms are drawn and
+│              walked by — with intent and service its two field definitions — one file each,
+│              none over 400 lines), actions (what a key writes, through the CLI's own functions),
+│              notify, frames, format, theme
 ├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control,
-│              daemon (list, status, on, off, run, stop, log), supervisor (start, stop, status, install, uninstall)
+│              daemon (list, status, run, stop, log), supervisor (start, stop, status, install, uninstall)
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
@@ -57,15 +59,16 @@ scripts/spawn.ts        The one real model run behind `e2e.spawn`: a @Worker's d
                nested recipe reads back under its dotted path
 .factory/daemons.yaml   the project's daemons and services, committed, one entry per name;
                `~/.factory/config.yaml` says which of them this machine runs
-workflows/     intent, story, chore, research, quick — the shipped workflow YAML: every mission
+workflows/     intent, story, chore, research, session — the shipped workflow YAML: every mission
                starts on intent, `mission shape` appends a preset behind that step and `--verify`
                puts a verifier loop behind a chore's implement
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset
 ~/.factory/    Home dir: projects list, config.yaml (var overrides, a `parts:` block choosing
                `project`, `global` or `off` per part over the scope its part.yaml recommends, plus
                `caffeinate: auto|on|off`, which the hook reads per event and Mission Control's `c`
-               rewrites, `launch: fg|bg`, how `mission open` runs claude, and an `order:` block
-               Mission Control's `⇧↑↓` keeps), events/<session>.jsonl
+               rewrites, `launch: fg|bg`, how `mission open` runs claude, an `order:` block
+               Mission Control's `⇧↑↓` keeps and a `names:` block, path to display name, its `R`
+               writes), events/<session>.jsonl
                (the hook's lines plus Mission Control's one `Rename`), caffeinate/<session>.pid and
                control.pid, daemons/<project>/<name>/ (`state.json`, `log`, `log.1`, `request`) and
                supervisor/ (`pid`, `log`), the state the supervisor and the `daemon` family share

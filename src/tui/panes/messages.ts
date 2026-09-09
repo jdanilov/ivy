@@ -1,12 +1,12 @@
 import { C, COMMAND } from '../theme.js';
 import { type Cell, ago, spans, spread, wrap } from '../format.js';
-import { logTail } from './daemon.js';
-import { marker, type Pane, type Ui } from './pane.js';
+import { logTail } from './foot.js';
+import { chevron, type Pane, type Ui } from './pane.js';
 import type { InboxItem, Snapshot } from '../model.js';
 
 /** MESSAGES: everything waiting on the human across every project, and how each one is answered. */
 
-/** Enough of a daemon's log to say what went wrong; the whole tail is the DAEMON pane's. */
+/** Enough of a daemon's log to say what went wrong; the whole tail is the foot's, under `A`. */
 const LOG_LINES = 5;
 
 export function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {
@@ -14,13 +14,13 @@ export function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {
   p.row([['MESSAGES', C.bright], [` (${items.length})`, C.dim]]);
   p.rule();
 
+  const focused = ui.focus === 'right';
   items.forEach((item, i) => {
     const selected = i === ui.msg;
-    const cells: Cell[] = [
-      marker(selected, ui.focus === 'right'), ['⊘ ', C.warning],
-      [`${item.project}/${item.origin}`, C.bright], ['  ', C.dim], [item.label, C.dim],
-    ];
-    p.row(spread(cells, [[ago(item.at), C.dim]], p.width), selected && ui.focus === 'right');
+    const cells: Cell[] = [['⊘ ', C.warning], [`${item.project}/${item.origin}`, C.bright], ['  ', C.dim], [item.label, C.dim]];
+    // The left column's reading: the row starts at the edge and ends in the two cells the
+    // chevron takes, so how long each one has waited lands at one column.
+    p.row(spread(cells, [['  ', C.dim], [ago(item.at), C.dim], chevron(selected, focused)], p.width), selected && focused);
   });
 
   p.rule();

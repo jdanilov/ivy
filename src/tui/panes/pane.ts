@@ -2,9 +2,9 @@ import { BoxRenderable, TextRenderable, type CliRenderer } from '@opentui/core';
 import { C } from '../theme.js';
 import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
-import type { Autonomy, DaemonRow, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
+import type { DaemonRow, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
 import type { Draft } from './compose.js';
-import type { Shape } from './form.js';
+import type { FormDraft, FormKind } from './form.js';
 
 /**
  * What every pane shares: the Ui state it reads, the rows the left column lists — one of which the
@@ -14,12 +14,17 @@ import type { Shape } from './form.js';
 export interface Ui {
   focus: 'left' | 'right';
   left: number;
+  /** The first row of the left list drawn under its fixed header: the pane moves it by the least
+   *  that keeps the selected row on screen, so walking down scrolls one row at a time. */
+  top: number;
   msg: number;
   part: number;
   /** What `↵` would apply: install or not on a project row, the chosen scope on the global one. */
   toggles: Record<string, boolean | ScopeChoice>;
   confirm: boolean;
-  full: boolean;
+  /** How much of the screen the foot has: a third of the body, the whole screen, or its tab row
+   *  alone. The drawn tab's own key walks the three. */
+  size: 'third' | 'full' | 'min';
   /** Rows the full-height foot is scrolled back from its own foot. Zero everywhere else. */
   scroll: number;
   help: boolean;
@@ -35,34 +40,24 @@ export interface Ui {
   /** The keys are the message box's; the drafts stay by row whether or not they are. */
   compose: boolean;
   drafts: Record<string, Draft>;
-  /** `l` on a daemon row: the right pane is that row's log and nothing else, until `Esc` or `←`. */
-  daemonLog: boolean;
-  /** The keys are the intent form's. */
-  form: boolean;
-  /** One intent draft per row, kept like a message draft: a stub row by its own key, a new
-   *  mission under `new <project>`, so a project row shows what has been typed for it. */
-  intents: Record<string, IntentDraft>;
-}
-
-/** The intent form's own state: a draft per field, the dial, and which field has the cursor. */
-export interface IntentDraft {
-  name: Draft;
-  goal: Draft;
-  done: Draft;
-  extra: Draft;
-  autonomy: Autonomy;
-  /** The Shape dial: `auto` leaves the graph to the Orchestrator, a name is that preset's graph. */
-  shape: Shape;
-  /** Indexes the editable order `name goal done extra autonomy shape`. */
-  field: number;
+  /** Which form has the keys — the mission's intent, or a project's new daemon or service —
+   *  and null while neither is being filled in. */
+  form: FormKind | null;
+  /** The first row of the form drawn under its fixed header, the way `top` scrolls the left list:
+   *  every field draws all its lines and the pane is what moves to keep the cursor on screen. */
+  formTop: number;
+  /** One form draft per row, kept like a message draft: a stub row by its own key, a new mission
+   *  under `new <project>` and a new entry under `svc <project>`, so a project row shows what has
+   *  been typed for it. */
+  forms: Record<string, FormDraft>;
 }
 
 export function newUi(): Ui {
   return {
-    focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
+    focus: 'left', left: 0, top: 0, msg: 0, part: 0, toggles: {}, confirm: false, size: 'third',
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
-    showArchived: false, toast: null, input: null, compose: false, drafts: {}, daemonLog: false,
-    form: false, intents: {},
+    showArchived: false, toast: null, input: null, compose: false, drafts: {},
+    form: null, formTop: 0, forms: {},
   };
 }
 
@@ -85,11 +80,13 @@ export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
     globalRow(snap),
     ...snap.projects.flatMap((project): LeftItem[] => [
       { kind: 'project', project },
+      // What the project runs by itself first, then the work it has, then the tabs open on it:
+      // the daemons are the rows a glance is for, and they are the ones that never move.
+      ...project.daemons.map((daemon): LeftItem => ({ kind: 'daemon', project, daemon })),
       ...project.missions
         .filter((mission) => showArchived || !mission.archived)
         .map((mission): LeftItem => ({ kind: 'mission', project, mission })),
       ...project.sessions.map((session): LeftItem => ({ kind: 'session', project, session })),
-      ...project.daemons.map((daemon): LeftItem => ({ kind: 'daemon', project, daemon })),
     ]),
   ];
 }
@@ -118,6 +115,22 @@ export function clamp(i: number, n: number): number {
   return n === 0 ? 0 : Math.min(Math.max(i, 0), n - 1);
 }
 
+/** The two cells a scrolling list's row ends in: the chevron the selection keeps while the focus
+ *  is in the other pane, or the room for it, so the right column of every row ends at one place. */
+export const chevron = (selected: boolean, focused: boolean): Cell => [selected && !focused ? ' ›' : '  ', C.accent];
+
+/** The first row a pane draws, moved by the least that keeps row `here` on screen: walking down
+ *  scrolls one row at a time, and a jump lands the row it left the selection on in view. A pane
+ *  with nothing focused passes `here` under zero and keeps the window where it was. */
+export function windowTop(top: number, here: number, rows: number, room: number): number {
+  if (room <= 0) return 0;
+  // The list shrank under the window first, then the selection has the last word.
+  let at = Math.min(top, Math.max(0, rows - room));
+  if (here >= 0 && here < at) at = here;
+  if (here >= at + room) at = here - room + 1;
+  return Math.max(0, at);
+}
+
 /** A column of rows drawn at a fixed width, so a selected row inverts edge to edge. */
 export function column(r: CliRenderer, width: number, extra: Record<string, unknown> = {}) {
   const box = new BoxRenderable(r, { flexDirection: 'column', overflow: 'hidden', ...extra });
@@ -128,8 +141,3 @@ export function column(r: CliRenderer, width: number, extra: Record<string, unkn
 }
 
 export type Pane = ReturnType<typeof column>;
-
-/** Two cells: the arrow a selection keeps while the focus is in the other pane, or room for it. */
-export function marker(selected: boolean, focused: boolean): Cell {
-  return [selected && !focused ? '› ' : '  ', C.dim];
-}

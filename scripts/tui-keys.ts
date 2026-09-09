@@ -13,8 +13,9 @@
  *   --archived          start with the archived missions shown, as `z` does
  *   --focus right|left  starting focus (default left)
  *   --wait <ms>         pause after each key so an action's write lands (default 400)
+ *   --rows <n>          terminal height (default 42), so a short screen can be driven
  *   --quiet             only the last frame
- *   --expect <substr>   the last frame must contain it, else ✗ and exit 1
+ *   --expect <substr>   the last frame must contain it, else ✗ and exit 1; may be given more than once
  *   --spans <substr>    after the last key, print colour + column of every span holding substr ('*' = all)
  *   keys: up down left right tab return escape space backspace delete home end a d e k m s t c l o y r ? q
  *         S-<key> (shifted), C-<key> (control), M-<key> (option)  |  type:<text> (one key per character)  |  sleep:ms  |  reload
@@ -31,7 +32,7 @@ const opt = (name: string): string | undefined => {
   return i === -1 ? undefined : argv[i + 1];
 };
 const flag = (name: string): boolean => argv.includes(`--${name}`);
-const VALUE_FLAGS = new Set(['row', 'focus', 'wait', 'spans', 'expect']);
+const VALUE_FLAGS = new Set(['row', 'focus', 'wait', 'spans', 'expect', 'rows']);
 const keys = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1]?.startsWith('--') && VALUE_FLAGS.has(argv[i - 1]!.slice(2))));
 
 const rebuild = async (): Promise<Snapshot> => {
@@ -41,7 +42,8 @@ const rebuild = async (): Promise<Snapshot> => {
 const snap: Snapshot = flag('fixture') ? (await import('../src/tui/fixture.js')).snapshot : await rebuild();
 
 const { createTestRenderer } = await import('@opentui/core/testing');
-const { renderer, renderOnce, captureCharFrame, captureSpans } = await createTestRenderer({ width: 140, height: 42 });
+// A short terminal is a screen of its own: the left list has to scroll on one and not on 42 rows.
+const { renderer, renderOnce, captureCharFrame, captureSpans } = await createTestRenderer({ width: 140, height: Number(opt('rows') ?? 42) });
 
 const ui: Ui = newUi();
 ui.showArchived = flag('archived');
@@ -121,8 +123,9 @@ if (want !== undefined) {
   });
 }
 
-const expect = opt('expect');
-if (expect !== undefined && !last.includes(expect)) {
+// One frame answers for several claims — a size, a pane and a word in it — so `--expect` repeats.
+for (const expect of argv.filter((a, i) => argv[i - 1] === '--expect')) {
+  if (last.includes(expect)) continue;
   broken++;
   console.log(`✗ expected ${JSON.stringify(expect)} in the last frame`);
 }

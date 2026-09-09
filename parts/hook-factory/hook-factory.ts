@@ -73,10 +73,12 @@ async function findFactoryDir(from: string): Promise<string | null> {
   }
 }
 
-/** FACTORY_MISSION is set by `factory mission open`; the claim covers adopted sessions. */
+/** FACTORY_MISSION is set by `factory mission open`; the claim covers adopted sessions — and a
+ *  session whose env still names a mission since archived, which then adopted the next one. */
 async function bind(cwd: string, session: string): Promise<Bound | null> {
   const fromEnv = process.env.FACTORY_MISSION;
-  if (fromEnv) return readMission(path.resolve(fromEnv));
+  const named = fromEnv ? await readMission(path.resolve(fromEnv)) : null;
+  if (named) return named;
 
   const factory = await findFactoryDir(cwd);
   if (!factory) return null;

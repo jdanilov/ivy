@@ -70,37 +70,64 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 row 0        blank
 row 1        ⌬ FACTORY · status: mission bar or project bar, or the toast that replaces it
 row 2        ───────────────────────────────────────────────────────────────────────
-             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | DAEMON | PARTS (60%)
+             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | DAEMON | SERVICE | PARTS (60%)
              inbox, Global,          │  a list above a detail block; a gate and a
-             projects, missions,     │  decision each end in the command that
-             sessions, daemons       │  answers them in the session
+             projects, daemons,      │  decision each end in the command that
+             missions, sessions      │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             ACTIVITY  DECISIONS     one third of the body, all of it on a second A or D
+             ACTIVITY | A LOG  DECISIONS   a third of the body; the drawn tab's key sizes it:
+                                           a third → the whole screen → this row alone,
+                                           and minimised it loses the rule over it too
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  S Show Archived  Q Quit  ? Help        Launch FG  Caffeinate AUTO [ON]
+             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  N New Project  S Show Archived  Q Quit  ? Help    Launch FG  Caffeinate AUTO [ON]
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
   screen breathes on the side the eye starts from and fills the rest.
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
-  Two cells of padding on the left pane keep its right-aligned wall time and diff off the divider.
-  An open mission row ends in those two and no token count: the status bar has the tokens, and
-  the row has no room. A mission or session under Claude Code's `--bg` job carries a dim `bg`.
+  Two cells of padding on the left pane keep its right-aligned columns off the divider.
+  An open mission row ends in its wall time and diff and no token count: the status bar has the
+  tokens, and the row has no room. A mission or session under Claude Code's `--bg` job carries a
+  dim `bg`.
+- A heading starts at the pane's edge and the rows under it two cells in, the glyph first — there
+  is no marker column — so a project reads as a block; what names a row stays left: the glyph, the name, an open mission's workflow and step, a session's
+  preset and id. Where it stands goes right, against the edge: a mission's `closed 1h ago`,
+  `stub` or `archived`, or its wall time and diff; a session's `idle 3h 18m`, `working` or
+  `asking`; a daemon's tail. The selection inverts the row while the left pane has the focus, and
+  ends it in an accent `›` while the focus is in the right pane — every other row keeps the two
+  cells that chevron takes, so the right column ends at one place down the whole list.
+- The list scrolls under a fixed header and rule, moved by the least that keeps the selected row
+  drawn: walking down scrolls one row at a time, and a jump — `S`, `M`, a list rebuilt under the
+  selection — lands it in view. The blank rows between projects and a project's hint lines are
+  rows like any other.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `S` asks for them.
-- A project's daemons and services sit in the same list, under its sessions, and not in a block of
-  their own: the glyph is the kind, `↻` a daemon and `▶` a service, and the colour is the state —
-  dim off, bright on, accent orange while a pid is set, warning amber once a run failed or an alert
-  is waiting. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
+- A project reads as the name `names:` in `~/.factory/config.yaml` gives its path, and as its
+  folder's own name until `R` writes one. That name is the row, the prefix of every daemon key
+  under it — `ivy/nightly` — and the folder its rows' state sits in under `~/.factory/daemons/`,
+  so a rename moves all three in the same breath. The checkout never moves: the name is this
+  machine's word for it, not the project's.
+- A project's daemons and services sit in the same list, over its missions and its sessions, and
+  not in a block of their own: what the project runs by itself is what a glance is for, and those
+  rows are the ones that never move. The glyph is the kind, `↻` a daemon and `▶` a service, and
+  the colour is the state — warning amber once a run failed or an alert is waiting, read before
+  dim off so a service the supervisor turned off for dying is not a dim row, then bright on and
+  accent orange while a pid is set. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
   `every 3h · last ✓ 2h ago · next 1h`, `last ✗ post: exit 2 9h ago`, `last ○ nothing pending 1h
   ago` or `never`; a service `pid 4123 · up 3h · :3060`, `stopped`, or `✗ died 1` — a stopped row
   wears its alert's own words — and `tab→detached` on the end where the tab could not be opened.
   A manifest that does not parse costs the project its rows and draws one dim
   `daemons.yaml: <error>` line instead.
-- The foot keeps a third of the body, never fewer than 5 rows; `A` or `D` pressed on the tab already drawn gives it all of it. Its header
-  is the two tabs, the drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back.
+- The foot keeps a third of the body, never fewer than 5 rows. Its header is the two tabs, the
+  drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back. Pressed on the tab already
+  drawn the key is a size dial instead — the whole screen, then this one row, then a third again —
+  so a foot minimised still counts what came in. Minimised it is that one row and no rule over it:
+  a rule above a single line is a second foot, and the body keeps every row the foot gave up. On a daemon or service row the first tab is that
+  row's log: a daemon has no session and so no activity, and its log is what its row is read for.
+  The word there is `A LOG`, the key before it, because the bright first letter of a tab is always
+  the key that opens it and `L` is Launch.
 
 ### The status bar
 
@@ -118,8 +145,12 @@ A session has no steps to bar and no project to count: `IDLE`, its id, preset an
 long since its last event on the right.
 
 A mission's one human line is the first paragraph of `## Goal` in its `intent.md`, and the MISSION
-pane carries it under the rule, wrapped to two lines with an ellipsis where it cuts and a blank row
-after: what the mission is for deserves whole lines, and a header's tail is where a line gets cut. A stub has no graph and no facts to state, so its right
+pane carries it under the rule at the pane's own edge, wrapped to two lines with an ellipsis where
+it cuts and a blank row after: what the mission is for deserves whole lines, and a header's tail is
+where a line gets cut. Two cells are the pane's unit and nothing in it is one: a step row is
+indented two under the goal, a name too long for the step column still keeps two before the runner,
+and a deviation's wrapped lines sit two in — one cell is not an indent, it is a margin that reads
+as a wobble. A stub has no graph and no facts to state, so its right
 pane is the intent form instead.
 
 The SESSION pane says what ACTIVITY cannot at a glance: `now`, the `bash` or `sub` row still out
@@ -128,11 +159,11 @@ turn's; `spend`, the session's own tokens in and out and `context`, what its las
 the one figure that says how full the window is. Its last word is the log's last row, and the
 pane does not repeat it.
 
-DAEMON is the manifest entry and what the supervisor wrote about it: `cmd`, `cwd`, `env`, then
-`every` with its `atMost`, `when` and `timeout`, or `run` with its restart policy and port; then
-`pid`, `last` as a glyph, its summary and how long ago, `next`, and `alert` in warning. Under a
-`LOG` rule, whatever height is left is the tail, newest at the foot. `l` gives the log the whole
-pane — the header, the line count and the last thirty lines, nothing else — and `←` or `Esc` leaves.
+DAEMON, or SERVICE on a service, is the manifest entry and what the supervisor wrote about it:
+`cmd`, `cwd`, `env`, then `every` with its `atMost`, `when` and `timeout`, or `run` with its
+restart policy and port; then `pid`, `last` as a glyph, its summary and how long ago, `next`, and
+`alert` in warning. The facts and nothing else: the log is the foot's, where it has the width of
+the screen and the sizes every foot pane has.
 
 The bar is also the one line the screen takes a name on. `R` asks for one there — the label, what
 has been typed, a cursor — and while the line is open every key is a character but `↵`, `Esc` and
@@ -176,14 +207,20 @@ the branch, and fixed once the folder exists — renaming a stub is delete and r
 the name is drawn and never focused; `Mission Goal`, what the mission is for; `What done looks
 like`, one per line; `Extra`, the guardrails, what not to touch and where to start from, one field
 so the form stays short; `Autonomy`, a dial, `full | partial | none`; and `Shape`, a dial,
-`auto | quick | chore | research | train | story`, the chosen one bright on each. `auto` leaves the
+`auto | session | chore | research | train | story`, the chosen one bright on each. `auto` leaves the
 stub on the `intent` workflow for the Orchestrator to shape; a name is that preset's whole graph,
 written on `^S` only when the dial was turned, so a stub on a workflow the dial does not list keeps
 it. Every label ends in a colon behind a `›`, and a blank row follows every input, so a label never
 reads as a value.
 
 Every field is a message-box draft — the same editor, the same wrap, the same cursor — so `↵` is a
-line break inside a field and the field is changed with `⇥` and `⇧⇥`. `^S` saves: an empty goal or
+line break inside a field and the field is changed with `⇥` and `⇧⇥`. Not on `Name`: a name is one
+line, the folder and later the branch, so `↵` there is `⇥` and walks to the goal. `⇧↵` walks the
+fields too, wherever the cursor is — the same chord that sends a message, so one hand ends both —
+and on the Shape dial, the last stop, it saves the way `^S` does, so the form is finished where
+the eye already is. A terminal that cannot tell `⇧↵` from `↵` still has `⇥` and `^S`. Every field draws every line it holds and nothing
+scrolls inside an input: the pane is what scrolls, under the fixed header and rule, moved by the
+least that keeps the cursor's row on screen, the way the left list moves under its own. `^S` saves: an empty goal or
 a name that is not a slug, taken, or empty is refused with a toast naming the field and the cursor
 put on it, and nothing is written. `Esc` hands the keys back and keeps the draft, one per row, so
 `↑↓` between two stubs keeps what was typed into each; a draft nothing was changed in is dropped
@@ -202,6 +239,25 @@ keeps it and the pane goes on showing it, so a value the row never gave is never
 The CLI's own `mission open` is not: running it is a deliberate act, and a bare stub is a fair
 thing to open by hand.
 
+### The SERVICE form
+
+`P` on any of a project's rows gives the same pane the other form the engine draws: one entry of
+that project's `.factory/daemons.yaml`, filled in where the rows it makes are read. Adding
+background work was the last common path that still needed an editor and a shell.
+
+The `Kind` dial, `daemon | service`, is the first row because it decides the rest: `Name`, a
+lowercase slug that is half the row's key, `Description`, `Command` and `Working dir` are both
+kinds'; a daemon adds `Every`, a service a `Restart` dial and `Port`. What the other kind uses is
+not drawn — a form with three dead fields in it reads as a form that does not know what is being
+made. The title is the dial's own word, `DAEMON  ivy` or `SERVICE  ivy`.
+
+`^S` refuses a name that is not a slug or that the manifest already has, an empty `cmd` and an
+`every` its own parser will not read, each with the cursor put on the field, the way the intent
+form refuses. What it writes is one block appended: the file is made with a one-line header when
+it is not there, and nothing already in it is rewritten, because the comments, the order and the
+fields in it are a human's. The entry arrives **off** — a command typed into a form has never run
+once — and `R` on its row is what says it may.
+
 ### The Inbox
 
 Every open gate, waiting decision and waiting question across all projects, keyed
@@ -212,10 +268,18 @@ most final messages are statements, and a statement rings nobody. A closed missi
 session, if it still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
 `777;notify`. A daemon whose run failed or whose service died is a row here too, under the project
 that declares it, and its command is `factory daemon log <project>/<name>`: reading the log is what
-answers it, so the row goes when the alert is cleared. Messages, the right pane over it, shows the
-selected item's body and that command.
+answers it, so the row goes when the alert is cleared — `A` on the row is the same call. Messages, the right pane over it, shows the
+selected item's body and that command. Its rows read as the left column's do: they start at the
+pane's edge with no marker column, how long each has waited sits against the right edge, and the
+selected row inverts while the pane has the focus and ends in an accent `›` while it does not.
 
-### The foot: DECISIONS
+### The foot: DECISIONS, ACTIVITY, LOG
+
+On a daemon or service row the first tab is the row's log, the tail as the terminal wrote it,
+colours kept and a long line wrapped to two rows, newest at the foot and `↑↓` walking back through
+it while the foot is full. The count on the right is lines and the tab's `+N` what has come in
+since it was last read. Drawing it is the acknowledgement of the row's alert — the same call
+`factory daemon log` makes — so `A` answers an Inbox row and selecting the row does not.
 
 One row per decision of whatever the left column has selected — a mission, a project's open
 missions, or every open mission on the Inbox and Global rows — newest last, the mission column present only
@@ -275,14 +339,15 @@ while a global part is in `~/.claude`, warning while it is not there yet or its 
 dim for `project` and `off`. A status word beside it would say the same thing twice, so there is
 none and the description keeps the rest of the row; under the rule the selected part names its
 recommendation before its files, while the pane has the focus — unfocused it has no selection to
-show, so it draws neither the marker nor those rows, the list alone. The rule and the lines under it keep the pane's bottom however
+show, so it draws neither a highlighted row nor those rows, the list alone. Its rows start at the
+pane's edge, like the left column's: the marker column went with the chevron. The rule and the lines under it keep the pane's bottom however
 long the list is, and the list is what a short terminal loses, clipped around the row the
 selection sits on: `↵` asks for a `Y` on the apply line, and an apply line drawn past the foot is
 one nobody can read. A graph row in MISSION ends in two right-aligned columns, tokens
 then wall time, so the numbers read down the pane, and a step the mission looped back to carries a
 dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each entry its own wrapped
 line, and is absent at zero. A session under a project is named by what `--name` or `/rename`
-called it, else by its id, then `· <preset>`, never by its preset alone: two quick sessions must
+called it, else by its id, then `· <preset>`, never by its preset alone: two bare sessions must
 not read the same. The `no missions` hint is absent while a session is standing there; with
 nothing under a project at all it says `create one with M`. A session's mark is a diamond, `◈`
 working and `◇` idle, where every mission row carries a circle: a session is a place you type
@@ -343,11 +408,14 @@ keys do, and none of these three do the same thing.
 | `^V`    | message box      | paste the clipboard; `⌘V` is the terminal's own paste and lands the same |
 | `Esc`   | message box      | keep the draft, hand the keys back                               |
 | `↵`     | stub row         | edit its intent in the form, on the goal                          |
-| `⇥` `⇧⇥` | intent form     | the next field, the one before; the last stops are the two dials  |
-| `←→`    | intent form      | on a dial, turn it; in a field, walk the text                     |
+| `⇥` `⇧⇥` | either form    | the next field, the one before; a field the entry does not use is not a stop |
+| `⇧↵`    | either form      | the next field, wherever the cursor is; on the last stop it saves  |
+| `↵`     | either form      | a line break; on `Name` the next field, because a name is one line |
+| `←→`    | either form      | on a dial, turn it; in a field, walk the text                     |
 | `^S`    | intent form      | save: the stub is made, or its `intent.md`, autonomy and graph rewritten |
-| `^U`    | intent form      | clear the field                                                   |
-| `Esc`   | intent form      | hand the keys back; a draft nothing changed is dropped |
+| `^S`    | SERVICE form     | save: the entry is appended to `.factory/daemons.yaml`, off       |
+| `^U`    | either form      | clear the field                                                   |
+| `Esc`   | either form      | hand the keys back; a draft nothing changed is dropped |
 | `←`     | right            | back to the left pane                                            |
 | `Esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
 | `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
@@ -361,25 +429,33 @@ keys do, and none of these three do the same thing.
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |
 | `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
-| `Space` | daemon row       | the daemon or service on, off — `daemons:` in `~/.factory/config.yaml` |
-| `R`     | daemon row       | run a daemon now, past its cadence and idle gates; start a service |
-| `X`     | daemon row       | stop it, killing the process group                               |
-| `L`     | daemon row       | the log alone in the right pane, the alert cleared; Launch is not turned here |
-| `↵`     | daemon row       | DAEMON: the entry, the last result and the last thirty log lines |
-| `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
-| `L`     | any but a daemon row | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
+| `P`     | project's rows   | the SERVICE form for a new entry in that project's `.factory/daemons.yaml`; it arrives off and `R` runs it |
+| `R`     | project row      | rename it on this machine: one line in `names:` in `~/.factory/config.yaml`, and its daemon keys, their state folder and its `order:` keys move with it |
+| `U`     | project row      | uninstall the parts and drop the project from `~/.factory/projects`, after a `Y` on the status bar; the checkout and its own `.factory/` stay |
+| `N`     | left             | a new project: a path typed on the status bar, then what `factory install <path> --yes` does, registered |
+| `R`     | daemon row       | run a daemon now past its cadence and idle gates, or start a service, turning the row on — `daemons:` in `~/.factory/config.yaml` |
+| `X`     | daemon row       | stop it, killing the process group, and turn the row off         |
+| `A`     | daemon row       | the foot draws the row's log and acknowledges its alert: the call `factory daemon log` makes |
+| `↵`     | daemon row       | DAEMON, or SERVICE: the entry and what the last run left          |
+| `⇧↑↓`   | left             | move the row past its neighbour of the same kind — projects, missions, sessions, each within its own run of the list; the order is kept in `~/.factory/config.yaml` |
+| `L`     | any              | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
-| `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
-| `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |
+| `D`     | any              | the foot draws DECISIONS; on it already, its size: full, the tab row alone, a third |
+| `A`     | any              | the foot draws ACTIVITY, or a daemon row's LOG; on it already, its size, the same three |
 | `?`     | any              | the KEYS panel                                                   |
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
-project `M`, a daemon row `Space R X L` with `R` reading `Run` on a daemon and `Start` on a
-service, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
-with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
-Autonomy` on a stub, whose pane is the form and not MISSION.
+project `M R U`, a daemon row `R X` with `R` reading `Run` on a daemon and `Start` on a
+service, the Inbox and `Global` none of them; `P New Service` follows on all four, because the
+manifest it writes belongs to the project every one of those rows hangs under; `N New Project`
+follows whatever the row itself answers, on every left row, because the project it makes is the
+one the list does not hold yet; `↵` reads `Edit` on a stub, `Message` on a row with a session
+behind it and `Open` on the rest. In the right pane the same rule drops `→ T Autonomy` on a stub,
+whose pane is the form and not MISSION. A bar too long for the terminal loses `? Help` first —
+the panel it opens lists every key anyway — then `S Show Archived`, and nothing else: what the row
+answers and what `Launch` and `Caffeinate` are set to are why the bar is there.
 
 A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `R`
 keeps the Factory's word on the session's own events file: one `Rename` line carrying what the
@@ -390,8 +466,9 @@ screen's name outranks the transcript's; it is the later word. The order `⇧↑
 outside it stays. What a list does not name follows it, as it came: a new stub lands last, a
 session that appears lands last.
 
-The panel is HOW FACTORY WORKS, the primer, then TERMS, the words the screen uses, then KEYS, one
-key to a line under its pane. Top down, so what a short terminal loses is the end of the key list,
+The panel is HOW FACTORY WORKS, the primer, then HOW TO USE, the five paths through the screen
+with the keys that walk them — create a project, add parts, start a mission, watch activity and
+decisions, run daemons and services — then KEYS, one key to a line under its pane. Top down, so what a short terminal loses is the end of the key list,
 which the bar repeats. While the Inbox is empty the panel stands where MESSAGES would, so a fresh
 install opens on it.
 

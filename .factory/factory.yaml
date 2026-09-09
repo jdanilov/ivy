@@ -11,7 +11,7 @@ recipes:
       - bash scripts/e2e.sh
       # The two surfaces the CLI walk never reaches: the screen under keys, and the hook's
       # decision paths fired the way Claude Code fires them. Both check themselves.
-      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a f up escape d '?'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right down down return left a up escape d '?'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row global right space return escape escape
       # The intent form: `m` opens it on a project row, and each `--expect` is the toast's own
       # words and no field label, so the line fails the moment a guard stops refusing. The refusal
@@ -19,11 +19,42 @@ recipes:
       # goal guard writes a mission into `.factory/missions/` here and fails after the write.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' m type:x C-s --expect 'goal is empty'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/recall' o --expect 'no goal'
-      # The daemon rows: `↵` opens the DAEMON pane, `l` gives the log the pane, `Esc` goes back.
-      # `space` writes nothing here — the fixture's rows are in no project's manifest, so the CLI
+      # The daemon rows: the foot's first tab is the row's log, `A` acknowledges its alert and
+      # gives the log the screen, and `↵` is the entry's own facts — SERVICE over a service.
+      # `r` writes nothing here — the fixture's rows are in no project's manifest, so the CLI
       # verb behind the key refuses, and the refusal is the assertion. It is given room to land.
-      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/cws-reviews' return escape l escape --expect 'LOG'
-      - bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'ivy/api' space --expect 'no daemon'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/cws-reviews' a --expect 'LOG'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/api' return --expect 'SERVICE'
+      # The foot's three sizes under one key: full, the tab row alone, then a third again — the
+      # tab drawn, a row of its body back on screen, and the row's own key bar, not the full foot's.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/refit' a a a --expect 'ACTIVITY' --expect 'Round 2 accepted?' --expect '↑↓ Select'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'ivy/api' r --expect 'no daemon'
+      # The left list: on a 20-row screen it is eight rows tall and the fixture has nineteen, so
+      # walking down to the last row is only readable if the list scrolled under the selection.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --rows 20 down down down down down down down down down down down down down down --expect 'closed 4d ago'
+      # The selection while the focus is in the right pane: the chevron at the row's right end.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right --expect '›'
+      # The intent form on a 24-row screen: the body leaves it eleven rows and seven lines are
+      # typed into `done`, so the first of them is drawn only because the pane scrolled and not
+      # the field — `INTENT` is the header that stays put over it.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --rows 24 --row 'p ivy' m type:x return tab type:a1 return type:a2 return type:a3 return type:a4 return type:a5 return type:a6 return type:a7 --expect 'INTENT' --expect 'a1' --expect 'a7'
+      # `↵` on Name walks to the goal — a name that took the break would not be a slug and the
+      # save would refuse — and `⇧↵` walks the four fields after it to the Shape dial, where it
+      # saves. The one `tui-keys` line that writes: the stub lands in this checkout's own
+      # ignored `.factory/missions/`, so the line throws it away on either side of itself.
+      - rm -rf .factory/missions/*-formsave; bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'p ivy' m type:formsave return type:a S-return S-return S-return S-return S-return --expect 'stub formsave'; s=$?; rm -rf .factory/missions/*-formsave; exit $s
+      # Projects from the screen: a project row answers `R` and `U`, every left row `N`, and the
+      # bar is read with no key pressed at all. `u` is the one key that would take the parts off
+      # this very checkout — the fixture's `ivy` row is it — so the line answers the confirm with
+      # anything but `y` and the assertion is that nothing happened.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' --expect 'U Uninstall' --expect 'N New Project'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' u type:n return --expect 'kept'
+      # The service form: `p` opens it on the project row and `^S` refuses the first field that is
+      # empty by name. The refusal is the assertion again — a `cmd` typed here would land in this
+      # checkout's own committed manifest — and `x` in the name is what gets it past the slug rule.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' p type:x C-s --expect 'cmd'
+      # The panel: what a human who has read no doc opens first.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 '?' --expect 'HOW TO USE'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { Row } from '../core/daemons.js';
 import { listRows, logFile, manifestFile, readLogTail, readState, writeRequest, writeState } from '../core/daemons.js';
 import { writeDaemonEnabled } from '../core/config.js';
+import { existingProjects, projectName } from '../core/projects.js';
 import { Refusal } from '../core/mission.js';
 import { supervisorPid } from '../core/supervisor.js';
 import { field, headerRow, rule } from '../ui/format.js';
@@ -11,6 +12,8 @@ import { I, colors } from '../ui/theme.js';
  *  so a key and its CLI twin are the same call and neither surface can drift from the other. */
 
 const KEY = '<project>/<name>';
+/** What `factory daemon log` prints with no `-n`, and what the TUI's `A` reads on its way in. */
+export const LOG_LINES = 30;
 const need = (value: string | undefined, usage: string): string => {
   if (!value) throw new Refusal(usage);
   return value;
@@ -22,9 +25,6 @@ export async function daemon(sub: string, args: string[]): Promise<void> {
       return list(args[0]);
     case 'status':
       return show(need(args[0], `daemon status ${KEY}`));
-    case 'on':
-    case 'off':
-      return say(await setEnabled(need(args[0], `daemon ${sub} ${KEY}`), sub === 'on'));
     case 'run':
       return say(await runNow(need(args[0], `daemon run ${KEY}`)));
     case 'stop':
@@ -32,11 +32,18 @@ export async function daemon(sub: string, args: string[]): Promise<void> {
     case 'log':
       return tail(need(args[0], `daemon log ${KEY} [-f] [-n N]`), args);
     default:
-      throw new Refusal(`daemon: unknown subcommand "${sub ?? ''}" — list, status, on, off, run, stop, log`);
+      throw new Refusal(`daemon: unknown subcommand "${sub ?? ''}" — list, status, run, stop, log`);
   }
 }
 
 const say = (text: string): void => console.log(`${I}${colors.green}✓${colors.reset} ${text}`);
+
+/** A key's first half is the project's display name, which `names:` can put on any path: the
+ *  manifest is found through the name, never built out of it. Unknown names the name itself. */
+async function manifestOf(name: string): Promise<string> {
+  for (const dir of await existingProjects()) if ((await projectName(dir)) === name) return manifestFile(dir);
+  return manifestFile(name);
+}
 
 /** An unknown key names the manifest it is missing from: that is the file the human has to edit. */
 async function findRow(key: string): Promise<Row> {
@@ -44,39 +51,30 @@ async function findRow(key: string): Promise<Row> {
   const row = rows.find((r) => r.key === key);
   if (row) return row;
   const project = key.split('/')[0] ?? '';
+  const file = await manifestOf(project);
   const error = errors[project];
   throw new Refusal(error
-    ? `${key}: ${manifestFile(project)} does not parse — ${error}`
-    : `no daemon "${key}" — it is not in ${manifestFile(project)}`);
+    ? `${key}: ${file} does not parse — ${error}`
+    : `no daemon "${key}" — it is not in ${file}`);
 }
 
 // ── what a key and its CLI twin both call ────────────────────────────────────
 
-/** `off` also stops what is running, and `on` makes a service wanted: the supervisor starts it. */
-export async function setEnabled(key: string, on: boolean): Promise<string> {
-  const row = await findRow(key);
-  await writeDaemonEnabled(key, on ? 'on' : 'off');
-  if (!on && row.state.pid !== undefined) await writeRequest(key, 'stop');
-  if (on && row.entry.kind === 'service') await writeState(key, { ...(await readState(key)), wanted: true });
-  return `${key} ${on ? 'on' : 'off'}`;
-}
-
-/** A run bypasses the cadence, never the enablement: an off row is a refusal with its cure. */
+/** Run is the way on: enabled is the whole desired state, so the verb that asks for a run says
+ *  the row runs from now on too, and bypasses the cadence and the idle gate on top of it. */
 export async function runNow(key: string): Promise<string> {
   const row = await findRow(key);
-  if (!row.state.enabled) throw new Refusal(`${key} is off — factory daemon on ${key}`);
-  if (row.entry.kind === 'service') {
-    await writeState(key, { ...(await readState(key)), wanted: true });
-    await writeRequest(key, 'start');
-    return `${key} starting`;
-  }
-  await writeRequest(key, 'run');
-  return `${key} queued`;
+  await writeDaemonEnabled(key, 'on');
+  await writeRequest(key, row.entry.kind === 'service' ? 'start' : 'run');
+  return `${key} ${row.entry.kind === 'service' ? 'starting' : 'queued'}`;
 }
 
+/** Stop is the way off: the request kills what runs, and the row stops being scheduled — a row
+ *  left on would be started again by the next tick, or by its own restart policy. */
 export async function stopRow(key: string): Promise<string> {
   await findRow(key);
   await writeRequest(key, 'stop');
+  await writeDaemonEnabled(key, 'off');
   return `${key} stopping`;
 }
 
@@ -117,11 +115,13 @@ export function rowTail(row: Row): string {
 
 const glyphOf = (row: Row): string => (row.entry.kind === 'daemon' ? '↻' : '▶');
 
-/** Dim off, warning after a failure, accent while it runs: the colours the TUI row uses. */
-function colourOf(row: Row): string {
+/** Warning after a failure, then dim off, accent while it runs: the colours the TUI row uses.
+ *  The failure reads first because a service the supervisor turned off for dying is an off row
+ *  the human still has to look at, and a dim one says nothing happened. */
+export function colourOf(row: Row): string {
   const s = row.state;
-  if (!s.enabled) return colors.dim;
   if (s.alert !== undefined || s.lastStatus === 'fail') return colors.yellow;
+  if (!s.enabled) return colors.dim;
   return s.pid === undefined ? colors.green : colors.cyan;
 }
 
@@ -132,7 +132,7 @@ async function list(project?: string): Promise<void> {
   console.log('');
   if ((await supervisorPid()) === null) console.log(`${I}${colors.dim}supervisor not running — factory supervisor start${colors.reset}`);
   for (const [name, error] of Object.entries(errors)) {
-    if (project === undefined || project === name) console.log(`${I}${colors.red}✗${colors.reset} ${manifestFile(name)} ${colors.dim}${error}${colors.reset}`);
+    if (project === undefined || project === name) console.log(`${I}${colors.red}✗${colors.reset} ${await manifestOf(name)} ${colors.dim}${error}${colors.reset}`);
   }
   for (const row of mine) {
     const head = `${colourOf(row)}${glyphOf(row)}${colors.reset} ${row.key.padEnd(28)}${colors.dim}${rowTail(row)}${colors.reset}`;
@@ -159,7 +159,6 @@ async function show(key: string): Promise<void> {
     field('every', [short(e.every), e.atMost ? `at most ${e.atMost.n}/${short(e.atMost.window)}` : '', `when ${e.when}`, e.timeout ? `timeout ${short(e.timeout)}` : ''].filter(Boolean).join(' · '));
   } else {
     field('run', [e.run, `restart ${e.restart}`, e.port ? `port ${e.port}` : '', s.tabFallback ? 'tab→detached' : ''].filter(Boolean).join(' · '));
-    field('wanted', String(s.wanted === true));
   }
   if (s.pid !== undefined) field('pid', `${s.pid}${s.startedAt ? ` · since ${s.startedAt}` : ''}`);
   if (s.lastStart) field('ran', `${s.lastStart}${s.lastEnd ? ` → ${s.lastEnd}` : ''}`);
@@ -174,7 +173,7 @@ async function show(key: string): Promise<void> {
 /** `-f` and `-n N`, the flags `tail` has: nobody types `--follow` at a log. */
 async function tail(key: string, args: string[]): Promise<void> {
   const n = Number(args[args.indexOf('-n') + 1]);
-  for (const line of await readLog(key, args.includes('-n') && n > 0 ? n : 30)) console.log(`${I}${line}`);
+  for (const line of await readLog(key, args.includes('-n') && n > 0 ? n : LOG_LINES)) console.log(`${I}${line}`);
   if (!args.includes('-f')) return;
 
   // Whatever the supervisor appends, until the human quits; a rotation starts the tail over.

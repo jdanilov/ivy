@@ -78,7 +78,7 @@ function partBlock(p: Pane, part: PartRow, i: number, ui: Ui, global: boolean): 
   // A part whose files no longer match the Factory is neither installed nor available: `update` fixes it.
   const word = status === 'modified' ? 'modified' : on ? 'installed' : 'available';
   const head: Cell[] = [
-    ['  ', C.dim], [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
+    [part.name.padEnd(16), C.bright], [part.type.padEnd(9), C.dim],
     global ? scopeCell(part, status, ui)
       : [`${on ? '●' : '○'} ${word.padEnd(11)}`, status === 'modified' ? C.warning : on ? C.success : C.dim],
   ];

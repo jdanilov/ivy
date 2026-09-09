@@ -13,7 +13,7 @@ tokens**. Spend tokens and minutes to save a minute of the human's, never qualit
 
 ## The loop
 
-◇ intent gate → ≋ spec.md + acceptance.md → ● implement → ↻ review → ⊘ merge gate → close
+◇ intent gate → ≋ spec.md + acceptance.md → ● implement ↻ check → ● review → ● fix → ⊘ merge gate → close
 
 - `intent.md` is the only doc written for the human. Grill until the why is sharp, then gate it. A
   budget in it is provisional — set before the code exists, revised by the spec with a reason, never
@@ -26,17 +26,16 @@ tokens**. Spend tokens and minutes to save a minute of the human's, never qualit
 
 ## Graph
 
-A mission starts unshaped: `workflow.yaml` is the `intent` workflow, one gated step and nothing after
-it. Propose a preset and an autonomy under `## Shape` in `intent.md`; once the gate is answered,
-`factory mission shape <preset> --autonomy L` appends that preset's steps behind `intent`. A stub
-shaped from the form's Shape dial arrives with its graph: gate the intent, skip the proposal. `merge`
-spawns the Summarizer first — `retro.md` is part of what the human approves — then opens the gate.
-`step add|skip|loop` customise a shaped graph, nothing reshapes it; `mission new --quick` skips all
-of it, one `work` step with no intent to shape.
+A mission starts unshaped: `workflow.yaml` is the `intent` workflow, one gated step and no more.
+Propose a preset and an autonomy under `## Shape` in `intent.md`; once the gate is answered, `factory
+mission shape <preset> --autonomy L` appends that preset's steps behind `intent`; a stub from the
+form's Shape dial arrives shaped: gate the intent, skip the proposal. `merge` spawns the Summarizer
+first — `retro.md` is part of what the human approves — then opens the gate. `step add|skip|loop`
+customise it, nothing reshapes it; `mission new --session` skips it all, one `work` step.
 
 | Preset     | Steps after `intent`                                                | Fits                    |
 |------------|---------------------------------------------------------------------|-------------------------|
-| `story`    | research → spec → implement → review (verify ∥ validate, back to implement, max 3) → merge | a feature, anything with a contract |
+| `story`    | research → plan → implement → check (loop to implement, max 8) → review (verify ∥ validate, once) → fix → merge | a feature, anything with a contract |
 | `chore`    | implement → merge; `--verify` adds verify (back to implement, max 2) | mechanical work, a known bug with it |
 | `research` | investigate (sources ∥ transcripts) → report                        | a question, no code     |
 | `train`    | plan → implement → check (you, back to implement, max 8) → merge   | a large task in legs, no gatekeepers |
@@ -44,7 +43,7 @@ of it, one `work` step with no intent to shape.
 ## CLI
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--session] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
 factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset P] [--dry-run] | list [--all] | status|resume|close [name] | adopt <name> --session <id>
 factory step start|done|skip|loop <step> [--reason R] [--mission M] | add <step> --after <step> --role R --reason R
@@ -67,9 +66,9 @@ and `@Summarizer`. Never commit while a Worker or gatekeeper runs: between spawn
 One Worker per step is the default, packing steps into one is the saving: a spawn costs the context
 it rereads. A step touching under ten files is ~100k tokens, a Worker holds ~300k of useful work.
 Start a new one only when the work must be verified before the next step, the pack would pass ~300k
-tokens, or the next step is a different nature or module. A step split across Workers is `train`:
-`plan` cuts legs as cleanly as separate files, each leg is a round of `implement`, and `check` is
-yours — rerun the verify recipe, read the leg's diff by hunks, hold its ids, `step loop check`.
+tokens, or the next step is a different nature or module. `story` and `train` both split a step
+across Workers: `plan` cuts legs as cleanly as separate files, each leg is a round of `implement`,
+and `check` is yours — rerun the verify recipe, read the diff by hunks, hold its ids, `step loop check`.
 
 ## Gates and questions
 
@@ -94,17 +93,17 @@ human in every mode, as does `max` rounds reached with findings still open.
 A decision is a fork a reviewer might have taken differently: one line in `decisions.md` with a
 confidence and its reason. Sub-agents file theirs in the handoff, you file yours with `decision add`.
 A round's triage is one decision, never one per finding: rank by blast radius, effort and confidence,
-fix wide and cheap first, skip outside the contract by default, and record the plan in `findings.md`;
-accepted findings are the spec for the next round. Autonomy decides which decisions wait: when the
-hook or a `step start` refusal names one, put it to the human and go no further until `decision
-answer <id> accept|overrule --note N`. An overrule is a signal: a new Worker, a spec edit, or nothing.
+fix wide and cheap first, skip outside the contract by default, record the plan in `findings.md`;
+accepted findings are the spec for `fix`. Read the fix's diff against `findings.md` the way `check`
+reads a leg, then open the merge gate: no second review. Autonomy decides which wait: when the hook
+or a `step start` refusal names one, put it to the human and go no further until `decision answer
+<id> accept|overrule --note N`. An overrule is a signal: a new Worker, a spec edit, or nothing.
 
 ## Amending the workflow
 
-Amend when the next step cannot change the outcome and the recorded reason is a real one: `step skip
-research` with nothing to research, `step add <step> --after spec --role worker` for an assertion no
-step owns, `step loop review` when accepted findings mean code must change. Verifier covers code and
-docs, Validator CLI or UI behaviour — one changed, one runs, not both.
+Amend when the next step cannot change the outcome and the reason is real: `step skip research` with
+nothing to read, `step skip fix` with nothing found, `step add <step> --after plan --role worker` for
+an assertion no step owns. Verifier covers code and docs, Validator CLI or UI; one runs, not both.
 
 ## Handoff
 

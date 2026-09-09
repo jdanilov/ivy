@@ -20,7 +20,8 @@ function fact(p: Pane, label: string, cells: Cell[]): void {
   p.row([[label.padEnd(LABEL), C.dim], ...cells]);
 }
 
-/** The step name column, wide enough for the longest name plus the `×N` of a step run again. */
+/** The step name column, wide enough for the longest name plus the `×N` of a step run again. A
+ *  name that outgrows it keeps two cells before the runner: two is the pane's unit, one is a typo. */
 const NAME_COL = 13;
 
 export function missionPane(p: Pane, m: Mission, focused = false): void {
@@ -28,13 +29,14 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   p.row(spread([['MISSION', C.bright], [`  ${m.name}`, C.dim]], m.steps.length ? [[`${done}/${m.steps.length}`, C.dim]] : [], p.width));
   p.rule();
   // What the mission is for: the first paragraph of `## Goal`, joined onto one line since the file
-  // wraps it where the editor did. Two rows of its own, an ellipsis where the second one cuts,
-  // then a blank row so the graph does not read as its third line.
+  // wraps it where the editor did. Two rows of its own at the pane's edge — an indent of one cell
+  // is no indent, it is a margin the eye reads as a wobble — an ellipsis where the second one
+  // cuts, then a blank row so the graph does not read as its third line.
   const goal = m.intent?.goal.split(/\n\s*\n/)[0]?.replace(/\s+/g, ' ').trim() ?? '';
   if (goal !== '') {
-    const rows = wrap(goal, p.width - 1, 2);
-    if (rows.join(' ').length < goal.length) rows[rows.length - 1] = `${rows[rows.length - 1]!.slice(0, p.width - 2)}…`;
-    for (const l of rows) p.row([[' ', C.dim], [l, C.bright]]);
+    const rows = wrap(goal, p.width, 2);
+    if (rows.join(' ').length < goal.length) rows[rows.length - 1] = `${rows[rows.length - 1]!.slice(0, p.width - 1)}…`;
+    for (const l of rows) p.row([[l, C.bright]]);
     p.row([]);
   }
 
@@ -42,8 +44,8 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
     // A step the mission looped back to says so: one run is the norm and carries no mark.
     const again = (s.runs ?? 0) > 1 ? ` ×${s.runs}` : '';
     const cells: Cell[] = [
-      [' ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind)], [again, C.dim],
-      [' '.repeat(Math.max(1, NAME_COL - s.name.length - again.length)), C.dim],
+      ['  ', C.dim], [`${GLYPH[s.status]} `, stateColor(s.status)], [s.name, stepColor(s.kind)], [again, C.dim],
+      [' '.repeat(Math.max(2, NAME_COL - s.name.length - again.length)), C.dim],
       [runner(s), C.dim], ...(s.gateOpen ? ([['  ⊘', C.warning]] as Cell[]) : []),
     ];
     // What the step itself cost: tokens it added and produced. Cache reads re-send the whole
@@ -69,7 +71,7 @@ export function missionPane(p: Pane, m: Mission, focused = false): void {
   if (!m.deviations.length) return;
   p.rule();
   p.row([['DEVIATIONS', C.bright], [`  ${m.deviations.length}`, C.dim]]);
-  for (const d of m.deviations) for (const l of wrap(d, p.width - 1, 2)) p.row([[' ', C.dim], [l, C.dim]]);
+  for (const d of m.deviations) for (const l of wrap(d, p.width - 2, 2)) p.row([['  ', C.dim], [l, C.dim]]);
 }
 
 /** The session's own facts, narrower than a mission's: `session`, `cwd`, `now`, `turn`, `spend`. */

@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { mkdir, rename } from 'node:fs/promises';
 import { readDaemonEnabled } from './config.js';
-import { existingProjects, factoryHome } from './projects.js';
+import { Refusal } from './mission.js';
+import { existingProjects, factoryHome, projectName } from './projects.js';
 
 /** Enablement is per machine, so it is read from the config and never from the project's manifest. */
 export const enabledOf = readDaemonEnabled;
@@ -54,12 +55,11 @@ export interface DaemonState {
   nextDue?: string;
   successes?: string[];
   restarts?: string[];
-  wanted?: boolean;
   alert?: string;
   tabFallback?: boolean;
 }
 
-/** `key` is `<project folder>/<name>`, the name Mission Control gives a row; `project` its dir. */
+/** `key` is `<project name>/<name>`, the name Mission Control gives a row; `project` its dir. */
 export interface Row {
   key: string;
   project: string;
@@ -160,6 +160,50 @@ function parseEnv(raw: unknown, fail: (msg: string) => never): Record<string, st
   }));
 }
 
+/** A new entry as a human typed it: `every` and `port` are still their own text, so the file
+ *  reads back the way it was written — `every: 3h`, not the milliseconds the parser makes of it. */
+export interface NewEntry {
+  name: string;
+  kind: Kind;
+  description?: string;
+  cmd: string;
+  cwd?: string;
+  every?: string;
+  restart?: Service['restart'];
+  port?: string;
+}
+
+/** The header a manifest the Factory makes starts with; one a human wrote already has its own. */
+const HEADER = '# What this project runs in the background: factory daemon list\n';
+
+/** The fields of a written entry, in the order the manifest's own table lists them. */
+const WRITTEN: (keyof Omit<NewEntry, 'name'>)[] = ['kind', 'description', 'cmd', 'cwd', 'every', 'restart', 'port'];
+
+/** Quoted where the value is a human's line and would otherwise be YAML — a `cmd` holds colons,
+ *  a description holds anything — plain where the field is one of the manifest's own words. */
+const scalar = (key: string, value: string): string =>
+  `  ${key}: ${key === 'cmd' || key === 'description' || key === 'cwd' ? JSON.stringify(value) : value}\n`;
+
+/**
+ * `P` in Mission Control, the one writer of a manifest: the entry is appended and nothing already
+ * in the file is rewritten, because the comments, the order and the fields in it are a human's and
+ * a round trip through the parser would drop every one of them. A name the file already has is
+ * refused rather than merged — two entries under one name is a manifest that does not parse.
+ */
+export async function writeEntry(projectDir: string, entry: NewEntry): Promise<void> {
+  const file = manifestFile(projectDir);
+  const manifest = await readManifest(projectDir);
+  if (manifest.error) throw new Refusal(`${file} does not parse — fix it first: ${manifest.error}`);
+  if (manifest.entries.some((e) => e.name === entry.name)) throw new Refusal(`${projectDir} already runs ${entry.name}`);
+
+  const block = `${entry.name}:\n` + WRITTEN
+    .filter((key) => entry[key] !== undefined && entry[key] !== '')
+    .map((key) => scalar(key, entry[key]!)).join('');
+  const text = (await Bun.file(file).text().catch(() => '')) || HEADER;
+  await mkdir(path.dirname(file), { recursive: true });
+  await Bun.write(file, `${text.replace(/\n*$/, '\n')}\n${block}`);
+}
+
 // ── state, requests and logs, under ~/.factory/daemons/<project>/<name>/ ──────
 
 export const daemonDir = (key: string): string => path.join(factoryHome(), 'daemons', key);
@@ -168,10 +212,12 @@ export const requestFile = (key: string): string => path.join(daemonDir(key), 'r
 
 export const logFile = (key: string): string => path.join(daemonDir(key), 'log');
 
-/** A hand-written or half-written state file is no state, never a throw in the reader's face. */
+/** A hand-written or half-written state file is no state, never a throw in the reader's face.
+ *  `wanted` was a second desired state beside `enabled`; a file still carrying one is read past. */
 export async function readState(key: string): Promise<DaemonState> {
   const raw = await Bun.file(path.join(daemonDir(key), 'state.json')).json().catch(() => ({}));
-  return { ...(isRecord(raw) ? (raw as Partial<DaemonState>) : {}), enabled: false };
+  const { wanted, ...stored } = isRecord(raw) ? (raw as Partial<DaemonState> & { wanted?: unknown }) : {};
+  return { ...stored, enabled: false };
 }
 
 /** Temp file plus rename: the TUI reads this while the supervisor writes it. */
@@ -228,9 +274,11 @@ export async function listRows(): Promise<{ rows: Row[]; errors: Record<string, 
 
   for (const project of await existingProjects()) {
     const manifest = await readManifest(project);
-    if (manifest.error) errors[path.basename(project)] = manifest.error;
+    // The project's display name, not its folder's: a renamed project takes its keys with it.
+    const name = await projectName(project);
+    if (manifest.error) errors[name] = manifest.error;
     for (const entry of manifest.entries) {
-      const key = `${path.basename(project)}/${entry.name}`;
+      const key = `${name}/${entry.name}`;
       const state = await readState(key);
       state.enabled = await enabledOf(key);
       rows.push({ key, project, entry, state });

@@ -8,7 +8,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Term      | Meaning                                                                                              |
 |-----------|------------------------------------------------------------------------------------------------------|
 | Factory   | This repo and its CLI. Installs parts, tracks missions across projects, runs Mission Control.        |
-| Project   | A git repo registered with the Factory. Owns `.factory/` and an optional `factory.yaml`.             |
+| Project   | A git repo registered with the Factory. Owns `.factory/` and an optional `factory.yaml`. Called by the name `names:` in `~/.factory/config.yaml` gives its path, else its folder's. |
 | Part      | One installable unit, copied in and tracked in a manifest. Type skill, tool, fixture or mcp; scope `project` (into `.claude/`) or `global` (into `~/.claude/`), what `part.yaml` recommends until `~/.factory/config.yaml` says otherwise — `off` is a scope too. |
 | Preset    | Spawn-time bundle for a session: prompt file, settings overlay, MCP list, model, effort.             |
 | Workflow  | An ordered YAML list of steps that says how a mission is run. Every mission starts on `intent`; `mission shape <preset>` appends the rest. |
@@ -33,7 +33,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Stub         | A mission with an intent and no branch. `mission open` promotes it.                               |
 | Archive      | `.factory/archive/<dir>`, where `mission archive` moves a closed mission's folder. Only `mission list --all` reads it. |
 | Daemon       | A periodic command a project declares in its Manifest: `every`, optional `atMost` and `when`, run by the Supervisor. Exit 0 is ok, exit 0 with a last stdout line `{"skip":…}` is skip, non-zero is fail. Glyph `↻`. |
-| Service      | A long-running command a project declares in its Manifest: `detached` or in a `tab`, with a `restart` policy. Runs while it is enabled and `wanted`. Glyph `▶`. |
+| Service      | A long-running command a project declares in its Manifest: `detached` or in a `tab`, with a `restart` policy. Runs while it is enabled; `restart` acts only while it is. Glyph `▶`. |
 | Supervisor   | The one Factory process per machine that runs every enabled Daemon and Service. `factory supervisor start`, a liveness-checked pid file under `~/.factory/supervisor/` as its lock; `install` writes the one OS unit that keeps it alive at login. |
 | Orchestrator | The interactive Fable session bound to a mission. Plans, delegates, asks, triages, records steps. Never implements. Never merges by hand. |
 | Worker       | Opus sub-agent that implements one step with clean context. Serial, one at a time per mission.    |
@@ -68,9 +68,9 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 | Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No broker: every surface reads the files. |
 | Mission Control | The Factory TUI, `factory` with no arguments. Reads the files the CLI writes, writes through the CLI's own functions. |
 | Inbox           | Every open gate, waiting decision, waiting question and daemon Alert across all projects. Each names the command that answers it. |
-| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row. Answered by `factory daemon log <key>`, or `l` on the row: reading the log is the acknowledgement, and a next success clears it too. |
+| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row; a death no `restart` policy will retry turns the row off beside it. Answered by `factory daemon log <key>`, or `A` on the row, which draws the same log in the Foot: reading the log is the acknowledgement, and a next success clears it too. |
 | Messages        | The right pane over the Inbox: the selected item's body and its answering command. Read-only.   |
-| Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, for whatever the left column has selected. |
+| Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, a daemon or service row's log on `A`, for whatever the left column has selected. The drawn tab's own key sizes it: a third of the body, the whole screen, the tab row alone. |
 | Message box     | Under the foot on `↵`: a message to the selected row's session, posted to its inbox socket. One draft per row, kept until sent. |
 | Caffeinate      | Whether the Mac is held awake: `auto` per turn, `on` per session, `off` never. Key `caffeinate` in `~/.factory/config.yaml`. |
 | Changes         | Warp's own diff panel. The Factory does not render diffs.                                       |

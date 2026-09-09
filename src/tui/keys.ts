@@ -2,19 +2,22 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, openTab, readLog, renameSession, runNow, saveIntent,
-  sendMessage, setAutonomy, setCaffeinate, setEnabled, setLaunch, stopRow,
+  addEntry, applyParts, applyScopes, archive, killSession, newProject, openTab, readLog, renameProject,
+  renameSession, runNow, saveIntent, sendMessage, setAutonomy, setCaffeinate, setLaunch, stopRow, uninstallProject,
 } from './actions.js';
+import { LOG_LINES } from '../commands/daemon.js';
+import { parseDuration, type NewEntry, type Service } from '../core/daemons.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
-import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
+import { clamp, itemKey, leftItems, select, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
-import { LOG_LINES, seedTail } from './panes/daemon.js';
+import { seedTail } from './panes/foot.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
-import { AUTONOMY, AUTONOMY_FIELD, FIELDS, SHAPES, SHAPE_FIELD, draftFor, formOf, shapeOf, showsParts, untouched, workflowOf, type Form } from './panes/form.js';
+import { defOf, draftFor, fieldAt, showsParts, stops, untouched, type FormDraft, type FormKind } from './panes/form.js';
+import { AUTONOMY, intentForm, shapeOf, workflowOf, type Shape } from './panes/intent.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
-import type { Caffeinate, Intent, Launch, Mission, Project } from './model.js';
+import type { Autonomy, Caffeinate, Intent, Launch, Mission, Project } from './model.js';
 
 /** What every key does. The screen draws; this is the only place a keypress changes anything. */
 
@@ -85,80 +88,153 @@ function composing(app: App, key: KeyEvent): void {
 }
 
 /**
- * The intent form has the keys: `⇥` walks the fields, `↵` breaks a line inside one, `^S` writes
- * the stub, `Esc` hands the keys back and keeps what was typed. Every field is a message-box
- * draft, so the editing below the field level is `editKey`'s and nothing here repeats it.
+ * A form has the keys: `⇥` and `⇧↵` walk its stops, `↵` breaks a line inside a field and walks on
+ * a one-line one, `←→` turn a dial, `^S` — or `⇧↵` on the last stop — saves, `Esc` hands the keys
+ * back and keeps what was typed. Which form it is decides two things and no more: the definition
+ * whose fields these are, and the save. Every field is a message-box draft, so the editing below
+ * the field level is `editKey`'s and nothing here repeats it.
  */
 function forming(app: App, key: KeyEvent): void {
   const { ui } = app;
   const { here } = select(app.snap, ui);
-  const form = formOf(here);
+  const kind = ui.form!;
+  const def = defOf(kind);
   // The row moved out from under the form — an archived stub, a promoted one: the keys go back.
-  if (form === null) {
-    ui.form = false;
+  if (def.key(here) === null) {
+    ui.form = null;
     return draw(app);
   }
-  const d = draftFor(ui, here);
-  // A stub's name is fixed once the folder exists, so the cursor never lands on it there.
-  const first = form.create ? 0 : 1;
-  const stops = SHAPE_FIELD + 1 - first;
-  const field = FIELDS[d.field];
+  const d = draftFor(ui, kind, here);
+  const fields = def.fields(here, d);
+  // The stops the walk knows: a field the entry has no use for, or one the form only draws, is
+  // not one of them. A cursor that has fallen off them lands back on the first.
+  const walk = stops(fields);
+  const at = Math.max(0, walk.indexOf(d.field));
+  const field = fields[d.field];
+  // The draft under the cursor; nothing while it is on a dial, which has no text to edit.
+  const text = field && field.options === undefined ? d.texts[field.key] : undefined;
+  // `⇧↵` walks the fields the way `⇥` does, so the chord that ends a message ends a field too,
+  // and on the last stop it saves — the form is finished where the eye already is. `↵` walks a
+  // one-line field for the same reason it cannot break a line there: a name is a folder, a branch
+  // and half a daemon's key.
+  const shifted = key.name === 'return' && key.shift;
+  const walks = key.name === 'tab' || shifted || (key.name === 'return' && field?.line === true);
 
   if (key.name === 'escape') {
-    ui.form = false;
+    ui.form = null;
     // A draft still equal to what it was made from leaves nothing behind: the project row goes
     // back to its parts, a stub's pane back to following its file. A changed one is kept, and
     // the pane keeps showing it.
-    if (untouched(d, here)) delete ui.intents[form.key];
-  } else if (key.name === 'tab') {
-    d.field = first + (((d.field - first + (key.shift ? -1 : 1)) % stops) + stops) % stops;
-  } else if (key.ctrl && key.name === 's') return saveForm(app, form, d);
+    if (untouched(kind, d, here)) delete ui.forms[def.key(here)!];
+  } else if (shifted && d.field === walk.at(-1)) return SAVES[kind](app, here, d);
+  else if (walks) {
+    const back = key.name === 'tab' && key.shift;
+    d.field = walk[(at + (back ? walk.length - 1 : 1)) % walk.length]!;
+  } else if (key.ctrl && key.name === 's') return SAVES[kind](app, here, d);
   else if (key.ctrl && key.name === 'u') {
-    if (field) d[field[0]] = { text: '', cursor: 0 };
-  } else if (field === undefined && (key.name === 'left' || key.name === 'right')) {
-    const right = key.name === 'right';
-    if (d.field === AUTONOMY_FIELD) d.autonomy = turn(AUTONOMY, d.autonomy, right);
-    else d.shape = turn(SHAPES, d.shape, right);
-  } else if (field === undefined) return;
-  else if (key.ctrl && key.name === 'v') return pasteClipboard(app, d[field[0]]);
-  else if (!editKey(d[field[0]], key, rightWidth(app.r))) return;
+    if (field && text) d.texts[field.key] = { text: '', cursor: 0 };
+  } else if (field?.options && (key.name === 'left' || key.name === 'right')) {
+    d.dials[field.key] = turn(field.options, d.dials[field.key]!, key.name === 'right');
+  } else if (text === undefined) return;
+  else if (key.ctrl && key.name === 'v') return pasteClipboard(app, text);
+  else if (!editKey(text, key, rightWidth(app.r))) return;
   draw(app);
+}
+
+/** The form takes the keys with the cursor where its own definition opens it and the pane back at
+ *  its first row: a window left where the last form was scrolled to would open on the middle of
+ *  this one. */
+function openForm(ui: Ui, kind: FormKind, here: LeftItem): void {
+  ui.form = kind;
+  ui.formTop = 0;
+  draftFor(ui, kind, here).field = defOf(kind).fresh(here).field;
+}
+
+/** `M` and `P` are the project's, whichever of its rows is selected: the selection moves to the
+ *  project row and the form opens there, so a draft is always shown by the row it belongs to. */
+function openOnProject(app: App, items: LeftItem[], project: Project, kind: FormKind): void {
+  app.ui.left = items.findIndex((item) => item.kind === 'project' && item.project === project);
+  openForm(app.ui, kind, items[app.ui.left]!);
 }
 
 /** The next option on a dial, or the one before; the ends wrap. */
 const turn = <T>(options: readonly T[], value: T, right: boolean): T =>
   options[(options.indexOf(value) + (right ? 1 : options.length - 1)) % options.length]!;
 
+/** A save is on its way: the draft is gone and the keys are back, and the toast the write returns
+ *  is the only thing left to wait for. */
+function written(app: App, kind: FormKind, here: LeftItem, doing: string, run: () => Promise<string>): void {
+  delete app.ui.forms[defOf(kind).key(here)!];
+  app.ui.form = null;
+  act(app, doing, run);
+}
 
-/** `^S`: what the form refuses is named on the status bar and the cursor is put on it, so the
- *  next keystroke fixes it. Nothing is written until both required fields hold something. */
-function saveForm(app: App, form: Form, d: IntentDraft): void {
-  const { ui } = app;
+/** A save's refusal: the field is named on the status bar and the cursor put on it, so the next
+ *  keystroke fixes it, and nothing is written. */
+const refusing = (app: App, kind: FormKind, here: LeftItem, d: FormDraft) => (key: string, why: string): void => {
+  d.field = fieldAt(kind, here, d, key);
+  toast(app, why);
+};
+
+/** Which save `^S` runs. The only thing `forming` reads the form's kind for, beyond its fields. */
+const SAVES: Record<FormKind, (app: App, here: LeftItem, d: FormDraft) => void> = {
+  intent: saveIntentForm,
+  service: saveServiceForm,
+};
+
+/** `^S` on the intent form: nothing is written until both required fields hold something. */
+function saveIntentForm(app: App, here: LeftItem, d: FormDraft): void {
+  const form = intentForm(here)!;
   const { project, create } = form;
-  const name = create ? d.name.text.trim() : form.name;
-  const goal = d.goal.text.trim();
+  const refuse = refusing(app, 'intent', here, d);
+  const name = create ? d.texts.name!.text.trim() : form.name;
+  const goal = d.texts.goal!.text.trim();
 
-  if (create && !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
-    d.field = 0;
-    return toast(app, 'the name is the folder and the branch — lowercase letters, digits and dashes');
-  }
-  if (create && project.missions.some((m) => m.name === name)) {
-    d.field = 0;
-    return toast(app, `${project.name} already has a mission called ${name}`);
-  }
-  if (goal === '') {
-    d.field = 1;
-    return toast(app, 'goal is empty — say what the mission is for');
-  }
+  if (create && !/^[a-z0-9][a-z0-9-]*$/.test(name)) return refuse('name', 'the name is the folder and the branch — lowercase letters, digits and dashes');
+  if (create && project.missions.some((m) => m.name === name)) return refuse('name', `${project.name} already has a mission called ${name}`);
+  if (goal === '') return refuse('goal', 'goal is empty — say what the mission is for');
 
-  const intent: Intent = { goal, done: d.done.text.trim(), extra: d.extra.text.trim() };
-  const autonomy = d.autonomy;
+  const intent: Intent = { goal, done: d.texts.done!.text.trim(), extra: d.texts.extra!.text.trim() };
+  const autonomy = d.dials.autonomy as Autonomy;
   // The graph is rewritten only when the dial was turned: a stub on a workflow the dial does not
   // list reads `auto` and keeps it, unless the human picks another.
-  const workflow = d.shape === shapeOf(form.workflow) ? null : workflowOf(d.shape);
-  delete ui.intents[form.key];
-  ui.form = false;
-  act(app, `saving ${name}…`, () => saveIntent(project.path, name, intent, autonomy, workflow, create));
+  const shape = d.dials.shape as Shape;
+  const workflow = shape === shapeOf(form.workflow) ? null : workflowOf(shape);
+  written(app, 'intent', here, `saving ${name}…`, () => saveIntent(project.path, name, intent, autonomy, workflow, create));
+}
+
+/** `^S` on the service form: the manifest's own three rules — a name that is a key, a command to
+ *  run, a cadence that parses — checked here so the cursor can land on what was refused, and
+ *  checked again by `writeEntry`, which is the one that has the file in front of it. */
+function saveServiceForm(app: App, here: LeftItem, d: FormDraft): void {
+  const project = here.kind === 'project' ? here.project : null;
+  if (project === null) return;
+  const text = (key: string): string => d.texts[key]!.text.trim();
+  const refuse = refusing(app, 'service', here, d);
+  const daemon = d.dials.kind === 'daemon';
+  const name = text('name');
+
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) return refuse('name', 'the name is half the row\'s key — lowercase letters, digits and dashes');
+  if (project.daemons.some((row) => row.entry.name === name)) return refuse('name', `${project.name} already runs ${name}`);
+  if (text('cmd') === '') return refuse('cmd', 'cmd is empty — say what to run');
+  if (daemon) {
+    try {
+      parseDuration(text('every'));
+    } catch (e) {
+      return refuse('every', e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (!daemon && text('port') !== '' && !/^\d+$/.test(text('port'))) return refuse('port', 'a port is a number, or nothing');
+
+  const entry: NewEntry = {
+    name,
+    kind: daemon ? 'daemon' : 'service',
+    description: text('description'),
+    cmd: text('cmd'),
+    cwd: text('cwd'),
+    ...(daemon ? { every: text('every') } : { restart: d.dials.restart as Service['restart'], port: text('port') }),
+  };
+  written(app, 'service', here, `adding ${name}…`, () => addEntry(project.path, entry));
 }
 
 /**
@@ -201,11 +277,11 @@ function handleKey(app: App, key: KeyEvent): void {
   if (key.name === '?') { ui.help = true; return draw(app); }
 
   // The foot has the screen to itself: the arrows walk back through it, three keys hand it back.
-  if (ui.full) {
+  if (ui.size === 'full') {
     if (key.name === 'up') ui.scroll += 1;
     else if (key.name === 'down') ui.scroll = Math.max(0, ui.scroll - 1);
-    else if (key.name === 'return' || key.name === 'escape') ui.full = false;
-    // The tab's own key: switch to it, or, pressed on the tab already drawn, hand the screen back.
+    else if (key.name === 'return' || key.name === 'escape') ui.size = 'third';
+    // The tab's own key: switch to it, or, pressed on the tab already drawn, walk the size on.
     else if (key.name === 'a' || key.name === 'd') footKey(ui, key.name === 'a' ? 'activity' : 'decisions');
     else return;
     return draw(app);
@@ -242,11 +318,7 @@ function handleKey(app: App, key: KeyEvent): void {
       if (key.shift && !right) return moveRow(app, here, d);
       if (inMessages) ui.msg = move(ui.msg, snap.inbox.length, d);
       else if (inParts) ui.part = move(ui.part, here.project.parts.length, d);
-      else {
-        // The log view belongs to the row it was opened on, and the selection is leaving it.
-        ui.daemonLog = false;
-        ui.left = move(ui.left, items.length, d);
-      }
+      else ui.left = move(ui.left, items.length, d);
       break;
     }
     case 'right':
@@ -255,22 +327,14 @@ function handleKey(app: App, key: KeyEvent): void {
       ui.focus = 'right';
       break;
     case 'left':
-      ui.daemonLog = false;
       ui.focus = 'left';
       break;
     case 'escape':
       // Esc is the way out of a set of toggles nobody applied; a second one leaves the pane.
       if (inParts && pending(here.project, ui, inGlobal).length > 0) ui.toggles = {};
-      else {
-        ui.daemonLog = false;
-        ui.focus = 'left';
-      }
+      else ui.focus = 'left';
       break;
     case 'space':
-      if (here.kind === 'daemon') {
-        const { key, state } = here.daemon;
-        return act(app, `${key} ${state.enabled ? 'off' : 'on'}…`, () => setEnabled(key, !state.enabled));
-      }
       if (inParts) {
         const part = here.project.parts[ui.part];
         // The global row picks where a part lives, a project row whether it is installed here.
@@ -288,8 +352,7 @@ function handleKey(app: App, key: KeyEvent): void {
       // A stub is not written to, it is written: `↵` gives the intent form the keys, on the goal,
       // because the name is the folder and fixed once the folder is there.
       if (!right && here.kind === 'mission' && here.mission.status === 'stub') {
-        ui.form = true;
-        draftFor(ui, here).field = 1;
+        openForm(ui, 'intent', here);
         break;
       }
       // A row with a session behind it is written to; the arrows already enter the right pane.
@@ -302,6 +365,10 @@ function handleKey(app: App, key: KeyEvent): void {
       break;
     }
     case 'a':
+      // The first tab on a daemon row is its log, and reading the log is what acknowledges the
+      // row's alert: the key that draws it makes the call `factory daemon log` makes, and
+      // selecting the row makes none.
+      if (here.kind === 'daemon') showLog(app, here.daemon.key);
       footKey(ui, 'activity');
       break;
     case 'd':
@@ -334,13 +401,6 @@ function handleKey(app: App, key: KeyEvent): void {
       return act(app, `caffeinate ${mode.toUpperCase()}…`, () => setCaffeinate(mode));
     }
     case 'l': {
-      // On a daemon row `l` is the Log and Launch is not pressed: the key bar there says so.
-      if (here.kind === 'daemon') {
-        ui.daemonLog = true;
-        ui.focus = 'right';
-        showLog(app, here.daemon.key);
-        break;
-      }
       snap.launch = LAUNCH[(LAUNCH.indexOf(snap.launch) + 1) % LAUNCH.length]!;
       const mode = snap.launch;
       return act(app, `launch ${mode.toUpperCase()}…`, () => setLaunch(mode));
@@ -353,7 +413,8 @@ function handleKey(app: App, key: KeyEvent): void {
       if (here.mission.status === 'stub' && !here.mission.intent?.goal) return toast(app, `${here.mission.name} has no goal — ↵ fills the intent`);
       return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
     case 'r': {
-      // A daemon is run now, a service is started: `runNow` refuses an off row with its cure.
+      // A daemon is run now, a service is started, and either way the row is turned on: Run is
+      // the only way on, so there is no off row the key leaves the human staring at.
       if (here.kind === 'daemon') {
         const { key, entry } = here.daemon;
         return act(app, `${key} ${entry.kind === 'daemon' ? 'run' : 'start'}…`, () => runNow(key));
@@ -364,22 +425,48 @@ function handleKey(app: App, key: KeyEvent): void {
         break;
       }
       if (right) break;
+      // A project's name is this machine's own word for the checkout, a session's is the Factory's
+      // word for a conversation: two writers, one key, and the row says which.
+      if (here.kind === 'project') {
+        const { project } = here;
+        return ask(app, `name for ${project.name}:`, (name) =>
+          name === '' ? draw(app) : act(app, `renaming ${project.name}…`, () => renameProject(project.path, name)));
+      }
       if (here.kind === 'session') {
         const { session } = here;
         return ask(app, `name for ${id(session.id)}:`, (name) =>
           name === '' ? draw(app) : act(app, `naming ${id(session.id)}…`, () => renameSession(session.id, name)));
       }
-      return toast(app, 'select a session to rename it');
+      return toast(app, 'select a project or a session to rename it');
     }
     case 'm': {
       if (here.kind === 'inbox' || here.kind === 'global') return toast(app, 'select a project to add a mission to');
       // The form belongs to the project, so any of its rows opens it and the selection moves there:
       // a new mission's draft is shown by the project row, the way a message draft is by its own.
-      const { project } = here;
-      ui.left = items.findIndex((item) => item.kind === 'project' && item.project === project);
-      ui.form = true;
-      draftFor(ui, items[ui.left]!).field = 0;
+      openOnProject(app, items, here.project, 'intent');
       break;
+    }
+    case 'p': {
+      if (here.kind === 'inbox' || here.kind === 'global') return toast(app, 'select a project to add a daemon or a service to');
+      // The manifest is the project's, so the form opens on the project's row, the way `M` does:
+      // what `^S` writes is one entry of `.factory/daemons.yaml`, and `R` is what turns it on.
+      openOnProject(app, items, here.project, 'service');
+      break;
+    }
+    case 'n':
+      // On any row, the Inbox and `Global` included: a machine with no projects yet still has to
+      // be able to add the first one.
+      return ask(app, 'path of the project:', (input) =>
+        input === '' ? draw(app) : act(app, `installing ${input}…`, () => newProject(input)));
+    case 'u': {
+      if (here.kind !== 'project') return toast(app, 'select a project to uninstall it');
+      // The one key that takes parts off a checkout, so it asks for the letter first; anything
+      // else typed is a no, because a slip on this line is a reinstall.
+      const { project } = here;
+      return ask(app, `uninstall ${project.name}? Y to confirm:`, (answer) =>
+        answer.toLowerCase() === 'y'
+          ? act(app, `uninstalling ${project.name}…`, () => uninstallProject(project.path))
+          : toast(app, 'kept'));
     }
     case 'x':
       if (here.kind !== 'daemon') return toast(app, 'select a daemon or a service to stop it');
@@ -397,8 +484,8 @@ function handleKey(app: App, key: KeyEvent): void {
 }
 
 /**
- * `l`'s CLI twin is `factory daemon log`: the same call, once, as the view opens — which is what
- * acknowledges an alert and drops its Inbox row. The view is opened first and the refusal is
+ * `A`'s CLI twin is `factory daemon log`: the same call, once, as the log is drawn — which is what
+ * acknowledges an alert and drops its Inbox row. The pane is drawn first and the refusal is
  * swallowed, because only a fixture row can refuse: a live one came from `listRows`.
  */
 function showLog(app: App, key: string): void {
@@ -410,11 +497,15 @@ function showLog(app: App, key: string): void {
 
 /** A key must never take the screen down: the toast says what broke, the log says where. */
 
-/** `A` and `D` each name a foot tab: the first press draws it, the second gives it the screen,
- *  the third hands the screen back. */
+/** The sizes the foot walks, in the order the key gives them: what is drawn, then the whole
+ *  screen, then the tab row alone. */
+const SIZES: Ui['size'][] = ['third', 'full', 'min'];
+
+/** `A` and `D` each name a foot tab: pressed on the other tab the key switches to it and the foot
+ *  keeps its size, pressed on the tab already drawn it turns the size dial one step. */
 function footKey(ui: Ui, tab: Ui['foot']): void {
   if (ui.foot !== tab) ui.foot = tab;
-  else ui.full = !ui.full;
+  else ui.size = SIZES[(SIZES.indexOf(ui.size) + 1) % SIZES.length]!;
   ui.scroll = 0;
 }
 
@@ -423,10 +514,11 @@ function footKey(ui: Ui, tab: Ui['foot']): void {
 export function onPaste(app: App, text: string): void {
   const { ui } = app;
   if (ui.input) ui.input.value += text.replace(/\s+/g, ' ').trim();
-  else if (ui.form && formOf(select(app.snap, ui).here) !== null) {
-    const d = draftFor(ui, select(app.snap, ui).here);
-    const field = FIELDS[d.field];
-    if (field) insert(d[field[0]], text);
+  else if (ui.form !== null && defOf(ui.form).key(select(app.snap, ui).here) !== null) {
+    const { here } = select(app.snap, ui);
+    const d = draftFor(ui, ui.form, here);
+    const field = defOf(ui.form).fields(here, d)[d.field];
+    if (field && !field.options) insert(d.texts[field.key]!, text);
   } else if (ui.compose) insert(draftOf(ui, select(app.snap, ui).here), text);
   else return;
   draw(app);

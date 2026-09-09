@@ -10,9 +10,9 @@ All five act on the checkout you are standing in, never prompt (the one exceptio
 offer in `mission new` on a claimed checkout) and exit 1 with a one-line `✗ …` on a refusal.
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--session] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
 factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
-factory mission open [name] [--preset orchestrator|quick|research] [--dry-run]
+factory mission open [name] [--preset orchestrator|session|research] [--dry-run]
 factory mission list [--all] | status [name] | adopt <name> --session <id> | resume [name] | close [name] [--keep-branch]
 factory mission archive <name> | unarchive <name>
 factory step start|done|skip <step> [--reason R] | add <step> --after X [--role R] --reason R | loop <step>

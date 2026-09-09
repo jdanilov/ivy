@@ -290,7 +290,9 @@ function logPane(p: Pane, lines: string[], room: number, ui: Ui, counts: Record<
  * is still the row that says whether anything came in.
  */
 export function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep: boolean, ui: Ui): void {
-  if (sep) p.rule();
+  // Minimised the foot is one line, its tab row: a rule over a single row is a second foot.
+  const min = ui.size === 'min';
+  if (sep && !min) p.rule();
   const log = here.kind === 'daemon' ? linesOf(here.daemon, READ_LINES) : null;
   const room = Math.max(0, h - (sep ? 3 : 2));
   const counts = {
@@ -298,7 +300,7 @@ export function footPane(p: Pane, snap: Snapshot, here: LeftItem, h: number, sep
     activity: log ? log.length : activityRows(snap, sessionsOf(snap, here)).length,
   };
   markSeen(ui, here, counts);
-  if (ui.size === 'min') return p.row(spread(tabs(ui, counts, log !== null), [[`${counts[ui.foot]}`, C.dim]], p.width));
+  if (min) return p.row(spread(tabs(ui, counts, log !== null), [[`${counts[ui.foot]}`, C.dim]], p.width));
   if (ui.foot === 'decisions') return decisionsPane(p, snap, here, room, ui, counts);
   if (log) return logPane(p, log, room, ui, counts);
   activityPane(p, snap, here, room, ui, counts);

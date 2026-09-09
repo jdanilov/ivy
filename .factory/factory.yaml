@@ -29,6 +29,11 @@ recipes:
       # tab drawn, a row of its body back on screen, and the row's own key bar, not the full foot's.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'ivy/refit' a a a --expect 'ACTIVITY' --expect 'Round 2 accepted?' --expect '↑↓ Select'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'ivy/api' r --expect 'no daemon'
+      # The left list: on a 20-row screen it is eight rows tall and the fixture has nineteen, so
+      # walking down to the last row is only readable if the list scrolled under the selection.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --rows 20 down down down down down down down down down down down down down down --expect 'closed 4d ago'
+      # The selection while the focus is in the right pane: the chevron at the row's right end.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right --expect '›'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

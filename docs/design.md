@@ -72,11 +72,12 @@ row 1        ⌬ FACTORY · status: mission bar or project bar, or the toast tha
 row 2        ───────────────────────────────────────────────────────────────────────
              PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | DAEMON | SERVICE | PARTS (60%)
              inbox, Global,          │  a list above a detail block; a gate and a
-             projects, missions,     │  decision each end in the command that
-             sessions, daemons       │  answers them in the session
+             projects, daemons,      │  decision each end in the command that
+             missions, sessions      │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
              ACTIVITY | A LOG  DECISIONS   a third of the body; the drawn tab's key sizes it:
-                                           a third → the whole screen → this row alone
+                                           a third → the whole screen → this row alone,
+                                           and minimised it loses the rule over it too
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
@@ -86,16 +87,29 @@ last row     ──────────────────────�
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
   screen breathes on the side the eye starts from and fills the rest.
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
-  Two cells of padding on the left pane keep its right-aligned wall time and diff off the divider.
-  An open mission row ends in those two and no token count: the status bar has the tokens, and
-  the row has no room. A mission or session under Claude Code's `--bg` job carries a dim `bg`.
+  Two cells of padding on the left pane keep its right-aligned columns off the divider.
+  An open mission row ends in its wall time and diff and no token count: the status bar has the
+  tokens, and the row has no room. A mission or session under Claude Code's `--bg` job carries a
+  dim `bg`.
+- A row starts at the pane's edge — the glyph is the first cell, there is no marker column — and
+  what names it stays left: the glyph, the name, an open mission's workflow and step, a session's
+  preset and id. Where it stands goes right, against the edge: a mission's `closed 1h ago`,
+  `stub` or `archived`, or its wall time and diff; a session's `idle 3h 18m`, `working` or
+  `asking`; a daemon's tail. The selection inverts the row while the left pane has the focus, and
+  ends it in an accent `›` while the focus is in the right pane — every other row keeps the two
+  cells that chevron takes, so the right column ends at one place down the whole list.
+- The list scrolls under a fixed header and rule, moved by the least that keeps the selected row
+  drawn: walking down scrolls one row at a time, and a jump — `S`, `M`, a list rebuilt under the
+  selection — lands it in view. The blank rows between projects and a project's hint lines are
+  rows like any other.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `S` asks for them.
-- A project's daemons and services sit in the same list, under its sessions, and not in a block of
-  their own: the glyph is the kind, `↻` a daemon and `▶` a service, and the colour is the state —
-  warning amber once a run failed or an alert is waiting, read before dim off so a service the
-  supervisor turned off for dying is not a dim row, then bright on and accent orange while a pid
-  is set. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
+- A project's daemons and services sit in the same list, over its missions and its sessions, and
+  not in a block of their own: what the project runs by itself is what a glance is for, and those
+  rows are the ones that never move. The glyph is the kind, `↻` a daemon and `▶` a service, and
+  the colour is the state — warning amber once a run failed or an alert is waiting, read before
+  dim off so a service the supervisor turned off for dying is not a dim row, then bright on and
+  accent orange while a pid is set. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
   `every 3h · last ✓ 2h ago · next 1h`, `last ✗ post: exit 2 9h ago`, `last ○ nothing pending 1h
   ago` or `never`; a service `pid 4123 · up 3h · :3060`, `stopped`, or `✗ died 1` — a stopped row
   wears its alert's own words — and `tab→detached` on the end where the tab could not be opened.
@@ -104,7 +118,8 @@ last row     ──────────────────────�
 - The foot keeps a third of the body, never fewer than 5 rows. Its header is the two tabs, the
   drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back. Pressed on the tab already
   drawn the key is a size dial instead — the whole screen, then this one row, then a third again —
-  so a foot minimised still counts what came in. On a daemon or service row the first tab is that
+  so a foot minimised still counts what came in. Minimised it is that one row and no rule over it:
+  a rule above a single line is a second foot, and the body keeps every row the foot gave up. On a daemon or service row the first tab is that
   row's log: a daemon has no session and so no activity, and its log is what its row is read for.
   The word there is `A LOG`, the key before it, because the bright first letter of a tab is always
   the key that opens it and `L` is Launch.
@@ -288,7 +303,8 @@ while a global part is in `~/.claude`, warning while it is not there yet or its 
 dim for `project` and `off`. A status word beside it would say the same thing twice, so there is
 none and the description keeps the rest of the row; under the rule the selected part names its
 recommendation before its files, while the pane has the focus — unfocused it has no selection to
-show, so it draws neither the marker nor those rows, the list alone. The rule and the lines under it keep the pane's bottom however
+show, so it draws neither a highlighted row nor those rows, the list alone. Its rows start at the
+pane's edge, like the left column's: the marker column went with the chevron. The rule and the lines under it keep the pane's bottom however
 long the list is, and the list is what a short terminal loses, clipped around the row the
 selection sits on: `↵` asks for a `Y` on the apply line, and an apply line drawn past the foot is
 one nobody can read. A graph row in MISSION ends in two right-aligned columns, tokens
@@ -378,7 +394,7 @@ keys do, and none of these three do the same thing.
 | `X`     | daemon row       | stop it, killing the process group, and turn the row off         |
 | `A`     | daemon row       | the foot draws the row's log and acknowledges its alert: the call `factory daemon log` makes |
 | `↵`     | daemon row       | DAEMON, or SERVICE: the entry and what the last run left          |
-| `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
+| `⇧↑↓`   | left             | move the row past its neighbour of the same kind — projects, missions, sessions, each within its own run of the list; the order is kept in `~/.factory/config.yaml` |
 | `L`     | any              | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
 | `D`     | any              | the foot draws DECISIONS; on it already, its size: full, the tab row alone, a third |

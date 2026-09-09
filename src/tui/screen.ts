@@ -187,8 +187,9 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 
 // ── render ────────────────────────────────────────────────────────────────────
 
-/** A minimised foot is the rule above it and its tab row: what came in is still counted there. */
-const MIN_FOOT = 2;
+/** A minimised foot is its tab row and nothing else — no rule over one line — so what came in is
+ *  still counted and the body keeps every row the foot gave up. */
+const MIN_FOOT = 1;
 
 /** The left column takes two fifths, never under this. */
 const LEFT_MIN = 30;
@@ -242,7 +243,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     // Two cells of padding keep the left pane's right-aligned tokens off the divider.
     const left = column(r, leftW - 2, { width: leftW, paddingRight: 2 });
     const right = column(r, rightW - 1, { width: rightW, paddingLeft: 1 });
-    leftPane(left, items, snap, ui);
+    leftPane(left, items, snap, ui, bodyH);
     // An empty Inbox has nothing to show, so the panel stands there: a fresh install opens on it.
     if (panel) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);

@@ -14,6 +14,9 @@ import type { Shape } from './form.js';
 export interface Ui {
   focus: 'left' | 'right';
   left: number;
+  /** The first row of the left list drawn under its fixed header: the pane moves it by the least
+   *  that keeps the selected row on screen, so walking down scrolls one row at a time. */
+  top: number;
   msg: number;
   part: number;
   /** What `↵` would apply: install or not on a project row, the chosen scope on the global one. */
@@ -59,7 +62,7 @@ export interface IntentDraft {
 
 export function newUi(): Ui {
   return {
-    focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, size: 'third',
+    focus: 'left', left: 0, top: 0, msg: 0, part: 0, toggles: {}, confirm: false, size: 'third',
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
     showArchived: false, toast: null, input: null, compose: false, drafts: {},
     form: false, intents: {},
@@ -85,11 +88,13 @@ export function leftItems(snap: Snapshot, showArchived = false): LeftItem[] {
     globalRow(snap),
     ...snap.projects.flatMap((project): LeftItem[] => [
       { kind: 'project', project },
+      // What the project runs by itself first, then the work it has, then the tabs open on it:
+      // the daemons are the rows a glance is for, and they are the ones that never move.
+      ...project.daemons.map((daemon): LeftItem => ({ kind: 'daemon', project, daemon })),
       ...project.missions
         .filter((mission) => showArchived || !mission.archived)
         .map((mission): LeftItem => ({ kind: 'mission', project, mission })),
       ...project.sessions.map((session): LeftItem => ({ kind: 'session', project, session })),
-      ...project.daemons.map((daemon): LeftItem => ({ kind: 'daemon', project, daemon })),
     ]),
   ];
 }
@@ -128,8 +133,3 @@ export function column(r: CliRenderer, width: number, extra: Record<string, unkn
 }
 
 export type Pane = ReturnType<typeof column>;
-
-/** Two cells: the arrow a selection keeps while the focus is in the other pane, or room for it. */
-export function marker(selected: boolean, focused: boolean): Cell {
-  return [selected && !focused ? '› ' : '  ', C.dim];
-}

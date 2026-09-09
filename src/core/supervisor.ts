@@ -32,6 +32,7 @@ const quote = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
 const isAlive = (pid: number): boolean => { try { return process.kill(pid, 0); } catch { return false; } };
 /** Everything is spawned detached, so the negative pid reaches whatever the command started. */
 const killGroup = (pid: number, signal: NodeJS.Signals = 'SIGTERM'): void => {
+  if (pid <= 0) return;
   try { process.kill(-pid, signal); } catch { /* already gone */ }
 };
 
@@ -176,17 +177,36 @@ async function visitDaemon(row: Row & { entry: Daemon }, idle: number): Promise<
 
 async function runDaemon(row: Row & { entry: Daemon }): Promise<void> {
   const { key, entry } = row;
-  const cwd = path.join(row.project, entry.cwd ?? '.');
-  const proc = Bun.spawn([shell(), '-lc', entry.cmd], { cwd, env: { ...process.env, ...entry.env }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true });
-  const run = { pid: proc.pid, stopped: false, timedOut: false };
+  // The row is claimed before the first await: the next tick must not start the same run twice.
+  const run = { pid: 0, stopped: false, timedOut: false };
   runs.set(key, run);
-  const timer = entry.timeout === undefined ? null : setTimeout(() => { run.timedOut = true; killGroup(proc.pid, 'SIGKILL'); }, entry.timeout);
+  let timer: ReturnType<typeof setTimeout> | null = null;
   try {
-    await patch(key, { pid: proc.pid, lastStart: iso() });
+    // The one rotation check of the run, and the header the tail is read against.
     await appendLog(key, `── ${iso()} run ${entry.cmd}\n`);
-    const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    const fh = await open(logFile(key), 'a');
+    const proc = Bun.spawn([shell(), '-lc', entry.cmd], {
+      cwd: path.join(row.project, entry.cwd ?? '.'),
+      env: { ...process.env, ...entry.env },
+      stdin: 'ignore', stdout: 'pipe', stderr: fh.fd, detached: true,
+    });
+    await fh.close();
+    run.pid = proc.pid;
+    if (run.stopped) killGroup(proc.pid, 'SIGKILL');
+    if (entry.timeout !== undefined) timer = setTimeout(() => { run.timedOut = true; killGroup(proc.pid, 'SIGKILL'); }, entry.timeout);
+    await patch(key, { pid: proc.pid, lastStart: iso() });
+
+    // A twenty-minute run is watched while it runs: each chunk lands in the log as it arrives,
+    // and the text is kept because the verdict is in the last line of it.
+    const decoder = new TextDecoder();
+    let out = '';
+    for await (const chunk of proc.stdout as ReadableStream<Uint8Array>) {
+      const text = decoder.decode(chunk, { stream: true });
+      out += text;
+      await appendFile(logFile(key), text);
+    }
     const code = await proc.exited;
-    await appendLog(key, out + err);
+
     const result = run.timedOut ? { status: 'fail' as const, summary: 'timeout' }
       : run.stopped ? { status: 'fail' as const, summary: 'stopped' } : verdict(code, out);
     const state = await readState(key);
@@ -261,7 +281,8 @@ async function startInTab(key: string, cwd: string, entry: Service): Promise<num
   return null;
 }
 
-/** The one place a service's death is judged: what its policy says, or an inbox row for the human. */
+/** The one place a service's death is judged: what its policy says, or an inbox row for the human.
+ *  Every exit nobody asked for is one, exit 0 included: the human said run, and it is not running. */
 async function onExit(row: Row & { entry: Service }, code: number | null): Promise<void> {
   const { key } = row;
   services.delete(key);
@@ -273,7 +294,7 @@ async function onExit(row: Row & { entry: Service }, code: number | null): Promi
   // `never` drops `wanted` as well: the tick starts anything enabled and wanted that is not alive,
   // so a service left wanted would be restarted by the very policy that forbids restarting it.
   const retry = row.entry.restart === 'always' || (row.entry.restart === 'on-failure' && code !== 0);
-  if (!retry) return patch(key, { pid: undefined, wanted: false, restarts, alert: code === 0 ? undefined : `died ${code ?? 'unobserved'}` });
+  if (!retry) return patch(key, { pid: undefined, wanted: false, restarts, alert: `died ${code ?? 'unobserved'}` });
   if (restarts.length >= GIVE_UP) return patch(key, { pid: undefined, wanted: false, restarts, alert: `gave up after ${GIVE_UP} restarts` });
   await patch(key, { pid: undefined, restarts: [...restarts, iso(now)] });
   busy.add(key);

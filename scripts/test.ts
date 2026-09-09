@@ -1154,7 +1154,9 @@ await writeFile(path.join(runner, '.factory', 'daemons.yaml'),
   'sleep:\n  kind: service\n  cmd: "echo up; sleep 30"\n  restart: never\n' +
   'boom:\n  kind: daemon\n  cmd: "echo trouble; exit 1"\n  every: 1h\n' +
   'slow:\n  kind: daemon\n  cmd: sleep 30\n  every: 1h\n  timeout: 1s\n' +
-  'flap:\n  kind: service\n  cmd: "echo nope; exit 3"\n  restart: on-failure\n');
+  'flap:\n  kind: service\n  cmd: "echo nope; exit 3"\n  restart: on-failure\n' +
+  'quit:\n  kind: service\n  cmd: "exit 0"\n  restart: never\n' +
+  'stream:\n  kind: daemon\n  cmd: echo first; sleep 2; echo \'{"summary":"done"}\'\n  every: 1h\n');
 
 /** The supervisor is a second process: a case says what it is waiting for, not how long. */
 async function until(what: string, ready: () => Promise<boolean>, ms = 8000): Promise<void> {
@@ -1231,6 +1233,28 @@ try {
     await until('the timeout never fired', async () => (await readRow('runner/slow')).lastStatus === 'fail');
     ok((await readRow('runner/slow')).lastSummary === 'timeout', `the timed-out run filed ${JSON.stringify(await readRow('runner/slow'))}`);
     ok(!alive(pid), `the timed-out run left its group alive at ${pid}`);
+  });
+
+  await check('a service that ended on its own is an inbox row, whatever its exit code', async () => {
+    await setEnabled('runner/quit', true);
+    await until('a service that exited on its own was never noticed', async () => (await readRow('runner/quit')).alert !== undefined);
+
+    const state = await readRow('runner/quit');
+    ok(state.alert === 'died 0', `a service that exited 0 unasked filed ${JSON.stringify(state.alert)}`);
+    ok(state.wanted === false && state.pid === undefined, `a service that died is still ${JSON.stringify(state)}`);
+  });
+
+  await check('a daemon writes its output to the log while the run is still in flight', async () => {
+    await setEnabled('runner/stream', true);
+    await runNow('runner/stream');
+    await until('the first line only reached the log when the run ended', async () => {
+      const state = await readRow('runner/stream');
+      return state.pid !== undefined && (await readLogTail('runner/stream', 20)).includes('first');
+    });
+
+    await until('the streaming run never finished', async () => (await readRow('runner/stream')).lastStatus !== undefined);
+    const done = await readRow('runner/stream');
+    ok(done.lastStatus === 'ok' && done.lastSummary === 'done', `the streamed run filed ${JSON.stringify(done)}`);
   });
 
   await check('a service that keeps dying backs off and gives up after five restarts', async () => {

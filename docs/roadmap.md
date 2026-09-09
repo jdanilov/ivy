@@ -6,7 +6,7 @@ moves a line up into the order or drops it. Nothing else reads this file.
 
 ## Next
 
-- [ ] **A real mission through the new open.** `O` now starts the session under `claude --bg` and
+- [x] **A real mission through the new open.** `O` now starts the session under `claude --bg` and
   the tab attaches to it; that path has only run against the e2e stub. Open one mission for real:
   the hook binds it through the settings overlay, Warp shows the badge, a reply from the message
   box lands, `K` stops it. Half a day, and it retires the risk in everything shipped on 2026-09-08.
@@ -22,6 +22,9 @@ moves a line up into the order or drops it. Nothing else reads this file.
 
 ## Then
 
+- [ ] **New skills.** Add `/review` skill, which is similar to `/critic` - check out davidondrej's
+  total-review. Add `guardrail-hook` / `global-agent-guardrails` (see the davidondrej/skills),
+  or improve save-bash to avoid surprises from agentic harnesses. 
 - [ ] **Memory.** The `mem` MCP: per project and global notes, recalled on prompt, seeded from
   `docs/memories.md`. The biggest item here and the one agents would feel most; its own mission.
   (2026-09-05-refit)

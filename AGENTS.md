@@ -43,7 +43,7 @@ src/           CLI source (entry: src/cli.ts)
 │              parts, foot, compose, daemon, help — one file each, none over 400 lines), actions (what a key
 │              writes, through the CLI's own functions), notify, frames, format, theme
 ├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control,
-│              daemon (list, status, on, off, run, stop, log), supervisor (start, stop, status, install, uninstall)
+│              daemon (list, status, run, stop, log), supervisor (start, stop, status, install, uninstall)
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
@@ -57,7 +57,7 @@ scripts/spawn.ts        The one real model run behind `e2e.spawn`: a @Worker's d
                nested recipe reads back under its dotted path
 .factory/daemons.yaml   the project's daemons and services, committed, one entry per name;
                `~/.factory/config.yaml` says which of them this machine runs
-workflows/     intent, story, chore, research, quick — the shipped workflow YAML: every mission
+workflows/     intent, story, chore, research, session — the shipped workflow YAML: every mission
                starts on intent, `mission shape` appends a preset behind that step and `--verify`
                puts a verifier loop behind a chore's implement
 presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bundle per preset

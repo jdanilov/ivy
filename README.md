@@ -104,7 +104,7 @@ shape <preset>` appends the rest of the graph.
 | `research` | investigate (sources ∥ transcripts) → report                                               |
 | `train`    | plan → implement → check (the Orchestrator's own review, max 8) → merge                    |
 | `chore`    | implement → merge; `--verify` adds a verify loop (max 2)                                   |
-| `--quick`  | one `work` step, no intent gate                                                            |
+| `--session`| one `work` step, no intent gate                                                            |
 
 The autonomy dial says which decisions stop for you. Gates reach you in every mode.
 

@@ -50,21 +50,23 @@ the cadence resumes. `atMost` is a second window, over successes only; `when` re
 through one adapter per OS, and an OS with neither is always active; a row with a pid is never due.
 `next` is the later of `lastEnd + every` and the window's oldest success plus the window. The loop
 wakes every 30 s and on a file change, so a cadence under 30 s is in practice 30 s. `daemon run`
-and `r` bypass all three gates, never the enablement.
+and `R` bypass all three gates, and turn the row on: Run is the only way on.
 
 ## Services
 
-Desired state is `enabled ∧ wanted`: enabled is the machine's config, `wanted` lives in the state
-file, raised by `on`, `run` and `r` and lowered by `off`, `stop` and `x` — two flags, one written by
-each surface, because `restart: always` must not fight a stop the human asked for. `detached` spawns
-under the supervisor in its own process group with stdout and stderr to the log, and a stop is
+Desired state is `enabled`, the one line in the machine's config, raised by `run` and lowered by
+`stop`: a service that is on and not running is started by the next tick, and a stop, having turned
+the row off, cannot be undone by the `restart: always` of the service it just killed. `detached`
+spawns under the supervisor in its own process group with stdout and stderr to the log, and a stop is
 `kill(-pid)`, SIGKILL five seconds later. `tab` opens a Warp tab the way `mission open` does, its
 shell writing its own pid to `<dir>/tab.pid` first so the supervisor can still stop what the human
 is watching; no Warp, or no pid within ten seconds, and it runs detached with a dim `tab→detached`.
 
-An exit nobody asked for is judged by `restart`: `never` drops `wanted` and alerts `died <code>`,
-exit 0 included — the human said run and it is not running. `on-failure` on a non-zero exit and
-`always` on any restart after `min(1s·2ⁿ, 60s)`, giving up after five inside ten minutes with an alert.
+An exit nobody asked for is judged by `restart`: `never` turns the row **off** and alerts
+`died <code>`, exit 0 included — the human said run and it is not running, and a row left on would
+be started again by the next tick. `on-failure` on a non-zero exit and `always` on any restart after
+`min(1s·2ⁿ, 60s)`, giving up after five inside ten minutes, which turns it off with its alert too.
+The supervisor is the one surface that writes the config, because it is the one that saw the exit.
 
 ## State, logs and requests
 
@@ -78,8 +80,9 @@ Under `~/.factory/daemons/<project>/<name>/`. The project repo holds nothing of 
 
 `state.json`: `pid` and `startedAt` while it runs; `lastStart`, `lastEnd`, `lastStatus`,
 `lastSummary`, `nextDue` from the last run; `successes`, the stamps `atMost` counts; `restarts`, the
-stamps inside the give-up window; `wanted`; `alert`; `tabFallback`. `enabled` is mirrored from the
-config when the state is read, never stored. A request is a file and not a socket because reads
+stamps inside the give-up window; `alert`; `tabFallback`. `enabled` is mirrored from the config
+when the state is read, never stored, and a `wanted` key an older Factory left in the file is read
+past and never written again. A request is a file and not a socket because reads
 already go through files, and one written while the supervisor restarts survives to the next tick.
 
 A failed run and a death set `alert`, one Inbox row beside the gates, naming the command that
@@ -92,9 +95,8 @@ Every key is one call into @src/commands/daemon.ts, the same call the subcommand
 
 | Key     | On a daemon row                                          | CLI                                  |
 |---------|-----------------------------------------------------------|--------------------------------------|
-| `space` | on, off                                                   | `factory daemon on \| off <key>`     |
-| `r`     | run now, or start a service                               | `factory daemon run <key>`           |
-| `x`     | stop the run or the service                               | `factory daemon stop <key>`          |
+| `r`     | turn it on and run now, or start a service                | `factory daemon run <key>`           |
+| `x`     | stop the run or the service, and turn it off              | `factory daemon stop <key>`          |
 | `l`     | the log alone in the right pane, the alert cleared        | `factory daemon log <key> [-f] [-n N]` |
 | `↵`     | DAEMON: the entry, the last result, the last 30 log lines | `factory daemon status <key>`        |
 

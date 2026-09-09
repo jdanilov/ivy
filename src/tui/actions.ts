@@ -241,8 +241,8 @@ export async function archive(project: string, name: string, back: boolean): Pro
 
 // ── daemons ──────────────────────────────────────────────────────────────────
 
-/** `space`, `r`, `x` and `l` are their CLI twins and nothing more: the same four functions
- *  `factory daemon on|off|run|stop|log` calls, three returning the line the toast shows and `log`
- *  the lines it read — reading them is what acknowledges the alert, there as here. The screen
+/** `r`, `x` and `l` are their CLI twins and nothing more: the same three functions
+ *  `factory daemon run|stop|log` calls, two returning the line the toast shows and `log` the
+ *  lines it read — reading them is what acknowledges the alert, there as here. The screen
  *  writes no request and no config of its own — one writer, and the CLI owns it. */
-export { readLog, runNow, setEnabled, stopRow } from '../commands/daemon.js';
+export { readLog, runNow, stopRow } from '../commands/daemon.js';

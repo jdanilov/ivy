@@ -61,7 +61,7 @@ interface Ev {
 interface EventLine { at?: string; event?: string; cwd?: string; detail?: string | null }
 
 /** The Warp tab config and the prompt file are named after the preset; the hook logs its source. */
-const PRESETS = ['orchestrator', 'quick', 'research'];
+const PRESETS = ['orchestrator', 'session', 'research'];
 
 function parse(line: string): EventLine | null {
   try {
@@ -89,7 +89,7 @@ async function readEvents(): Promise<Map<string, Ev>> {
     const reports: Ev['reports'] = [];
     let said = '';
     let called = '';
-    let preset = 'quick';
+    let preset = 'session';
     // What the session is waiting on the human with is the end of a turn, and only a prompt
     // answers it: an idle Notification after a Stop is the same question asked again, and one
     // before any Stop is a permission box nobody can read off this screen.

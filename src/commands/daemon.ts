@@ -22,9 +22,6 @@ export async function daemon(sub: string, args: string[]): Promise<void> {
       return list(args[0]);
     case 'status':
       return show(need(args[0], `daemon status ${KEY}`));
-    case 'on':
-    case 'off':
-      return say(await setEnabled(need(args[0], `daemon ${sub} ${KEY}`), sub === 'on'));
     case 'run':
       return say(await runNow(need(args[0], `daemon run ${KEY}`)));
     case 'stop':
@@ -32,7 +29,7 @@ export async function daemon(sub: string, args: string[]): Promise<void> {
     case 'log':
       return tail(need(args[0], `daemon log ${KEY} [-f] [-n N]`), args);
     default:
-      throw new Refusal(`daemon: unknown subcommand "${sub ?? ''}" — list, status, on, off, run, stop, log`);
+      throw new Refusal(`daemon: unknown subcommand "${sub ?? ''}" — list, status, run, stop, log`);
   }
 }
 
@@ -52,31 +49,21 @@ async function findRow(key: string): Promise<Row> {
 
 // ── what a key and its CLI twin both call ────────────────────────────────────
 
-/** `off` also stops what is running, and `on` makes a service wanted: the supervisor starts it. */
-export async function setEnabled(key: string, on: boolean): Promise<string> {
-  const row = await findRow(key);
-  await writeDaemonEnabled(key, on ? 'on' : 'off');
-  if (!on && row.state.pid !== undefined) await writeRequest(key, 'stop');
-  if (on && row.entry.kind === 'service') await writeState(key, { ...(await readState(key)), wanted: true });
-  return `${key} ${on ? 'on' : 'off'}`;
-}
-
-/** A run bypasses the cadence, never the enablement: an off row is a refusal with its cure. */
+/** Run is the way on: enabled is the whole desired state, so the verb that asks for a run says
+ *  the row runs from now on too, and bypasses the cadence and the idle gate on top of it. */
 export async function runNow(key: string): Promise<string> {
   const row = await findRow(key);
-  if (!row.state.enabled) throw new Refusal(`${key} is off — factory daemon on ${key}`);
-  if (row.entry.kind === 'service') {
-    await writeState(key, { ...(await readState(key)), wanted: true });
-    await writeRequest(key, 'start');
-    return `${key} starting`;
-  }
-  await writeRequest(key, 'run');
-  return `${key} queued`;
+  await writeDaemonEnabled(key, 'on');
+  await writeRequest(key, row.entry.kind === 'service' ? 'start' : 'run');
+  return `${key} ${row.entry.kind === 'service' ? 'starting' : 'queued'}`;
 }
 
+/** Stop is the way off: the request kills what runs, and the row stops being scheduled — a row
+ *  left on would be started again by the next tick, or by its own restart policy. */
 export async function stopRow(key: string): Promise<string> {
   await findRow(key);
   await writeRequest(key, 'stop');
+  await writeDaemonEnabled(key, 'off');
   return `${key} stopping`;
 }
 
@@ -117,11 +104,13 @@ export function rowTail(row: Row): string {
 
 const glyphOf = (row: Row): string => (row.entry.kind === 'daemon' ? '↻' : '▶');
 
-/** Dim off, warning after a failure, accent while it runs: the colours the TUI row uses. */
-function colourOf(row: Row): string {
+/** Warning after a failure, then dim off, accent while it runs: the colours the TUI row uses.
+ *  The failure reads first because a service the supervisor turned off for dying is an off row
+ *  the human still has to look at, and a dim one says nothing happened. */
+export function colourOf(row: Row): string {
   const s = row.state;
-  if (!s.enabled) return colors.dim;
   if (s.alert !== undefined || s.lastStatus === 'fail') return colors.yellow;
+  if (!s.enabled) return colors.dim;
   return s.pid === undefined ? colors.green : colors.cyan;
 }
 
@@ -159,7 +148,6 @@ async function show(key: string): Promise<void> {
     field('every', [short(e.every), e.atMost ? `at most ${e.atMost.n}/${short(e.atMost.window)}` : '', `when ${e.when}`, e.timeout ? `timeout ${short(e.timeout)}` : ''].filter(Boolean).join(' · '));
   } else {
     field('run', [e.run, `restart ${e.restart}`, e.port ? `port ${e.port}` : '', s.tabFallback ? 'tab→detached' : ''].filter(Boolean).join(' · '));
-    field('wanted', String(s.wanted === true));
   }
   if (s.pid !== undefined) field('pid', `${s.pid}${s.startedAt ? ` · since ${s.startedAt}` : ''}`);
   if (s.lastStart) field('ran', `${s.lastStart}${s.lastEnd ? ` → ${s.lastEnd}` : ''}`);

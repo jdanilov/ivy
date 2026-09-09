@@ -44,7 +44,7 @@ const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
 const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
 const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
-const { readLog, runNow, setEnabled, stopRow } = await import('../src/commands/daemon.js');
+const { colourOf, readLog, runNow, stopRow } = await import('../src/commands/daemon.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
@@ -607,8 +607,8 @@ await check('the Shape dial reshapes a stub whole, and only a stub', async () =>
   const again = await resolveMission(main, 'sh');
   ok(again.state.workflow === 'story' && again.state.step === 'intent', `the reshape did not land in state: ${again.state.workflow}`);
   ok((await missionWorkflow(again)).steps.some((s) => s.name === 'spec'), 'workflow.yaml was not rewritten');
-  await reshapeStub(main, again, 'quick');
-  ok((await resolveMission(main, 'sh')).state.step === 'work', 'quick did not move the pointer to its first step');
+  await reshapeStub(main, again, 'session');
+  ok((await resolveMission(main, 'sh')).state.step === 'work', 'session did not move the pointer to its first step');
   // The refusal comes before any write, so a stub read as open is enough to prove it.
   const open = { ...again, state: { ...again.state, status: 'open' as const } };
   const refused = await reshapeStub(main, open, 'story').then(() => null, (e: Error) => e);
@@ -672,11 +672,11 @@ await check('a mission starts unshaped and shape appends a preset once', async (
   await mission('shape', ['story'], {}, dir);
   ok((await Bun.file(file).text()) === before, 'a second shape story rewrote state.json');
 
-  const refused = await mission('shape', ['quick'], {}, dir).then(() => null, (e: Error) => e);
-  ok(refused?.name === 'Refusal', 'shape quick was not refused');
+  const refused = await mission('shape', ['session'], {}, dir).then(() => null, (e: Error) => e);
+  ok(refused?.name === 'Refusal', 'shape session was not refused');
 
-  await mission('new', ['q'], { quick: true, 'no-open': true, 'no-worktree': true }, dir);
-  ok((await graph(dir, 'q')).join() === 'work', `--quick took ${(await graph(dir, 'q')).join()}`);
+  await mission('new', ['q'], { session: true, 'no-open': true, 'no-worktree': true }, dir);
+  ok((await graph(dir, 'q')).join() === 'work', `--session took ${(await graph(dir, 'q')).join()}`);
 });
 
 await check('an insert past a finished step takes the pointer with it', async () => {
@@ -1174,6 +1174,19 @@ await check('daemon enablement is one line in the machine config, default off, a
   });
 });
 
+await check('a row that failed reads warning on both surfaces, off or not', async () => {
+  const { daemonColor } = await import('../src/tui/panes/left.js');
+  const { C } = await import('../src/tui/theme.js');
+  const { colors } = await import('../src/ui/theme.js');
+  const entry = { kind: 'service' as const, name: 'api', cmd: 'true', run: 'detached' as const, restart: 'never' as const };
+  const dead = { key: 'bots/api', project: '/tmp/bots', entry, state: { enabled: false, alert: 'died 1' } };
+  ok(daemonColor(dead) === C.warning, `the TUI drew a dead row ${daemonColor(dead)}, not warning`);
+  ok(colourOf(dead) === colors.yellow, 'the CLI drew a dead row dim, not warning');
+
+  const quiet = { ...dead, state: { enabled: false } };
+  ok(daemonColor(quiet) === C.dim && colourOf(quiet) === colors.dim, 'an off row with nothing to say is not dim');
+});
+
 // ── the supervisor, on the scratch HOME and one scratch project ──────────────
 
 const PIDFILE = path.join(process.env.HOME!, '.factory', 'supervisor', 'pid');
@@ -1219,7 +1232,8 @@ try {
   });
 
   await check('a due daemon runs through the login shell and files its pid, verdict and next', async () => {
-    await setEnabled('runner/tick', true);
+    await runNow('runner/tick');
+    ok(await enabledOf('runner/tick'), 'run left the row off');
     await until('the tick daemon never ran', async () => (await readRow('runner/tick')).lastStatus !== undefined);
 
     const state = await readRow('runner/tick');
@@ -1231,8 +1245,8 @@ try {
     ok(log.some((l) => / run echo /.test(l)) && log.includes('{"summary":"hi"}'), `the log holds ${JSON.stringify(log)}`);
   });
 
-  await check('a service runs in its own process group, and a stop holds wanted down', async () => {
-    await setEnabled('runner/sleep', true);
+  await check('a service runs in its own process group, and a stop kills it and turns it off', async () => {
+    await runNow('runner/sleep');
     await until('the service never started', async () => (await readRow('runner/sleep')).pid !== undefined);
 
     const pid = (await readRow('runner/sleep')).pid!;
@@ -1242,21 +1256,16 @@ try {
 
     await stopRow('runner/sleep');
     await until('the service outlived its stop', async () => !alive(pid) && (await readRow('runner/sleep')).pid === undefined);
-    ok((await readRow('runner/sleep')).wanted === false, 'a stopped service is still wanted');
+    ok(!(await enabledOf('runner/sleep')), 'a stopped service is still enabled');
   });
 
   await check('a failed run alerts, a timeout kills the group, and reading the log acknowledges', async () => {
-    const off = await runNow('runner/boom').then(() => null, (e: Error) => e);
-    ok(off?.message.includes('is off'), `a run on an off row said ${off?.message ?? 'nothing'}`);
-
-    await setEnabled('runner/boom', true);
     await runNow('runner/boom');
     await until('the failed run raised no alert', async () => (await readRow('runner/boom')).alert !== undefined);
     ok((await readRow('runner/boom')).lastSummary === 'trouble', `the failure filed ${JSON.stringify(await readRow('runner/boom'))}`);
     await readLog('runner/boom', 5);
     ok((await readRow('runner/boom')).alert === undefined, 'reading the log did not clear the alert');
 
-    await setEnabled('runner/slow', true);
     await runNow('runner/slow');
     await until('the slow run never started', async () => (await readRow('runner/slow')).pid !== undefined);
     const pid = (await readRow('runner/slow')).pid!;
@@ -1265,17 +1274,18 @@ try {
     ok(!alive(pid), `the timed-out run left its group alive at ${pid}`);
   });
 
-  await check('a service that ended on its own is an inbox row, whatever its exit code', async () => {
-    await setEnabled('runner/quit', true);
+  await check('a service that ended on its own is an inbox row and an off row, whatever its exit code', async () => {
+    await runNow('runner/quit');
     await until('a service that exited on its own was never noticed', async () => (await readRow('runner/quit')).alert !== undefined);
 
     const state = await readRow('runner/quit');
     ok(state.alert === 'died 0', `a service that exited 0 unasked filed ${JSON.stringify(state.alert)}`);
-    ok(state.wanted === false && state.pid === undefined, `a service that died is still ${JSON.stringify(state)}`);
+    ok(state.pid === undefined, `a service that died is still ${JSON.stringify(state)}`);
+    // `restart: never` and the row still on would be started again by the very next tick.
+    await until('a service that died under restart: never is still enabled', async () => !(await enabledOf('runner/quit')));
   });
 
   await check('a daemon writes its output to the log while the run is still in flight', async () => {
-    await setEnabled('runner/stream', true);
     await runNow('runner/stream');
     await until('the first line only reached the log when the run ended', async () => {
       const state = await readRow('runner/stream');
@@ -1289,16 +1299,17 @@ try {
 
   await check('a service that keeps dying backs off and gives up after five restarts', async () => {
     const now = Date.now();
-    await writeRow('runner/flap', { enabled: false, wanted: true, restarts: [1, 2, 3, 4, 5].map((i) => new Date(now - i * 30_000).toISOString()) });
-    await setEnabled('runner/flap', true);
+    await writeRow('runner/flap', { enabled: false, restarts: [1, 2, 3, 4, 5].map((i) => new Date(now - i * 30_000).toISOString()) });
+    await runNow('runner/flap');
 
     await until('the flapping service never gave up', async () => (await readRow('runner/flap')).alert !== undefined);
     const state = await readRow('runner/flap');
     ok(state.alert === 'gave up after 5 restarts', `it gave up with ${JSON.stringify(state.alert)}`);
-    ok(state.wanted === false && state.pid === undefined, `a service that gave up is still ${JSON.stringify(state)}`);
+    ok(state.pid === undefined, `a service that gave up is still ${JSON.stringify(state)}`);
+    await until('a service that gave up is still enabled', async () => !(await enabledOf('runner/flap')));
   });
 
-  await check('a supervisor restart leaves a wanted service alive and re-adopts its pid', async () => {
+  await check('a supervisor restart leaves a running service alive and re-adopts its pid', async () => {
     await runNow('runner/sleep');
     await until('the service never came back', async () => (await readRow('runner/sleep')).pid !== undefined);
     const pid = (await readRow('runner/sleep')).pid!;

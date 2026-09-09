@@ -25,8 +25,7 @@ function missionRow(p: Pane, m: Mission, selected: boolean, focused: boolean): v
   p.row(spread([...cells, ...tail], right, p.width), selected && focused);
 }
 
-/** Named by what it is, not by its preset: a bare `quick` under a project reads as a mission. */
-/** Named by what the human called it, else by its id: two quick sessions must not read the same. */
+/** Named by what the human called it, else by its id: two bare sessions must not read the same. */
 function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): void {
   // A picker up is the one busy state that waits on the human: it reads as a warning, not as work.
   const asking = s.now?.verb === 'ask';
@@ -38,12 +37,13 @@ function sessionRow(p: Pane, s: Session, selected: boolean, focused: boolean): v
   ], selected && focused);
 }
 
-/** Dim while it is off, warning once something failed, accent while it runs: the colour is the
- *  state, the glyph the kind — the same reading `factory daemon list` gives the same row. */
-function daemonColor(row: DaemonRow): string {
+/** Warning once something failed, dim while it is off, accent while it runs: the colour is the
+ *  state, the glyph the kind — the same reading `factory daemon list` gives the same row. The
+ *  failure reads first, so a service the supervisor turned off for dying is not a dim row. */
+export function daemonColor(row: DaemonRow): string {
   const s = row.state;
-  if (!s.enabled) return C.dim;
   if (s.alert !== undefined || s.lastStatus === 'fail') return C.warning;
+  if (!s.enabled) return C.dim;
   return s.pid === undefined ? C.bright : C.accent;
 }
 

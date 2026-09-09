@@ -3,7 +3,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
   applyParts, applyScopes, archive, killSession, openTab, readLog, renameSession, runNow, saveIntent,
-  sendMessage, setAutonomy, setCaffeinate, setEnabled, setLaunch, stopRow,
+  sendMessage, setAutonomy, setCaffeinate, setLaunch, stopRow,
 } from './actions.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
@@ -267,10 +267,6 @@ function handleKey(app: App, key: KeyEvent): void {
       }
       break;
     case 'space':
-      if (here.kind === 'daemon') {
-        const { key, state } = here.daemon;
-        return act(app, `${key} ${state.enabled ? 'off' : 'on'}…`, () => setEnabled(key, !state.enabled));
-      }
       if (inParts) {
         const part = here.project.parts[ui.part];
         // The global row picks where a part lives, a project row whether it is installed here.
@@ -353,7 +349,8 @@ function handleKey(app: App, key: KeyEvent): void {
       if (here.mission.status === 'stub' && !here.mission.intent?.goal) return toast(app, `${here.mission.name} has no goal — ↵ fills the intent`);
       return act(app, `opening ${here.mission.name}…`, () => openTab(here.project.path, here.mission.name));
     case 'r': {
-      // A daemon is run now, a service is started: `runNow` refuses an off row with its cure.
+      // A daemon is run now, a service is started, and either way the row is turned on: Run is
+      // the only way on, so there is no off row the key leaves the human staring at.
       if (here.kind === 'daemon') {
         const { key, entry } = here.daemon;
         return act(app, `${key} ${entry.kind === 'daemon' ? 'run' : 'start'}…`, () => runNow(key));

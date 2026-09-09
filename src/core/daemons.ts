@@ -54,7 +54,6 @@ export interface DaemonState {
   nextDue?: string;
   successes?: string[];
   restarts?: string[];
-  wanted?: boolean;
   alert?: string;
   tabFallback?: boolean;
 }
@@ -168,10 +167,12 @@ export const requestFile = (key: string): string => path.join(daemonDir(key), 'r
 
 export const logFile = (key: string): string => path.join(daemonDir(key), 'log');
 
-/** A hand-written or half-written state file is no state, never a throw in the reader's face. */
+/** A hand-written or half-written state file is no state, never a throw in the reader's face.
+ *  `wanted` was a second desired state beside `enabled`; a file still carrying one is read past. */
 export async function readState(key: string): Promise<DaemonState> {
   const raw = await Bun.file(path.join(daemonDir(key), 'state.json')).json().catch(() => ({}));
-  return { ...(isRecord(raw) ? (raw as Partial<DaemonState>) : {}), enabled: false };
+  const { wanted, ...stored } = isRecord(raw) ? (raw as Partial<DaemonState> & { wanted?: unknown }) : {};
+  return { ...stored, enabled: false };
 }
 
 /** Temp file plus rename: the TUI reads this while the supervisor writes it. */

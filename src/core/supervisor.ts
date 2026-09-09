@@ -3,6 +3,7 @@ import { appendFile, mkdir, open, rename, stat, unlink } from 'node:fs/promises'
 import { watch, type FSWatcher } from 'node:fs';
 import type { Daemon, DaemonState, Request, Row, Service } from './daemons.js';
 import { daemonDir, due, listRows, logFile, manifestFile, readRequest, readState, requestFile, verdict, writeState } from './daemons.js';
+import { writeDaemonEnabled } from './config.js';
 import { Refusal } from './mission.js';
 import { idleSeconds } from './platform.js';
 import { existingProjects, factoryHome } from './projects.js';
@@ -232,14 +233,15 @@ async function visitService(row: Row & { entry: Service }): Promise<void> {
     void stopService(row, state.pid).finally(() => busy.delete(key));
     return;
   }
-  const wanted = request === 'start' || request === 'run' ? true : state.wanted === true;
-  if (wanted && state.wanted !== true) await patch(key, { wanted: true });
   if (state.pid !== undefined) {
     // A pid this process never spawned has no `exited` to await: its death is noticed here.
     if (!isAlive(state.pid) && !services.has(key)) void onExit(row, null).catch((err) => void fail(key, err));
     return;
   }
-  if (!state.enabled || !wanted) return;
+  // Enabled is the whole desired state, so a service that is on and not running is started. The
+  // request is honoured on top of it: `daemon run` writes the config first, and this tick may
+  // have read it a moment before that landed.
+  if (!state.enabled && request !== 'start') return;
   busy.add(key);
   void startService(row).finally(() => busy.delete(key));
 }
@@ -249,14 +251,14 @@ async function startService(row: Row & { entry: Service }): Promise<void> {
   const cwd = path.join(row.project, entry.cwd ?? '.');
   await appendLog(key, `── ${iso()} start ${entry.cmd}\n`);
   const tab = entry.run === 'tab' ? await startInTab(key, cwd, entry) : null;
-  if (tab !== null) return patch(key, { pid: tab, startedAt: iso(), wanted: true, alert: undefined, tabFallback: undefined });
+  if (tab !== null) return patch(key, { pid: tab, startedAt: iso(), alert: undefined, tabFallback: undefined });
 
   const fh = await open(logFile(key), 'a');
   const proc = Bun.spawn([shell(), '-lc', entry.cmd], { cwd, env: { ...process.env, ...entry.env }, stdin: 'ignore', stdout: fh.fd, stderr: fh.fd, detached: true });
   await fh.close();
   services.set(key, proc.pid);
   // A tab that could not be opened still runs, and the row says where it ended up.
-  await patch(key, { pid: proc.pid, startedAt: iso(), wanted: true, alert: undefined, tabFallback: entry.run === 'tab' || undefined });
+  await patch(key, { pid: proc.pid, startedAt: iso(), alert: undefined, tabFallback: entry.run === 'tab' || undefined });
   void proc.exited.then((code) => onExit(row, code)).catch((err) => void fail(key, err));
 }
 
@@ -290,23 +292,28 @@ async function onExit(row: Row & { entry: Service }, code: number | null): Promi
   const now = Date.now();
   const state = await readState(key);
   const restarts = (state.restarts ?? []).filter((t) => now - Date.parse(t) < WINDOW);
-  if (asked) return patch(key, { pid: undefined, wanted: false, restarts });
-  // `never` drops `wanted` as well: the tick starts anything enabled and wanted that is not alive,
-  // so a service left wanted would be restarted by the very policy that forbids restarting it.
+  if (asked) return patch(key, { pid: undefined, restarts });
   const retry = row.entry.restart === 'always' || (row.entry.restart === 'on-failure' && code !== 0);
-  if (!retry) return patch(key, { pid: undefined, wanted: false, restarts, alert: `died ${code ?? 'unobserved'}` });
-  if (restarts.length >= GIVE_UP) return patch(key, { pid: undefined, wanted: false, restarts, alert: `gave up after ${GIVE_UP} restarts` });
+  if (!retry) return died(row, restarts, `died ${code ?? 'unobserved'}`);
+  if (restarts.length >= GIVE_UP) return died(row, restarts, `gave up after ${GIVE_UP} restarts`);
   await patch(key, { pid: undefined, restarts: [...restarts, iso(now)] });
   busy.add(key);
   setTimeout(() => void startService(row).catch((err) => void fail(key, err)).finally(() => busy.delete(key)), Math.min(1000 * 2 ** restarts.length, 60_000));
 }
 
-/** SIGTERM the group, SIGKILL what is left after five seconds. `wanted` goes down first, so the
- *  tick does not start it again while it dies, `restart: always` included. */
+/** An exit no policy will retry ends the row: the supervisor saw the death, and enabled is the
+ *  whole desired state — a row left on would be started again by the very next tick. The alert
+ *  keeps it visible, because an off row is dim and a dim row says nothing happened. */
+async function died(row: Row & { entry: Service }, restarts: string[], alert: string): Promise<void> {
+  await writeDaemonEnabled(row.key, 'off');
+  await patch(row.key, { pid: undefined, restarts, alert });
+}
+
+/** SIGTERM the group, SIGKILL what is left after five seconds. What asked for the stop wrote the
+ *  row off first, so the tick does not start it again while it dies, `restart: always` included. */
 async function stopService(row: Row & { entry: Service }, pid: number | undefined): Promise<void> {
   const { key } = row;
   stopping.add(key);
-  await patch(key, { wanted: false });
   if (pid !== undefined) {
     killGroup(pid);
     for (let i = 0; i < 50 && isAlive(pid); i++) await Bun.sleep(100);
@@ -315,7 +322,7 @@ async function stopService(row: Row & { entry: Service }, pid: number | undefine
   // An adopted pid has no exit to observe, so the stop files the death itself.
   if (pid === undefined || !isAlive(pid)) {
     stopping.delete(key);
-    await patch(key, { pid: undefined, wanted: false });
+    await patch(key, { pid: undefined });
   }
 }
 

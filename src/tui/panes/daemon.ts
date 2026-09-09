@@ -78,7 +78,7 @@ function facts(row: DaemonRow): Cell[][] {
 
   if (s.pid !== undefined) {
     out.push(fact('pid', [[String(s.pid), C.accent], [s.startedAt ? ` · up ${short(Date.now() - Date.parse(s.startedAt))}` : '', C.dim]]));
-  } else if (e.kind === 'service') out.push(fact('pid', [['stopped', C.dim], [s.wanted ? ' · wanted' : '', C.dim]]));
+  } else if (e.kind === 'service') out.push(fact('pid', [['stopped', C.dim]]));
 
   if (s.lastStatus) {
     const said = join([s.lastSummary, s.lastEnd && ago(Date.parse(s.lastEnd))]);

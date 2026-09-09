@@ -33,7 +33,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Stub         | A mission with an intent and no branch. `mission open` promotes it.                               |
 | Archive      | `.factory/archive/<dir>`, where `mission archive` moves a closed mission's folder. Only `mission list --all` reads it. |
 | Daemon       | A periodic command a project declares in its Manifest: `every`, optional `atMost` and `when`, run by the Supervisor. Exit 0 is ok, exit 0 with a last stdout line `{"skip":…}` is skip, non-zero is fail. Glyph `↻`. |
-| Service      | A long-running command a project declares in its Manifest: `detached` or in a `tab`, with a `restart` policy. Runs while it is enabled and `wanted`. Glyph `▶`. |
+| Service      | A long-running command a project declares in its Manifest: `detached` or in a `tab`, with a `restart` policy. Runs while it is enabled; `restart` acts only while it is. Glyph `▶`. |
 | Supervisor   | The one Factory process per machine that runs every enabled Daemon and Service. `factory supervisor start`, a liveness-checked pid file under `~/.factory/supervisor/` as its lock; `install` writes the one OS unit that keeps it alive at login. |
 | Orchestrator | The interactive Fable session bound to a mission. Plans, delegates, asks, triages, records steps. Never implements. Never merges by hand. |
 | Worker       | Opus sub-agent that implements one step with clean context. Serial, one at a time per mission.    |
@@ -68,7 +68,7 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 | Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No broker: every surface reads the files. |
 | Mission Control | The Factory TUI, `factory` with no arguments. Reads the files the CLI writes, writes through the CLI's own functions. |
 | Inbox           | Every open gate, waiting decision, waiting question and daemon Alert across all projects. Each names the command that answers it. |
-| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row. Answered by `factory daemon log <key>`, or `l` on the row: reading the log is the acknowledgement, and a next success clears it too. |
+| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row; a death no `restart` policy will retry turns the row off beside it. Answered by `factory daemon log <key>`, or `l` on the row: reading the log is the acknowledgement, and a next success clears it too. |
 | Messages        | The right pane over the Inbox: the selected item's body and its answering command. Read-only.   |
 | Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, for whatever the left column has selected. |
 | Message box     | Under the foot on `↵`: a message to the selected row's session, posted to its inbox socket. One draft per row, kept until sent. |

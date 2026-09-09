@@ -132,7 +132,7 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
   inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
-  daemon: ['Space', 'R', 'X', 'L'],
+  daemon: ['R', 'X', 'L'],
 };
 const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
 
@@ -143,12 +143,12 @@ const rowKeys = (here: LeftItem): string[] =>
     ? ROW_KEYS.mission.filter((key) => key !== 'T')
     : ROW_KEYS[here.kind];
 
-/** A daemon row's own labels: `R` is Run on a daemon and Start on a service, and `L` is the Log
- *  here where every other row still turns Launch. */
+/** A daemon row's own labels: `R` is Run on a daemon and Start on a service — both turn the row
+ *  on — `X` is Stop and off, and `L` is the Log here where every other row turns Launch. */
 function rowPairs(here: LeftItem): string[][] {
   if (here.kind !== 'daemon') return ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!));
   const label: Record<string, string> = {
-    Space: 'On/Off', R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', L: 'Log',
+    R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', L: 'Log',
   };
   return ROW_KEYS.daemon.map((key) => [key, label[key]!]);
 }

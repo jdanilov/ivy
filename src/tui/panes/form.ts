@@ -26,7 +26,7 @@ export const AUTONOMY_FIELD = FIELDS.length;
 export const SHAPE_FIELD = FIELDS.length + 1;
 export const AUTONOMY: Autonomy[] = ['full', 'partial', 'none'];
 /** The Shape dial: the shipped workflows, and `auto` for the `intent` one the Orchestrator shapes. */
-export const SHAPES = ['auto', 'quick', 'chore', 'research', 'train', 'story'] as const;
+export const SHAPES = ['auto', 'session', 'chore', 'research', 'train', 'story'] as const;
 export type Shape = (typeof SHAPES)[number];
 /** A stub's workflow as the dial reads it; one the dial does not list reads `auto`, and the save
  *  only rewrites a graph when the dial was turned, so that one is left as it is. */

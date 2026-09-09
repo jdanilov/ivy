@@ -31,7 +31,7 @@ it. Propose a preset and an autonomy under `## Shape` in `intent.md`; once the g
 `factory mission shape <preset> --autonomy L` appends that preset's steps behind `intent`. A stub
 shaped from the form's Shape dial arrives with its graph: gate the intent, skip the proposal. `merge`
 spawns the Summarizer first — `retro.md` is part of what the human approves — then opens the gate.
-`step add|skip|loop` customise a shaped graph, nothing reshapes it; `mission new --quick` skips all
+`step add|skip|loop` customise a shaped graph, nothing reshapes it; `mission new --session` skips all
 of it, one `work` step with no intent to shape.
 
 | Preset     | Steps after `intent`                                                | Fits                    |
@@ -44,7 +44,7 @@ of it, one `work` step with no intent to shape.
 ## CLI
 
 ```
-factory mission new <name> [--stub] [--quick] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
+factory mission new <name> [--stub] [--session] [--workflow W] [--verify] [--autonomy full|partial|none] [--worktree] [--no-open]
 factory mission shape <preset> [--verify] [--autonomy L] | autonomy full|partial|none [name]
 factory mission open [name] [--preset P] [--dry-run] | list [--all] | status|resume|close [name] | adopt <name> --session <id>
 factory step start|done|skip|loop <step> [--reason R] [--mission M] | add <step> --after <step> --role R --reason R

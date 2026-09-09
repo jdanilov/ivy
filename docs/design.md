@@ -92,8 +92,9 @@ last row     ──────────────────────�
   every project. Archived missions are off the list until `S` asks for them.
 - A project's daemons and services sit in the same list, under its sessions, and not in a block of
   their own: the glyph is the kind, `↻` a daemon and `▶` a service, and the colour is the state —
-  dim off, bright on, accent orange while a pid is set, warning amber once a run failed or an alert
-  is waiting. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
+  warning amber once a run failed or an alert is waiting, read before dim off so a service the
+  supervisor turned off for dying is not a dim row, then bright on and accent orange while a pid
+  is set. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
   `every 3h · last ✓ 2h ago · next 1h`, `last ✗ post: exit 2 9h ago`, `last ○ nothing pending 1h
   ago` or `never`; a service `pid 4123 · up 3h · :3060`, `stopped`, or `✗ died 1` — a stopped row
   wears its alert's own words — and `tab→detached` on the end where the tab could not be opened.
@@ -176,7 +177,7 @@ the branch, and fixed once the folder exists — renaming a stub is delete and r
 the name is drawn and never focused; `Mission Goal`, what the mission is for; `What done looks
 like`, one per line; `Extra`, the guardrails, what not to touch and where to start from, one field
 so the form stays short; `Autonomy`, a dial, `full | partial | none`; and `Shape`, a dial,
-`auto | quick | chore | research | train | story`, the chosen one bright on each. `auto` leaves the
+`auto | session | chore | research | train | story`, the chosen one bright on each. `auto` leaves the
 stub on the `intent` workflow for the Orchestrator to shape; a name is that preset's whole graph,
 written on `^S` only when the dial was turned, so a stub on a workflow the dial does not list keeps
 it. Every label ends in a colon behind a `›`, and a blank row follows every input, so a label never
@@ -282,7 +283,7 @@ one nobody can read. A graph row in MISSION ends in two right-aligned columns, t
 then wall time, so the numbers read down the pane, and a step the mission looped back to carries a
 dim `×N` after its name. Under the facts, a DEVIATIONS sub-panel gives each entry its own wrapped
 line, and is absent at zero. A session under a project is named by what `--name` or `/rename`
-called it, else by its id, then `· <preset>`, never by its preset alone: two quick sessions must
+called it, else by its id, then `· <preset>`, never by its preset alone: two bare sessions must
 not read the same. The `no missions` hint is absent while a session is standing there; with
 nothing under a project at all it says `create one with M`. A session's mark is a diamond, `◈`
 working and `◇` idle, where every mission row carries a circle: a session is a place you type
@@ -361,9 +362,8 @@ keys do, and none of these three do the same thing.
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |
 | `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
-| `Space` | daemon row       | the daemon or service on, off — `daemons:` in `~/.factory/config.yaml` |
-| `R`     | daemon row       | run a daemon now, past its cadence and idle gates; start a service |
-| `X`     | daemon row       | stop it, killing the process group                               |
+| `R`     | daemon row       | run a daemon now past its cadence and idle gates, or start a service, turning the row on — `daemons:` in `~/.factory/config.yaml` |
+| `X`     | daemon row       | stop it, killing the process group, and turn the row off         |
 | `L`     | daemon row       | the log alone in the right pane, the alert cleared; Launch is not turned here |
 | `↵`     | daemon row       | DAEMON: the entry, the last result and the last thirty log lines |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
@@ -376,7 +376,7 @@ keys do, and none of these three do the same thing.
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
-project `M`, a daemon row `Space R X L` with `R` reading `Run` on a daemon and `Start` on a
+project `M`, a daemon row `R X L` with `R` reading `Run` on a daemon and `Start` on a
 service, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
 with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
 Autonomy` on a stub, whose pane is the form and not MISSION.

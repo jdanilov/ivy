@@ -88,7 +88,7 @@ const authLog = log('8a9e6b42', `
 7|agent|The contract is green. Opening the merge gate on retro.md.
 3|ask|Merge auth into main?`);
 
-const quickLog = log('b3f21c07', `
+const recallLog = log('b3f21c07', `
 26|agent|Looking at how recall should be indexed before writing anything.
 22|read|docs/terminology.md
 18|bash|rg -n "Recall" docs|ok
@@ -202,7 +202,7 @@ const ivyDaemons: DaemonRow[] = [
       kind: 'service', name: 'api', cmd: 'npm run dev', cwd: 'inssist-api',
       env: { PORT: '3061', NODE_ENV: 'development' }, run: 'detached', restart: 'on-failure', port: 3061,
     },
-    state: { enabled: true, wanted: true, pid: 4123, startedAt: iso(3 * H) },
+    state: { enabled: true, pid: 4123, startedAt: iso(3 * H) },
     log: ['listening on http://localhost:3061', 'GET /health 200 3ms'],
   },
   {
@@ -259,7 +259,7 @@ const projects: Project[] = [
     daemons: [],
     sessions: [
       {
-        id: 'b3f21c07', name: 'recall', busy: false, preset: 'quick', cwd: '~/dev/igs', idleSince: now - 12 * M,
+        id: 'b3f21c07', name: 'recall', busy: false, preset: 'session', cwd: '~/dev/igs', idleSince: now - 12 * M,
         turn: { at: now - 26 * M, tools: 3, wall: 14 * M }, tokens: { input: 48_200, output: 3_900 }, context: 61_400,
       },
     ],
@@ -322,9 +322,9 @@ const inbox: InboxItem[] = [
     text: 'verify · verifier · LOW\nDevice-list paging is out of the contract, left alone',
   },
   {
-    kind: 'question', project: 'igs', origin: 'quick', label: 'asks', at: now - 8 * M,
+    kind: 'question', project: 'igs', origin: 'session', label: 'asks', at: now - 8 * M,
     text: 'Two recall strategies fit here, embeddings or a grep index. Embeddings need a model on the box and a rebuild whenever a note changes; a grep index is instant and dumb. Which do you want for v1?',
-    tab: 'factory-igs-quick',
+    tab: 'factory-igs-session',
   },
   {
     kind: 'gate', project: 'igs', origin: 'auth', label: 'gate merge', at: now - 3 * M,
@@ -340,6 +340,6 @@ const inbox: InboxItem[] = [
 ];
 
 export const snapshot: Snapshot = {
-  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...quickLog],
+  projects, global: globalParts, inbox, activity: [...refitLog, ...authLog, ...recallLog],
   caffeinate: 'auto', launch: 'fg', supervisor: 8821,
 };

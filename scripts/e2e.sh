@@ -119,10 +119,10 @@ grep -q '"workflow": "intent"' "$REPO"/.factory/missions/*-s/state.json || die '
 f mission shape story
 grep -q '"workflow": "story"' "$REPO"/.factory/missions/*-s/state.json || die 'shape did not record the preset'
 [ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-s/workflow.yaml)" = 6 ] || die 'shape did not append the story steps'
-refuses "$REPO" 'quick has no intent step' mission shape quick
+refuses "$REPO" 'session has no intent step' mission shape session
 
-f mission new q --quick --no-worktree --no-open
-[ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-q/workflow.yaml)" = 1 ] || die '--quick is not a single step'
+f mission new q --session --no-worktree --no-open
+[ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-q/workflow.yaml)" = 1 ] || die '--session is not a single step'
 
 f uninstall "$REPO" --yes
 [ ! -e "$REPO/.claude/skills/mission" ] || die 'uninstall left a skill behind'
@@ -137,7 +137,13 @@ says "$REPO" daemon list | grep -q 'repo/tick' || die 'daemon list does not show
 says "$REPO" daemon list | grep -q 'supervisor not running' || die 'daemon list does not head with the missing supervisor'
 says "$REPO" supervisor status | grep -q 'not running' || die 'supervisor status does not say it is not running'
 says "$REPO" supervisor status | grep -q 'not installed' || die 'supervisor status does not say the unit is not installed'
-refuses "$REPO" 'is off' daemon run repo/tick
+# Two verbs and no supervisor: `run` turns the row on and leaves the request for a tick that
+# never comes, `stop` turns it back off. The config is the whole desired state, so it is the proof.
+f daemon run repo/tick
+grep -q 'repo/tick: "on"' "$HOME/.factory/config.yaml" || die 'daemon run did not turn the row on'
+f daemon stop repo/tick
+grep -q 'repo/tick: "off"' "$HOME/.factory/config.yaml" || die 'daemon stop did not turn the row off'
+refuses "$REPO" 'no daemon' daemon run repo/nothing
 rm "$REPO/.factory/daemons.yaml"
 
 # The user's own parts: home dir, one settings.json for hooks and allow list, no project involved.

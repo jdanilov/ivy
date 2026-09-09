@@ -39,6 +39,9 @@ const frames: Frame[] = [
     },
   },
   { name: 'help', left: at((i) => i.kind === 'inbox'), focus: 'right', set: (ui) => { ui.help = true; } },
+  { name: 'daemon', left: at((i) => i.kind === 'daemon'), focus: 'right' },
+  // What `l` draws: the log alone, filling the pane.
+  { name: 'daemon-log', left: at((i) => i.kind === 'daemon'), focus: 'right', set: (ui) => { ui.daemonLog = true; } },
   {
     name: 'parts-confirm',
     left: at((i) => i.kind === 'project' && i.project.name === 'ivy'),

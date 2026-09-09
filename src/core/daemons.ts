@@ -194,12 +194,29 @@ export async function writeRequest(key: string, request: Request): Promise<void>
   await Bun.write(requestFile(key), `${request}\n`);
 }
 
-/** Only the tail is ever shown and the log runs to 5 MB: read the last 64 KB, not the file. */
+/**
+ * A log line as a terminal would have shown it. A dev server draws with escape sequences and
+ * rewrites its progress line with `\r`, and nothing that reads the log back is a terminal: the
+ * pane would draw `32m` and jumping columns, and `daemon log` would paste them into a shell.
+ * A `\r` rewrite keeps only what was written after the last one, which is what stood on screen.
+ */
+export function plainLine(line: string): string {
+  return line
+    .slice(line.lastIndexOf('\r') + 1)
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC: window titles and the like
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')           // CSI: colour, cursor moves, erases
+    .replace(/\x1b[@-Z\\-_]/g, '')                     // the lone two-byte escapes
+    .replace(/\t/g, '  ')
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');         // whatever control bytes are left
+}
+
+/** Only the tail is ever shown and the log runs to 5 MB: read the last 64 KB, not the file.
+ *  Every reader gets the lines already legible — there is no second place to clean them. */
 export async function readLogTail(key: string, n: number): Promise<string[]> {
   const file = Bun.file(logFile(key));
   if (!(await file.exists())) return [];
   const text = await file.slice(Math.max(0, file.size - 64 * 1024)).text();
-  return text === '' ? [] : text.replace(/\n$/, '').split('\n').slice(-n);
+  return text === '' ? [] : text.replace(/\n$/, '').split('\n').slice(-n).map(plainLine);
 }
 
 /** Every row on this machine: only projects in `~/.factory/projects` are visible, and a project

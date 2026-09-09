@@ -42,7 +42,7 @@ const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
-const { due, enabledOf, listRows, parseAtMost, parseDuration, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
+const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
 const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
 const { readLog, runNow, setEnabled, stopRow } = await import('../src/commands/daemon.js');
 
@@ -1119,6 +1119,21 @@ await check('the daemon contract is the exit code plus one optional JSON line', 
   ok(failed.status === 'fail' && failed.summary === 'post: 403', `a failure read as ${JSON.stringify(failed)}`);
   ok(verdict(0, '{oops}').summary === '{oops}', 'a line that only looks like JSON was not the summary');
   ok(verdict(0, 'x'.repeat(200)).summary.length === 80, `a long last line clipped to ${verdict(0, 'x'.repeat(200)).summary.length}`);
+});
+
+await check('a log line reads back the way a terminal would have shown it', async () => {
+  const colour = plainLine('\x1b[32m✓\x1b[0m built in 412ms');
+  ok(colour === '✓ built in 412ms', `a coloured line read back as ${JSON.stringify(colour)}`);
+
+  // A progress line rewritten in place: only what followed the last carriage return was on screen.
+  const progress = plainLine('transforming (12)\rtransforming (48)\r\x1b[2Ktransforming (301)');
+  ok(progress === 'transforming (301)', `a rewritten line read back as ${JSON.stringify(progress)}`);
+
+  const titled = plainLine('\x1b]0;vite dev\x07VITE v5.4.2  ready in 300 ms');
+  ok(titled === 'VITE v5.4.2  ready in 300 ms', `a line setting the window title read back as ${JSON.stringify(titled)}`);
+
+  const header = plainLine('── 2026-09-09T08:00:00.000Z run');
+  ok(header === '── 2026-09-09T08:00:00.000Z run', `the run header came back as ${JSON.stringify(header)}`);
 });
 
 await check('daemon enablement is one line in the machine config, default off, and off wins', async () => {

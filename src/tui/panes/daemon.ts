@@ -12,8 +12,12 @@ import type { DaemonRow } from '../model.js';
  * same functions `factory daemon` runs.
  */
 
-/** What `factory daemon log` prints with no `-n`, so the pane and the shell show one thing. */
+/** What the detail pane shows under LOG, and what `factory daemon log` prints with no `-n`. */
 export const LOG_LINES = 30;
+/** What the log view can draw: it fills the pane, and a tall terminal holds more than thirty
+ *  rows. The read costs the same either way — `readLogTail` reads the last 64 KB whatever it is
+ *  asked for — so the cache holds more lines than any pane can put on screen. */
+const READ_LINES = 500;
 /** A long line wraps, but a stack trace must not push the newest lines off the pane. */
 const WRAP_ROWS = 2;
 const LABEL = 9;
@@ -28,7 +32,7 @@ const reading = new Set<string>();
 export function logTail(key: string, n: number): string[] {
   if (!reading.has(key)) {
     reading.add(key);
-    void readLogTail(key, LOG_LINES)
+    void readLogTail(key, READ_LINES)
       .then((lines) => tails.set(key, lines))
       .catch(() => tails.set(key, []))
       .finally(() => reading.delete(key));
@@ -37,8 +41,11 @@ export function logTail(key: string, n: number): string[] {
 }
 
 /** What `l` already read on its way through the CLI's own `daemon log`: the view's first frame
- *  has the lines, and the refresh above takes over from there. */
-export const seedTail = (key: string, lines: string[]): void => { tails.set(key, lines); };
+ *  has the lines, and the refresh above takes over from there. It never shortens a tail that is
+ *  already longer — the ack reads thirty lines and the view draws more than that. */
+export const seedTail = (key: string, lines: string[]): void => {
+  if ((tails.get(key) ?? []).length < lines.length) tails.set(key, lines);
+};
 
 /** The fixture has no `~/.factory/daemons/` behind it and carries the lines it wants shown. */
 const linesOf = (row: DaemonRow, n: number): string[] => (row.log ? row.log.slice(-n) : logTail(row.key, n));
@@ -90,7 +97,7 @@ export function daemonPane(p: Pane, row: DaemonRow, ui: Ui, h: number): void {
 
   // `l`: the log alone, as much of it as the pane holds, the newest line at the foot.
   if (ui.daemonLog) {
-    const lines = linesOf(row, LOG_LINES);
+    const lines = linesOf(row, READ_LINES);
     p.row(spread([['LOG', C.bright], [`  ${title}`, C.dim]], [[`${lines.length} lines`, C.dim]], p.width));
     p.rule();
     const rows = lines.flatMap((l) => wrap(l, p.width, WRAP_ROWS));

@@ -1,6 +1,7 @@
 /** What Mission Control draws. `live.ts` fills these from state.json, events and manifests. */
 
 import type { Caffeinate, Launch } from '../core/config.js';
+import type { Row } from '../core/daemons.js';
 import { stepRole } from '../core/workflow.js';
 import type { Decision } from '../core/decision.js';
 import type { Intent } from '../core/intent.js';
@@ -125,16 +126,24 @@ export interface PartRow {
   files: string[];
 }
 
+/** A manifest entry with its state. The log is the pane's own read, except in the fixture, which
+ *  has no `~/.factory/daemons/` behind it and carries the lines it wants shown. */
+export type DaemonRow = Row & { log?: string[] };
+
 export interface Project {
   name: string;
   path: string;
   missions: Mission[];
   sessions: Session[];
   parts: PartRow[];
+  /** What `.factory/daemons.yaml` declares, in the same list as the missions and the sessions. */
+  daemons: DaemonRow[];
+  /** A manifest that does not parse: one line under the project, and no daemons for it. */
+  daemonError?: string;
 }
 
 export interface InboxItem {
-  kind: 'gate' | 'decision' | 'question';
+  kind: 'gate' | 'decision' | 'question' | 'daemon';
   project: string;
   origin: string;
   label: string;
@@ -156,4 +165,6 @@ export interface Snapshot {
   activity: Activity[];
   caffeinate: Caffeinate;
   launch: Launch;
+  /** The machine's supervisor, or null when nothing is running the daemons. */
+  supervisor: number | null;
 }

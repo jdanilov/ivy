@@ -7,11 +7,14 @@ import { leftPane } from './panes/left.js';
 import { messagesPane } from './panes/messages.js';
 import { missionPane, sessionPane } from './panes/mission.js';
 import { partsPane, pending } from './panes/parts.js';
+import { daemonPane } from './panes/daemon.js';
 import { footPane } from './panes/foot.js';
 import { composeHeight, composePane, targetOf } from './panes/compose.js';
 import { SHAPE_FIELD, formOf, formPane, showsForm, showsParts } from './panes/form.js';
 import { helpPane } from './panes/help.js';
 import { onKey, onPaste } from './keys.js';
+import { rowTail } from '../commands/daemon.js';
+import { startSupervisor, supervisorPid } from '../core/supervisor.js';
 import type { Mission, Session, Snapshot } from './model.js';
 
 /** Chrome rows: blank, header, rule — rule, key bar. The key bar sits on the last terminal row:
@@ -101,6 +104,12 @@ function status(width: number, snap: Snapshot, here: LeftItem, ui: Ui): Cell[] {
   if (ui.toast) return [[ui.toast, C.dim]];
   if (here.kind === 'mission') return missionBar(width, here.mission);
   if (here.kind === 'session') return sessionBar(width, here.session);
+  // A daemon has no run of its own to sum: the key says which one, the tail what it is doing.
+  // With no supervisor every one of those rows is a record of the past, so the bar says so.
+  if (here.kind === 'daemon') {
+    return [[here.daemon.key, C.bright], [' · ', C.rule], [rowTail(here.daemon), C.dim],
+      [snap.supervisor === null ? '  supervisor not running — factory supervisor start' : '', C.warning]];
+  }
   if (here.kind === 'inbox') {
     const n = snap.projects.length;
     return summary([`${n} project${n === 1 ? '' : 's'}`, C.bright], snap.projects.flatMap((project) => project.missions));
@@ -123,6 +132,7 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
   inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
+  daemon: ['Space', 'R', 'X', 'L'],
 };
 const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
 
@@ -132,6 +142,16 @@ const rowKeys = (here: LeftItem): string[] =>
   here.kind === 'mission' && here.mission.status === 'stub'
     ? ROW_KEYS.mission.filter((key) => key !== 'T')
     : ROW_KEYS[here.kind];
+
+/** A daemon row's own labels: `R` is Run on a daemon and Start on a service, and `L` is the Log
+ *  here where every other row still turns Launch. */
+function rowPairs(here: LeftItem): string[][] {
+  if (here.kind !== 'daemon') return ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!));
+  const label: Record<string, string> = {
+    Space: 'On/Off', R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', L: 'Log',
+  };
+  return ROW_KEYS.daemon.map((key) => [key, label[key]!]);
+}
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
  *  terminal is too narrow, because the overlay it opens lists everything anyway. `L`, `C`, `A`
@@ -147,7 +167,7 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
-    !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!)),
+    !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
       ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
@@ -226,6 +246,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     // mission it has a draft for. The body cuts the end of it, the way it cuts a long graph.
     else if (showsForm(ui, here)) formPane(right, ui, here);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global', bodyH);
+    else if (here.kind === 'daemon') daemonPane(right, here.daemon, ui, bodyH);
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');
     else sessionPane(right, here.session);
     body.add(left.box);
@@ -277,11 +298,20 @@ export function act(app: App, doing: string, fn: () => Promise<string>): void {
 /** Files change under the screen: `apply` swaps the snapshot in, `close()` stops the watching. */
 export type Live = (apply: (next: Snapshot) => void) => { close(): void };
 
+/** The daemons run whether or not anyone is watching, so the screen starts the machine's
+ *  supervisor when nothing else has and never stops it: quitting must not take them down. Only a
+ *  live screen does it — a fixture run and the headless frame drivers have no machine to keep. */
+async function ensureSupervisor(): Promise<void> {
+  if ((await supervisorPid()) !== null) return;
+  await startSupervisor();
+}
+
 /** Resolves when the human quits, so the CLI ends without an exit call. */
 export async function run(snap: Snapshot, live?: Live): Promise<void> {
   const r = await createCliRenderer({ exitOnCtrlC: true, targetFps: 30 });
   const app: App = { r, ui: newUi(), snap };
   draw(app);
+  if (live) void ensureSupervisor().catch((e: unknown) => toast(app, `✗ supervisor: ${e instanceof Error ? e.message : String(e)}`));
   r.on('resize', () => draw(app));
   const watcher = live?.((next) => {
     app.snap = next;

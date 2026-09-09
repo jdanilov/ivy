@@ -91,8 +91,8 @@ last row     ──────────────────────�
   An open mission row ends in its wall time and diff and no token count: the status bar has the
   tokens, and the row has no room. A mission or session under Claude Code's `--bg` job carries a
   dim `bg`.
-- A row starts at the pane's edge — the glyph is the first cell, there is no marker column — and
-  what names it stays left: the glyph, the name, an open mission's workflow and step, a session's
+- A heading starts at the pane's edge and the rows under it two cells in, the glyph first — there
+  is no marker column — so a project reads as a block; what names a row stays left: the glyph, the name, an open mission's workflow and step, a session's
   preset and id. Where it stands goes right, against the edge: a mission's `closed 1h ago`,
   `stub` or `archived`, or its wall time and diff; a session's `idle 3h 18m`, `working` or
   `asking`; a daemon's tail. The selection inverts the row while the left pane has the focus, and

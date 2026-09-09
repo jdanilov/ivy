@@ -14,6 +14,9 @@ import type { DaemonRow, Mission, Session, Snapshot } from '../model.js';
 const rowCells = (width: number, left: Cell[], right: Cell[], selected: boolean, focused: boolean): Cell[] =>
   spread(left, [['  ', C.dim], ...right, chevron(selected, focused)], width);
 
+/** A row under a project stands two cells in from its heading, so a project reads as a block. */
+const UNDER: Cell = ['  ', C.dim];
+
 /** What the branch is worth so far. Absent until the first `git diff` behind the snapshot lands. */
 function diffCells(m: Mission): Cell[] {
   if (!m.diff) return [];
@@ -23,7 +26,7 @@ function diffCells(m: Mission): Cell[] {
 function missionRow(width: number, m: Mission, selected: boolean, focused: boolean): Cell[] {
   const quiet = m.status !== 'open';
   const left: Cell[] = [
-    [`${GLYPH[m.state]} `, stateColor(m.state)], [m.name, quiet ? C.dim : C.bright],
+    UNDER, [`${GLYPH[m.state]} `, stateColor(m.state)], [m.name, quiet ? C.dim : C.bright],
     ...(m.status === 'open' && !m.archived
       ? ([['  ', C.dim], [m.workflow, C.dim], ['  ', C.dim], [m.step ?? '—', C.bright],
         [m.round ? ` ↻${m.round}` : '', C.dim], [m.bg ? '  bg' : '', C.dim]] as Cell[])
@@ -45,7 +48,7 @@ function sessionRow(width: number, s: Session, selected: boolean, focused: boole
   const asking = s.now?.verb === 'ask';
   const state = asking ? 'asking' : s.busy ? `working${s.agent ? ` · ${s.agent}` : ''}` : `idle ${dur(Date.now() - s.idleSince)}`;
   const left: Cell[] = [
-    s.busy ? [`${SESSION.working} `, asking ? C.warning : C.accent] : [`${SESSION.idle} `, C.dim],
+    UNDER, s.busy ? [`${SESSION.working} `, asking ? C.warning : C.accent] : [`${SESSION.idle} `, C.dim],
     [s.name ?? id(s.id), C.bright], [' · ', C.rule], [s.preset, C.dim], [s.bg ? '  bg' : '', C.dim],
     ...(s.name ? ([['  ', C.dim], [id(s.id), C.dim]] as Cell[]) : []),
   ];
@@ -66,7 +69,7 @@ export function daemonColor(d: DaemonRow): string {
  *  and what it last did in the tail — `rowTail` is the CLI's, so neither surface drifts. */
 function daemonRow(width: number, d: DaemonRow, selected: boolean, focused: boolean): Cell[] {
   const color = daemonColor(d);
-  return rowCells(width, [[`${d.entry.kind === 'daemon' ? '↻' : '▶'} `, color], [d.entry.name, color]],
+  return rowCells(width, [UNDER, [`${d.entry.kind === 'daemon' ? '↻' : '▶'} `, color], [d.entry.name, color]],
     [[rowTail(d), C.dim]], selected, focused);
 }
 

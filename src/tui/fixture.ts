@@ -25,10 +25,12 @@ function steps(spec: [name: string, status: StepRow['status'], wall?: number, of
 const refitSteps = steps([
   ['intent', 'done', 12 * M, { gate: 'human' }, { input: 24_000, cached: 260_000, output: 4_800 }],
   ['research', 'skipped', undefined, { role: 'investigator' }],
-  ['spec', 'done', 8 * M, undefined, { input: 41_500, cached: 620_000, output: 9_300 }],
+  ['plan', 'done', 8 * M, undefined, { input: 41_500, cached: 620_000, output: 9_300 }],
   ['implement', 'running', 6 * M, { role: 'worker' }, undefined, 2],
+  ['check', 'pending', undefined, { loop: { back: 'implement', max: 8 } }, undefined, 1],
   ['review', 'pending', undefined, { parallel: ['verify', 'validate'] }],
-  ['verify', 'pending'], ['validate', 'pending'], ['merge', 'pending', undefined, { gate: 'human' }],
+  ['verify', 'pending'], ['validate', 'pending'],
+  ['fix', 'pending', undefined, { role: 'worker' }], ['merge', 'pending', undefined, { gate: 'human' }],
 ]);
 
 /** `minutes back|verb|text[|status]`, oldest first — the shape wiring will read out of the transcript. */

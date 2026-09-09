@@ -118,7 +118,7 @@ f mission new s --no-open
 grep -q '"workflow": "intent"' "$REPO"/.factory/missions/*-s/state.json || die 'mission new did not start on the intent workflow'
 f mission shape story
 grep -q '"workflow": "story"' "$REPO"/.factory/missions/*-s/state.json || die 'shape did not record the preset'
-[ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-s/workflow.yaml)" = 6 ] || die 'shape did not append the story steps'
+[ "$(grep -c '^  - ' "$REPO"/.factory/missions/*-s/workflow.yaml)" = 8 ] || die 'shape did not append the story steps'
 refuses "$REPO" 'session has no intent step' mission shape session
 
 f mission new q --session --no-worktree --no-open

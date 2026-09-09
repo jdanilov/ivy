@@ -386,7 +386,7 @@ await check('a step is coloured by what kind of work it is', async () => {
   const story = await loadWorkflow('story', TMP);
   // The story workflow names all four kinds; the runner decides, the human's gates are their own.
   const kinds = story.steps.map((step) => `${step.name}:${stepKind(step)}`);
-  const want = 'intent:human,research:agent,spec:technical,implement:agent,review:gatekeeper,merge:human';
+  const want = 'intent:human,research:agent,plan:technical,implement:agent,check:technical,review:gatekeeper,fix:agent,merge:human';
   ok(kinds.join() === want, `story reads ${kinds.join()}`);
   ok(stepKind({ name: 'verify' }) === 'gatekeeper' && stepKind({ name: 'validate' }) === 'gatekeeper',
     'a parallel gatekeeper row is not gatekeeping');
@@ -606,7 +606,7 @@ await check('the Shape dial reshapes a stub whole, and only a stub', async () =>
   await reshapeStub(main, m, 'story');
   const again = await resolveMission(main, 'sh');
   ok(again.state.workflow === 'story' && again.state.step === 'intent', `the reshape did not land in state: ${again.state.workflow}`);
-  ok((await missionWorkflow(again)).steps.some((s) => s.name === 'spec'), 'workflow.yaml was not rewritten');
+  ok((await missionWorkflow(again)).steps.some((s) => s.name === 'plan'), 'workflow.yaml was not rewritten');
   await reshapeStub(main, again, 'session');
   ok((await resolveMission(main, 'sh')).state.step === 'work', 'session did not move the pointer to its first step');
   // The refusal comes before any write, so a stub read as open is enough to prove it.
@@ -661,7 +661,7 @@ await check('a mission starts unshaped and shape appends a preset once', async (
 
   await mission('shape', ['story'], { autonomy: 'partial' }, dir);
   const shaped = await resolveMission(dir, 's');
-  ok((await graph(dir, 's')).join() === 'intent,research,spec,implement,review,merge', `shape gave ${(await graph(dir, 's')).join()}`);
+  ok((await graph(dir, 's')).join() === 'intent,research,plan,implement,check,review,fix,merge', `shape gave ${(await graph(dir, 's')).join()}`);
   ok(shaped.state.workflow === 'story' && shaped.state.autonomy === 'partial', 'shape recorded neither the preset nor the dial');
   ok(shaped.state.steps.research?.status === 'pending', 'an appended step has no pending entry');
   ok(shaped.state.step === 'intent', `the pointer left an unfinished intent for ${shaped.state.step}`);
@@ -677,6 +677,38 @@ await check('a mission starts unshaped and shape appends a preset once', async (
 
   await mission('new', ['q'], { session: true, 'no-open': true, 'no-worktree': true }, dir);
   ok((await graph(dir, 'q')).join() === 'work', `--session took ${(await graph(dir, 'q')).join()}`);
+});
+
+await check('story loops on check, reviews once, and a skipped fix reaches merge', async () => {
+  const dir = await repo('story');
+  await mission('new', ['s'], { workflow: 'story', 'no-open': true }, dir);
+  const m = { mission: 's' };
+  const at = async (): Promise<string> => (await resolveMission(dir, 's')).state.step;
+  await step('start', ['intent'], m, dir);
+  await gate('open', ['intent'], { ...m, file: 'intent.md' }, dir);
+  await gate('answer', ['intent', 'accept'], m, dir);
+  await step('done', ['intent'], m, dir);
+  await step('skip', ['research'], { ...m, reason: 'nothing to read' }, dir);
+  for (const s of ['plan', 'implement']) {
+    await step('start', [s], m, dir);
+    await step('done', [s], m, dir);
+  }
+
+  // `check` is the Orchestrator's own leg review: it returns to implement with no gatekeeper spawned.
+  await step('start', ['check'], m, dir);
+  await step('loop', ['check'], { ...m, reason: 'the next leg' }, dir);
+  ok((await at()) === 'implement', `the check loop landed on ${await at()}`);
+
+  // The gatekeepers run once, over the whole train, and what they find is the spec for `fix`.
+  for (const s of ['implement', 'check', 'review', 'verify', 'validate']) {
+    await step('start', [s], m, dir);
+    if (s !== 'review') await step('done', [s], m, dir);
+  }
+  await step('done', ['review'], m, dir);
+  ok((await at()) === 'fix', `the one review round left the mission at ${await at()}`);
+
+  await step('skip', ['fix'], { ...m, reason: 'nothing found' }, dir);
+  ok((await at()) === 'merge', `a skipped fix left the mission at ${await at()}`);
 });
 
 await check('an insert past a finished step takes the pointer with it', async () => {

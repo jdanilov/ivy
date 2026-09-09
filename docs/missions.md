@@ -35,10 +35,10 @@ factory handoff save <step>            # reads the handoff from stdin
 - `mission open` writes the session id to `state.json` before the tab exists, so the first hook
   event the session emits already finds a mission bound to it. `launch` in `~/.factory/config.yaml`
   says how: `fg`, the default, runs `claude --session-id <id> …` in the tab itself, where Warp
-  keeps its blocks over the conversation; `bg` starts it first with `claude --bg`, whose daemon
-  chooses the id, reads that id back from `~/.claude/jobs/<short>/state.json`, and opens the tab on
-  `claude attach <short>`, a session that outlives its tab and draws fullscreen, so no blocks. A
-  daemon's child inherits nothing from the command line, so in both modes the mission dir reaches
+  keeps its blocks over the conversation; `bg` starts it first with `claude --bg`, whose own background
+  process chooses the id, reads that id back from `~/.claude/jobs/<short>/state.json`, and opens the tab on
+  `claude attach <short>`, a session that outlives its tab and draws fullscreen, so no blocks. That
+  process's child inherits nothing from the command line, so in both modes the mission dir reaches
   the hook as `FACTORY_MISSION` through the mission's own `settings.json`, the preset's overlay
   plus that `env` and `crossSessionInbound: accept`, written beside its state. The command ends in
   `/mission` as the first prompt, so the session is reading the intent by the time the tab shows

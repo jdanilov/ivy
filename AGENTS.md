@@ -10,6 +10,7 @@ project, and runs missions across those projects. Install, update, uninstall, tr
 - Parts: `docs/parts.md` — part.yaml, targets, scope, `${name}`, manifest, the install family
 - Missions: `docs/missions.md` — the mission family's grammar and invariants
 - Design: `docs/design.md` — palette, layout, keys, glyphs, formats for Mission Control
+- Daemons: `docs/daemons.md` — the manifest, the contract, cadence, services, state, the supervisor
 - Roadmap: `docs/roadmap.md`
 - Memories: `docs/memories.md` — what closed missions learned, the seed corpus for the `mem` MCP
 
@@ -28,17 +29,21 @@ src/           CLI source (entry: src/cli.ts)
 ├── core/      Business logic — registry, scanner, manifest, linker, parts (removal), env, peer
 │              (a session's inbox socket, and posting to it),
 │              projects (home and factoryHome read at call time, scopeOf), config (vars, the
-│              parts: scope block, caffeinate), recipes, args, workflow (YAML load + transitions,
+│              parts: scope block, caffeinate, the daemons: block), recipes, args, workflow (YAML load + transitions,
 │              stepRole, ROLE_MODEL), mission (folder, state, claim, branch, autonomy, insert pointer,
 │              archive), decision (decisions.md table, waits, first answer wins),
-│              spawn (preset, the mission's settings overlay, the Warp tab: `claude` in it, or `claude --bg` and attach)
+│              spawn (preset, the mission's settings overlay, the Warp tab: `claude` in it, or `claude --bg` and attach),
+│              daemons (the daemons.yaml manifest, durations, cadence, the contract's verdict, state
+│              and log files, rows), supervisor (the one loop per machine: due runs, services,
+│              requests, adopt, watch, rotate), platform (the two OS adapters: idle time, the unit file)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys
 │              (what a keypress does), panes/ (pane scaffolding plus left, messages, mission,
-│              parts, foot, compose, help — one file each, none over 400 lines), actions (what a key
+│              parts, foot, compose, daemon, help — one file each, none over 400 lines), actions (what a key
 │              writes, through the CLI's own functions), notify, frames, format, theme
-├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control
+├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control,
+│              daemon (list, status, on, off, run, stop, log), supervisor (start, stop, status, install, uninstall)
 └── types.ts   Shared type definitions
 
 parts/<name>/  One folder per part: part.yaml plus the files it installs
@@ -50,6 +55,8 @@ scripts/tui-snapshot.ts The fixture screen as plain text, for a look review with
 scripts/spawn.ts        The one real model run behind `e2e.spawn`: a @Worker's decision injected back
 .factory/factory.yaml   the project's own recipes: verify, e2e.ready, e2e.run, e2e.spawn — a
                nested recipe reads back under its dotted path
+.factory/daemons.yaml   the project's daemons and services, committed, one entry per name;
+               `~/.factory/config.yaml` says which of them this machine runs
 workflows/     intent, story, chore, research, quick — the shipped workflow YAML: every mission
                starts on intent, `mission shape` appends a preset behind that step and `--verify`
                puts a verifier loop behind a chore's implement
@@ -60,7 +67,8 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
                rewrites, `launch: fg|bg`, how `mission open` runs claude, and an `order:` block
                Mission Control's `⇧↑↓` keeps), events/<session>.jsonl
                (the hook's lines plus Mission Control's one `Rename`), caffeinate/<session>.pid and
-               control.pid
+               control.pid, daemons/<project>/<name>/ (`state.json`, `log`, `log.1`, `request`) and
+               supervisor/ (`pid`, `log`), the state the supervisor and the `daemon` family share
 ~/.claude/     Where `scope: global` parts install: the same copies, `.factory-manifest.json` and
                one `settings.json` holding both the hooks and the allow list
 .factory/archive/<dir>  a closed mission's folder, renamed there by `mission archive`. Both it
@@ -82,12 +90,14 @@ closed missions' retros back into work. Shared context reaches every agent throu
 `## Important Files` snippets, never through a sentence repeated in each prompt. The `mission`
 skill stays under 120 lines, `Worker` under 40, `/retro` under 60, every other prompt under 80.
 
-### Two command families
+### Command families
 
 `install | uninstall | status | update [project]` act on a project: the argument, else the cwd when it is registered, else the picker;
 `--global` stands where the project path would. `mission | step | gate | decision | handoff <sub>`
 act on the checkout you are standing in, never prompt, and exit 1 with a one-line `✗ …` on a
-refusal. Grammar and rules in `docs/parts.md` and `docs/missions.md`.
+refusal. `daemon | supervisor <sub>` act on the machine — every registered project's manifest and
+the one supervisor — and refuse the same way. Grammar and rules in `docs/parts.md`,
+`docs/missions.md` and `docs/daemons.md`.
 
 ## Conventions
 

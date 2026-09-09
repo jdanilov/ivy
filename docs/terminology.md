@@ -19,6 +19,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Decision  | One fork an agent took that a reviewer might have taken differently: a row in `decisions.md` with a confidence and its reason. `auto`, `waiting`, then `accepted` or `overruled`. A round's fix-or-skip plan is one decision, never one per finding. |
 | Autonomy  | Mission-level dial: `full`, `partial`, `none`. Decides which decisions wait on the human.            |
 | Recipe    | A project command list in `factory.yaml`: `verify`, `e2e`, `deliver`.                                |
+| Manifest  | `.factory/daemons.yaml`, a project's committed list of what it runs in the background: one entry per Daemon or Service. Whether an entry runs on this machine is not in it — that is `~/.factory/config.yaml`. The parts' own record, `.factory-manifest.json`, is always named in full. |
 | Claim     | `.factory/claim` naming the mission that owns the main checkout. Other missions are offered a worktree. |
 | Snippet   | One line a part owns in the project's `AGENTS.md`, under a section the part names.                  |
 | Roadmap   | `docs/roadmap.md`, decided and unstarted work in the order to do it, written for the human choosing the next mission. `/retro` appends under `## Unsorted`, a human orders and prunes. |
@@ -31,6 +32,9 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Mission      | One unit of tracked work. Folder `.factory/missions/<YYYY-MM-DD-name>/`, ignored by git, branch `mission/<name>`. One workflow, one session. |
 | Stub         | A mission with an intent and no branch. `mission open` promotes it.                               |
 | Archive      | `.factory/archive/<dir>`, where `mission archive` moves a closed mission's folder. Only `mission list --all` reads it. |
+| Daemon       | A periodic command a project declares in its Manifest: `every`, optional `atMost` and `when`, run by the Supervisor. Exit 0 is ok, exit 0 with a last stdout line `{"skip":…}` is skip, non-zero is fail. Glyph `↻`. |
+| Service      | A long-running command a project declares in its Manifest: `detached` or in a `tab`, with a `restart` policy. Runs while it is enabled and `wanted`. Glyph `▶`. |
+| Supervisor   | The one Factory process per machine that runs every enabled Daemon and Service. `factory supervisor start`, a liveness-checked pid file under `~/.factory/supervisor/` as its lock; `install` writes the one OS unit that keeps it alive at login. |
 | Orchestrator | The interactive Fable session bound to a mission. Plans, delegates, asks, triages, records steps. Never implements. Never merges by hand. |
 | Worker       | Opus sub-agent that implements one step with clean context. Serial, one at a time per mission.    |
 | Gatekeeper   | Verifier or Validator. Checks work it did not produce against `acceptance.md`. Never edits code. |
@@ -61,9 +65,10 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 
 | Term            | Meaning                                                                                         |
 |-----------------|-------------------------------------------------------------------------------------------------|
-| Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No daemon in v1.         |
+| Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No broker: every surface reads the files. |
 | Mission Control | The Factory TUI, `factory` with no arguments. Reads the files the CLI writes, writes through the CLI's own functions. |
-| Inbox           | Every open gate, waiting decision and waiting question across all projects. Each names the session command that answers it. |
+| Inbox           | Every open gate, waiting decision, waiting question and daemon Alert across all projects. Each names the command that answers it. |
+| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row. Answered by `factory daemon log <key>`, or `l` on the row: reading the log is the acknowledgement, and a next success clears it too. |
 | Messages        | The right pane over the Inbox: the selected item's body and its answering command. Read-only.   |
 | Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, for whatever the left column has selected. |
 | Message box     | Under the foot on `↵`: a message to the selected row's session, posted to its inbox socket. One draft per row, kept until sent. |

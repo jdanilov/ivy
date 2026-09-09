@@ -70,10 +70,10 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 row 0        blank
 row 1        ⌬ FACTORY · status: mission bar or project bar, or the toast that replaces it
 row 2        ───────────────────────────────────────────────────────────────────────
-             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | PARTS (60%)
+             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | DAEMON | PARTS (60%)
              inbox, Global,          │  a list above a detail block; a gate and a
              projects, missions,     │  decision each end in the command that
-             sessions                │  answers them in the session
+             sessions, daemons       │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
              ACTIVITY  DECISIONS     one third of the body, all of it on a second A or D
              ───────────────────────────────────────────────────────────────────────
@@ -87,9 +87,18 @@ last row     ──────────────────────�
 - Left pane 40% of the width, minimum 30 cells, right pane the rest less the one-cell divider.
   Two cells of padding on the left pane keep its right-aligned wall time and diff off the divider.
   An open mission row ends in those two and no token count: the status bar has the tokens, and
-  the row has no room. A mission or session under Claude Code's daemon carries a dim `bg`.
+  the row has no room. A mission or session under Claude Code's `--bg` job carries a dim `bg`.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `S` asks for them.
+- A project's daemons and services sit in the same list, under its sessions, and not in a block of
+  their own: the glyph is the kind, `↻` a daemon and `▶` a service, and the colour is the state —
+  dim off, bright on, accent orange while a pid is set, warning amber once a run failed or an alert
+  is waiting. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
+  `every 3h · last ✓ 2h ago · next 1h`, `last ✗ post: exit 2 9h ago`, `last ○ nothing pending 1h
+  ago` or `never`; a service `pid 4123 · up 3h · :3060`, `stopped`, or `✗ died 1` — a stopped row
+  wears its alert's own words — and `tab→detached` on the end where the tab could not be opened.
+  A manifest that does not parse costs the project its rows and draws one dim
+  `daemons.yaml: <error>` line instead.
 - The foot keeps a third of the body, never fewer than 5 rows; `A` or `D` pressed on the tab already drawn gives it all of it. Its header
   is the two tabs, the drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back.
 
@@ -118,6 +127,12 @@ and how long it has been; `turn`, the open turn's tool count and length so far, 
 turn's; `spend`, the session's own tokens in and out and `context`, what its last turn re-sent,
 the one figure that says how full the window is. Its last word is the log's last row, and the
 pane does not repeat it.
+
+DAEMON is the manifest entry and what the supervisor wrote about it: `cmd`, `cwd`, `env`, then
+`every` with its `atMost`, `when` and `timeout`, or `run` with its restart policy and port; then
+`pid`, `last` as a glyph, its summary and how long ago, `next`, and `alert` in warning. Under a
+`LOG` rule, whatever height is left is the tail, newest at the foot. `l` gives the log the whole
+pane — the header, the line count and the last thirty lines, nothing else — and `←` or `Esc` leaves.
 
 The bar is also the one line the screen takes a name on. `R` asks for one there — the label, what
 has been typed, a cursor — and while the line is open every key is a character but `↵`, `Esc` and
@@ -195,7 +210,10 @@ that owns it. An AskUserQuestion picker still up is one, whatever else the turn 
 ended is one only when its final message's last line ends in `?` or the turn put a picker up:
 most final messages are statements, and a statement rings nobody. A closed mission raises nothing: its session id is a record, and the
 session, if it still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
-`777;notify`. Messages, the right pane over it, shows the selected item's body and that command.
+`777;notify`. A daemon whose run failed or whose service died is a row here too, under the project
+that declares it, and its command is `factory daemon log <project>/<name>`: reading the log is what
+answers it, so the row goes when the alert is cleared. Messages, the right pane over it, shows the
+selected item's body and that command.
 
 ### The foot: DECISIONS
 
@@ -343,8 +361,13 @@ keys do, and none of these three do the same thing.
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |
 | `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
+| `Space` | daemon row       | the daemon or service on, off — `daemons:` in `~/.factory/config.yaml` |
+| `R`     | daemon row       | run a daemon now, past its cadence and idle gates; start a service |
+| `X`     | daemon row       | stop it, killing the process group                               |
+| `L`     | daemon row       | the log alone in the right pane, the alert cleared; Launch is not turned here |
+| `↵`     | daemon row       | DAEMON: the entry, the last result and the last thirty log lines |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
-| `L`     | any              | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
+| `L`     | any but a daemon row | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
 | `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
 | `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |
@@ -353,7 +376,8 @@ keys do, and none of these three do the same thing.
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
-project `M`, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
+project `M`, a daemon row `Space R X L` with `R` reading `Run` on a daemon and `Start` on a
+service, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
 with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
 Autonomy` on a stub, whose pane is the form and not MISSION.
 
@@ -385,6 +409,8 @@ in the session that raised them, and `←`, `→` and `↵` on one write nothing
 | `✓`                   | completed, success                | `✓` done       | `symbols.check ✓`            | aligned, no change                               |
 | none                  | n/a                               | `◈` `◇` session | none                         | a session row, working or idle, so it never reads as a mission's `●` `○`; the doc glyphs' warning and decision readings do not apply on screen |
 | none                  | n/a                               | `▸` command    | none                          | in front of a command a message says to type, never on a row |
+| none                  | n/a                               | `↻` loop       | none                          | a daemon row: work that comes round again, the doc glyph's own reading |
+| none                  | n/a                               | `▶` running    | none                          | a service row, running or not; the colour says which          |
 | none shown (`Failed (0)` tab) | failure state             | `✗` failed     | `symbols.cross ✗`            | Factory renders `✗` where Droid had nothing      |
 | `▲` (theme.ts only)   | n/a in Droid                      | `◈` warning    | `symbols.modified ▲`         | keep `▲` yellow for modified/drift only          |
 | `▲` (theme.ts only)   | n/a in Droid                      | `✗` failed     | `symbols.conflict ▲`         | CONFLICT: modified and conflict share `▲`, differ only by color. Pick: conflict becomes `✗` red, modified keeps `▲` yellow |

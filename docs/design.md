@@ -81,7 +81,7 @@ row 2        ──────────────────────�
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
-             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  S Show Archived  Q Quit  ? Help        Launch FG  Caffeinate AUTO [ON]
+             ↑↓ Select  ↵ Message  O Open Tab  K Kill  T Autonomy  E Archive  R Rename  M New Mission  N New Project  S Show Archived  Q Quit  ? Help    Launch FG  Caffeinate AUTO [ON]
 ```
 
 - Two blank columns down the left of every row, none on the right and none under the key bar: the
@@ -104,6 +104,11 @@ last row     ──────────────────────�
   rows like any other.
 - `Global` sits above the projects and opens PARTS on `~/.claude/`: the user's own parts, in
   every project. Archived missions are off the list until `S` asks for them.
+- A project reads as the name `names:` in `~/.factory/config.yaml` gives its path, and as its
+  folder's own name until `R` writes one. That name is the row, the prefix of every daemon key
+  under it — `ivy/nightly` — and the folder its rows' state sits in under `~/.factory/daemons/`,
+  so a rename moves all three in the same breath. The checkout never moves: the name is this
+  machine's word for it, not the project's.
 - A project's daemons and services sit in the same list, over its missions and its sessions, and
   not in a block of their own: what the project runs by itself is what a glance is for, and those
   rows are the ones that never move. The glyph is the kind, `↻` a daemon and `▶` a service, and
@@ -404,6 +409,9 @@ keys do, and none of these three do the same thing.
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |
 | `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
+| `R`     | project row      | rename it on this machine: one line in `names:` in `~/.factory/config.yaml`, and its daemon keys, their state folder and its `order:` keys move with it |
+| `U`     | project row      | uninstall the parts and drop the project from `~/.factory/projects`, after a `Y` on the status bar; the checkout and its own `.factory/` stay |
+| `N`     | left             | a new project: a path typed on the status bar, then what `factory install <path> --yes` does, registered |
 | `R`     | daemon row       | run a daemon now past its cadence and idle gates, or start a service, turning the row on — `daemons:` in `~/.factory/config.yaml` |
 | `X`     | daemon row       | stop it, killing the process group, and turn the row off         |
 | `A`     | daemon row       | the foot draws the row's log and acknowledges its alert: the call `factory daemon log` makes |
@@ -418,8 +426,9 @@ keys do, and none of these three do the same thing.
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
-project `M`, a daemon row `R X` with `R` reading `Run` on a daemon and `Start` on a
-service, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
+project `M R U`, a daemon row `R X` with `R` reading `Run` on a daemon and `Start` on a
+service, the Inbox and `Global` none of them; `N New Project` follows whatever the row itself
+answers, on every left row, because the project it makes is the one the list does not hold yet; `↵` reads `Edit` on a stub, `Message` on a row
 with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
 Autonomy` on a stub, whose pane is the form and not MISSION.
 

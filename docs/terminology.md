@@ -8,7 +8,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Term      | Meaning                                                                                              |
 |-----------|------------------------------------------------------------------------------------------------------|
 | Factory   | This repo and its CLI. Installs parts, tracks missions across projects, runs Mission Control.        |
-| Project   | A git repo registered with the Factory. Owns `.factory/` and an optional `factory.yaml`.             |
+| Project   | A git repo registered with the Factory. Owns `.factory/` and an optional `factory.yaml`. Called by the name `names:` in `~/.factory/config.yaml` gives its path, else its folder's. |
 | Part      | One installable unit, copied in and tracked in a manifest. Type skill, tool, fixture or mcp; scope `project` (into `.claude/`) or `global` (into `~/.claude/`), what `part.yaml` recommends until `~/.factory/config.yaml` says otherwise — `off` is a scope too. |
 | Preset    | Spawn-time bundle for a session: prompt file, settings overlay, MCP list, model, effort.             |
 | Workflow  | An ordered YAML list of steps that says how a mission is run. Every mission starts on `intent`; `mission shape <preset>` appends the rest. |

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { homedir } from 'node:os';
 import { lstat, mkdir, unlink } from 'node:fs/promises';
 import type { Scope } from '../types.js';
+import { readName } from './config.js';
 import { FACTORY_ROOT } from './registry.js';
 import { I, colors } from '../ui/theme.js';
 
@@ -64,6 +65,17 @@ export async function existingProjects(): Promise<string[]> {
   return live;
 }
 
+/**
+ * What a project is called on this machine: `names:` in `~/.factory/config.yaml` when the human
+ * renamed it, else the folder's own name. Every surface that puts a project's name on a row, a
+ * daemon key or a state folder comes through here, so one project has one name. Read fresh, the
+ * way the daemon flags are: Mission Control rewrites the config while it runs.
+ */
+export async function projectName(dir: string): Promise<string> {
+  const abs = path.resolve(dir);
+  return (await readName(abs)) ?? path.basename(abs);
+}
+
 export async function saveProject(projectPath: string): Promise<void> {
   if (!(await ownHome())) return;
   const projects = await loadProjects();
@@ -72,4 +84,13 @@ export async function saveProject(projectPath: string): Promise<void> {
   if (idx !== -1) projects.splice(idx, 1);
   projects.unshift(abs);
   await Bun.write(projectsFile(), projects.join('\n') + '\n');
+}
+
+/** Unregistering is this line and nothing else: the parts on disk are `uninstall`'s business, and
+ *  the project's own `.factory/` stays where it is. */
+export async function removeProject(projectPath: string): Promise<void> {
+  if (!(await ownHome())) return;
+  const abs = path.resolve(projectPath);
+  const rest = (await loadProjects()).filter((p) => p !== abs);
+  await Bun.write(projectsFile(), rest.length === 0 ? '' : rest.join('\n') + '\n');
 }

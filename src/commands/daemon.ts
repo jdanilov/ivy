@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { Row } from '../core/daemons.js';
 import { listRows, logFile, manifestFile, readLogTail, readState, writeRequest, writeState } from '../core/daemons.js';
 import { writeDaemonEnabled } from '../core/config.js';
+import { existingProjects, projectName } from '../core/projects.js';
 import { Refusal } from '../core/mission.js';
 import { supervisorPid } from '../core/supervisor.js';
 import { field, headerRow, rule } from '../ui/format.js';
@@ -37,16 +38,24 @@ export async function daemon(sub: string, args: string[]): Promise<void> {
 
 const say = (text: string): void => console.log(`${I}${colors.green}✓${colors.reset} ${text}`);
 
+/** A key's first half is the project's display name, which `names:` can put on any path: the
+ *  manifest is found through the name, never built out of it. Unknown names the name itself. */
+async function manifestOf(name: string): Promise<string> {
+  for (const dir of await existingProjects()) if ((await projectName(dir)) === name) return manifestFile(dir);
+  return manifestFile(name);
+}
+
 /** An unknown key names the manifest it is missing from: that is the file the human has to edit. */
 async function findRow(key: string): Promise<Row> {
   const { rows, errors } = await listRows();
   const row = rows.find((r) => r.key === key);
   if (row) return row;
   const project = key.split('/')[0] ?? '';
+  const file = await manifestOf(project);
   const error = errors[project];
   throw new Refusal(error
-    ? `${key}: ${manifestFile(project)} does not parse — ${error}`
-    : `no daemon "${key}" — it is not in ${manifestFile(project)}`);
+    ? `${key}: ${file} does not parse — ${error}`
+    : `no daemon "${key}" — it is not in ${file}`);
 }
 
 // ── what a key and its CLI twin both call ────────────────────────────────────
@@ -123,7 +132,7 @@ async function list(project?: string): Promise<void> {
   console.log('');
   if ((await supervisorPid()) === null) console.log(`${I}${colors.dim}supervisor not running — factory supervisor start${colors.reset}`);
   for (const [name, error] of Object.entries(errors)) {
-    if (project === undefined || project === name) console.log(`${I}${colors.red}✗${colors.reset} ${manifestFile(name)} ${colors.dim}${error}${colors.reset}`);
+    if (project === undefined || project === name) console.log(`${I}${colors.red}✗${colors.reset} ${await manifestOf(name)} ${colors.dim}${error}${colors.reset}`);
   }
   for (const row of mine) {
     const head = `${colourOf(row)}${glyphOf(row)}${colors.reset} ${row.key.padEnd(28)}${colors.dim}${rowTail(row)}${colors.reset}`;

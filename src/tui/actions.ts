@@ -1,15 +1,17 @@
 import path from 'node:path';
-import { appendFile, readdir, readFile, unlink } from 'node:fs/promises';
+import { appendFile, lstat, readdir, readFile, rename, unlink } from 'node:fs/promises';
 import { install } from '../commands/install.js';
+import { uninstall } from '../commands/uninstall.js';
 import { update } from '../commands/update.js';
 import { removeParts } from '../core/parts.js';
 import { readManifest } from '../core/manifest.js';
-import { archiveMission, createMission, readyToOpen, reshapeStub, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
+import { archiveMission, createMission, readyToOpen, Refusal, reshapeStub, resolveMission, sessionLive, sessionPid, setAutonomy as writeAutonomy } from '../core/mission.js';
 import { writeIntent, type Intent } from '../core/intent.js';
 import { loadPreset, openSession, stopSession } from '../core/spawn.js';
 import { inboxOf, post } from '../core/peer.js';
-import { resetConfig, writeCaffeinate, writeLaunch, writePartScope, type Caffeinate, type Launch } from '../core/config.js';
-import { existingProjects, factoryHome, home } from '../core/projects.js';
+import { renameProjectKeys, resetConfig, writeCaffeinate, writeLaunch, writeName, writePartScope, type Caffeinate, type Launch } from '../core/config.js';
+import { daemonDir } from '../core/daemons.js';
+import { existingProjects, factoryHome, home, projectName, removeProject, saveProject } from '../core/projects.js';
 import { id } from './format.js';
 import type { Autonomy, ScopeChoice } from './model.js';
 
@@ -131,7 +133,7 @@ export async function applyScopes(changes: { name: string; choice: ScopeChoice }
     if (!names.some((name) => before.includes(name))) continue;
     await quiet(() => update(project));
     const diff = moved(before, await held(project));
-    if (diff) report.push(`${path.basename(project)} ${diff}`);
+    if (diff) report.push(`${await projectName(project)} ${diff}`);
   }
 
   const global = changes.filter((c) => c.choice === 'global').map((c) => c.name);
@@ -141,6 +143,48 @@ export async function applyScopes(changes: { name: string; choice: ScopeChoice }
   const diff = moved(before, await held(home()));
   if (diff) report.push(`~/.claude ${diff}`);
   return report.length ? report.join(' · ') : 'scopes written · nothing moved';
+}
+
+// ── projects ─────────────────────────────────────────────────────────────────
+
+/** `N`: `factory install <path> --yes` and the line in `~/.factory/projects` it writes. The two
+ *  refusals are the ones a typed path earns and a picked one never could. */
+export async function newProject(input: string): Promise<string> {
+  const dir = path.resolve(input.replace(/^~(?=\/|$)/, home()));
+  if (!(await lstat(dir).catch(() => null))?.isDirectory()) throw new Refusal(`${dir} is not a directory`);
+  if (!(await lstat(path.join(dir, '.git')).catch(() => null))) throw new Refusal(`${dir} is not a git checkout — a mission needs a branch`);
+  await quiet(() => install(dir, true));
+  await saveProject(dir);
+  return `${await projectName(dir)} installed · ${(await held(dir)).length} parts`;
+}
+
+/**
+ * `R`: the name is this machine's word for the checkout, so it is one line in
+ * `~/.factory/config.yaml` and nothing in the project moves. What was keyed by the old name goes
+ * with it in the same breath — the state folder its daemons write into, and the `daemons:` and
+ * `order:` keys — or the rows would come back off, blank and at the bottom of the list.
+ */
+export async function renameProject(dir: string, name: string): Promise<string> {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new Refusal('a project reads as lowercase letters, digits and dashes');
+  const old = await projectName(dir);
+  if (name === old) return `${old} is already its name`;
+  for (const other of await existingProjects()) {
+    if (path.resolve(other) !== path.resolve(dir) && (await projectName(other)) === name) throw new Refusal(`${name} is already ${other}`);
+  }
+  // The state folder before the config: a move that cannot happen leaves the old name standing.
+  if (await lstat(daemonDir(old)).catch(() => null)) await rename(daemonDir(old), daemonDir(name));
+  await writeName(path.resolve(dir), name);
+  await renameProjectKeys(old, name);
+  return `${old} is now ${name}`;
+}
+
+/** `U`: the parts come out and the project leaves the list. Its own `.factory/`, its missions and
+ *  its checkout stay — this unregisters a project, it does not delete one. */
+export async function uninstallProject(dir: string): Promise<string> {
+  const name = await projectName(dir);
+  await quiet(() => uninstall(dir, true));
+  await removeProject(dir);
+  return `${name} uninstalled`;
 }
 
 // ── caffeinate ───────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { existingProjects, factoryHome, home } from '../core/projects.js';
+import { existingProjects, factoryHome, home, projectName } from '../core/projects.js';
 import { loadConfig, readCaffeinate, readLaunch } from '../core/config.js';
 import { isBackground } from '../core/spawn.js';
 import { readDecisions, type Decision } from '../core/decision.js';
@@ -439,28 +439,32 @@ function ordered<T>(items: T[], names: string[] | undefined, nameOf: (t: T) => s
 
 export async function buildSnapshot(): Promise<Snapshot> {
   const order = (await loadConfig()).order ?? {};
-  const dirs = ordered(await projectDirs(), order.projects, (d) => path.basename(d.dir));
+  // Named once, and every row of a project reads that name: the order, the daemon keys and the
+  // rows themselves cannot disagree about what the project is called.
+  const all = await projectDirs();
+  const names = new Map(await Promise.all(all.map(async (d) => [d.dir, await projectName(d.dir)] as const)));
+  const dirs = ordered(all, order.projects, (d) => names.get(d.dir)!);
   const events = await readEvents();
   // Every row on the machine at once: the manifests are read per project, the states per row.
   const { rows: daemonRows, errors: daemonErrors } = await listRows();
-  const found = new Map<string, [mission: CoreMission, archived: boolean][]>();
+  const missionsOf = new Map<string, [mission: CoreMission, archived: boolean][]>();
   for (const { dir } of dirs) {
     const live = await listMissions(dir).catch(() => []);
     const archived = await listArchived(dir).catch(() => []);
-    found.set(dir, [...live.map((m): [CoreMission, boolean] => [m, false]), ...archived.map((m): [CoreMission, boolean] => [m, true])]);
+    missionsOf.set(dir, [...live.map((m): [CoreMission, boolean] => [m, false]), ...archived.map((m): [CoreMission, boolean] => [m, true])]);
   }
 
   // A session bound to an open mission is that mission's row, never an unbound one of its own.
   // A closed mission keeps its session id as a record; the session, if it lives on, is free.
-  const bound = new Set([...found.values()].flatMap((ms) =>
+  const bound = new Set([...missionsOf.values()].flatMap((ms) =>
     ms.filter(([m]) => m.state.status !== 'closed').map(([m]) => m.state.session).filter((s) => s !== null)));
   const ctx: Ctx = { activity: [], inbox: [], logged: new Set() };
   const projects: Project[] = [];
 
   for (const { dir, real } of dirs) {
-    const name = path.basename(dir);
+    const name = names.get(dir)!;
     const missions: Mission[] = [];
-    for (const [m, archived] of found.get(dir) ?? []) {
+    for (const [m, archived] of missionsOf.get(dir) ?? []) {
       const ev = m.state.session && m.state.status !== 'closed' ? events.get(m.state.session) : undefined;
       missions.push(await missionRow(ctx, name, real, m, ev, archived));
     }

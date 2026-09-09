@@ -64,8 +64,9 @@ presets/<name>/ preset.yaml, prompt.md, settings.json, mcp.json — one spawn bu
 ~/.factory/    Home dir: projects list, config.yaml (var overrides, a `parts:` block choosing
                `project`, `global` or `off` per part over the scope its part.yaml recommends, plus
                `caffeinate: auto|on|off`, which the hook reads per event and Mission Control's `c`
-               rewrites, `launch: fg|bg`, how `mission open` runs claude, and an `order:` block
-               Mission Control's `⇧↑↓` keeps), events/<session>.jsonl
+               rewrites, `launch: fg|bg`, how `mission open` runs claude, an `order:` block
+               Mission Control's `⇧↑↓` keeps and a `names:` block, path to display name, its `R`
+               writes), events/<session>.jsonl
                (the hook's lines plus Mission Control's one `Rename`), caffeinate/<session>.pid and
                control.pid, daemons/<project>/<name>/ (`state.json`, `log`, `log.1`, `request`) and
                supervisor/ (`pid`, `log`), the state the supervisor and the `daemon` family share

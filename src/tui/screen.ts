@@ -131,10 +131,10 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
+  inbox: [], global: [], project: ['M', 'R', 'U'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
   daemon: ['R', 'X'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
+const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission'], ['U', 'Uninstall']];
 
 /** A stub's autonomy is the form's dial, so `T` there answers with a toast and nothing else: the
  *  bar drops it, the way it lists Parts only where Parts is the pane. */
@@ -165,8 +165,10 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.size === 'full' ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
+    // `N` is on every left row and last of them: it is the one key that answers with a project
+    // the list does not hold yet, so it reads after whatever the selected row itself does.
     !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
-      ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
+      ['N', 'New Project'], ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
     // Space picks the scope on the global row and the install on a project's: one key, two panes.

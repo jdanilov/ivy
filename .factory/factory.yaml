@@ -43,6 +43,12 @@ recipes:
       # saves. The one `tui-keys` line that writes: the stub lands in this checkout's own
       # ignored `.factory/missions/`, so the line throws it away on either side of itself.
       - rm -rf .factory/missions/*-formsave; bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'p ivy' m type:formsave return type:a S-return S-return S-return S-return S-return --expect 'stub formsave'; s=$?; rm -rf .factory/missions/*-formsave; exit $s
+      # Projects from the screen: a project row answers `R` and `U`, every left row `N`, and the
+      # bar is read with no key pressed at all. `u` is the one key that would take the parts off
+      # this very checkout — the fixture's `ivy` row is it — so the line answers the confirm with
+      # anything but `y` and the assertion is that nothing happened.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' --expect 'U Uninstall' --expect 'N New Project'
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' u type:n return --expect 'kept'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

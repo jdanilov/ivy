@@ -2,8 +2,8 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, openTab, readLog, renameSession, runNow, saveIntent,
-  sendMessage, setAutonomy, setCaffeinate, setLaunch, stopRow,
+  applyParts, applyScopes, archive, killSession, newProject, openTab, readLog, renameProject, renameSession,
+  runNow, saveIntent, sendMessage, setAutonomy, setCaffeinate, setLaunch, stopRow, uninstallProject,
 } from './actions.js';
 import { LOG_LINES } from '../commands/daemon.js';
 import { writeOrder } from '../core/config.js';
@@ -366,12 +366,19 @@ function handleKey(app: App, key: KeyEvent): void {
         break;
       }
       if (right) break;
+      // A project's name is this machine's own word for the checkout, a session's is the Factory's
+      // word for a conversation: two writers, one key, and the row says which.
+      if (here.kind === 'project') {
+        const { project } = here;
+        return ask(app, `name for ${project.name}:`, (name) =>
+          name === '' ? draw(app) : act(app, `renaming ${project.name}…`, () => renameProject(project.path, name)));
+      }
       if (here.kind === 'session') {
         const { session } = here;
         return ask(app, `name for ${id(session.id)}:`, (name) =>
           name === '' ? draw(app) : act(app, `naming ${id(session.id)}…`, () => renameSession(session.id, name)));
       }
-      return toast(app, 'select a session to rename it');
+      return toast(app, 'select a project or a session to rename it');
     }
     case 'm': {
       if (here.kind === 'inbox' || here.kind === 'global') return toast(app, 'select a project to add a mission to');
@@ -381,6 +388,21 @@ function handleKey(app: App, key: KeyEvent): void {
       ui.left = items.findIndex((item) => item.kind === 'project' && item.project === project);
       openForm(ui, items[ui.left]!, 0);
       break;
+    }
+    case 'n':
+      // On any row, the Inbox and `Global` included: a machine with no projects yet still has to
+      // be able to add the first one.
+      return ask(app, 'path of the project:', (input) =>
+        input === '' ? draw(app) : act(app, `installing ${input}…`, () => newProject(input)));
+    case 'u': {
+      if (here.kind !== 'project') return toast(app, 'select a project to uninstall it');
+      // The one key that takes parts off a checkout, so it asks for the letter first; anything
+      // else typed is a no, because a slip on this line is a reinstall.
+      const { project } = here;
+      return ask(app, `uninstall ${project.name}? Y to confirm:`, (answer) =>
+        answer.toLowerCase() === 'y'
+          ? act(app, `uninstalling ${project.name}…`, () => uninstallProject(project.path))
+          : toast(app, 'kept'));
     }
     case 'x':
       if (here.kind !== 'daemon') return toast(app, 'select a daemon or a service to stop it');

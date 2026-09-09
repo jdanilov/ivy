@@ -13,7 +13,7 @@ const TMP = await realpath(await mkdtemp(path.join(tmpdir(), 'factory-test-')));
 process.env.HOME = path.join(TMP, 'home');
 
 // The whole run writes under this home. If it does not resolve here, nothing else may happen.
-const { factoryHome, loadProjects, saveProject } = await import('../src/core/projects.js');
+const { factoryHome, loadProjects, projectName, removeProject, saveProject } = await import('../src/core/projects.js');
 if (!factoryHome().startsWith(TMP + path.sep)) {
   console.log(`✗ refusing to write: factoryHome() is ${factoryHome()}, not under ${TMP}`);
   process.exit(1);
@@ -1401,6 +1401,78 @@ await check('uninstall --yes leaves nothing behind', async () => {
   ok(!(await exists(path.join(main, '.claude/skills/mission/skill.md'))), 'a skill was left behind');
   ok(!(await exists(path.join(main, '.claude/.factory-manifest.json'))), 'the manifest was left behind');
   ok(!(await exists(path.join(main, '.mcp.json'))), 'an empty .mcp.json was left behind');
+});
+
+// ── projects from the screen ─────────────────────────────────────────────────
+
+await check('a project is its folder, or the name `names:` gives it', async () => {
+  const dir = await repo('named');
+  ok((await projectName(dir)) === 'named', `an unnamed project read as ${await projectName(dir)}`);
+  await withConfig(`${BASE_CONFIG}names:\n  ${dir}: "renamed"\n`, async () => {
+    ok((await projectName(dir)) === 'renamed', 'the names: entry never reached projectName');
+    ok((await projectName(`${dir}/`)) === 'renamed', 'a trailing slash read as another project');
+  });
+  ok((await projectName(dir)) === 'named', 'the name outlived the config that gave it');
+});
+
+await check('a rename takes the daemon keys, the order and the state folder with it', async () => {
+  const { renameProject } = await import('../src/tui/actions.js');
+  const dir = await repo('rowdy');
+  const taken = await repo('spoken');
+  await mkdir(path.join(dir, '.factory'), { recursive: true });
+  await writeFile(path.join(dir, '.factory', 'daemons.yaml'), 'tick:\n  kind: daemon\n  cmd: "true"\n  every: 1h\n');
+  const state = path.join(process.env.HOME!, '.factory', 'daemons', 'rowdy');
+  await mkdir(state, { recursive: true });
+  await writeFile(path.join(state, 'log'), 'a line\n');
+
+  await withConfig(`${BASE_CONFIG}daemons:\n  rowdy/tick: "on"\n  rowdyish/tick: "on"\norder:\n  projects: ["rowdy", "spoken"]\n  rowdy/missions: ["one"]\n`, async () => {
+    ok((await renameProject(dir, 'quiet')) === 'rowdy is now quiet', 'the rename did not say what it did');
+    ok((await projectName(dir)) === 'quiet', `the renamed project reads as ${await projectName(dir)}`);
+
+    const text = await Bun.file(CONFIG).text();
+    ok(text.includes('  quiet/tick: "on"') && !text.includes('  rowdy/tick'), `the daemons block reads\n${text}`);
+    ok(text.includes('  rowdyish/tick: "on"'), 'a key that only starts with the old name was rewritten too');
+    ok(text.includes('projects: ["quiet", "spoken"]'), `the projects order reads\n${text}`);
+    ok(text.includes('  quiet/missions: ["one"]'), `the missions order kept the old name:\n${text}`);
+    ok(text.includes(`  ${dir}: "quiet"`), `the name never landed in names::\n${text}`);
+
+    ok(await exists(path.join(process.env.HOME!, '.factory', 'daemons', 'quiet', 'log')),
+      'the state folder stayed under the old name');
+    ok((await listRows()).rows.some((r) => r.key === 'quiet/tick'), 'listRows still keys the row by the folder');
+
+    const slug = await renameProject(dir, 'Quiet Down').then(() => null, (e: Error) => e);
+    ok(slug?.name === 'Refusal', `a name that is not a slug said ${slug?.message ?? 'nothing'}`);
+    const twice = await renameProject(dir, 'spoken').then(() => null, (e: Error) => e);
+    ok(twice?.name === 'Refusal' && twice.message.includes(taken), `a name another project holds said ${twice?.message ?? 'nothing'}`);
+  });
+});
+
+await check('removeProject drops the one line and leaves the rest of the list', async () => {
+  const keeper = await repo('keeper');
+  const goner = await repo('goner');
+  await removeProject(goner);
+  const list = await loadProjects();
+  ok(!list.includes(goner) && list.includes(keeper), `the list reads ${list.join(', ')}`);
+});
+
+await check('N installs a git checkout and registers it, U takes both back', async () => {
+  const { newProject, uninstallProject } = await import('../src/tui/actions.js');
+  const dir = path.join(TMP, 'typed');
+  await mkdir(dir, { recursive: true });
+
+  const missing = await newProject(path.join(TMP, 'nowhere')).then(() => null, (e: Error) => e);
+  ok(missing?.name === 'Refusal', `a path that is not there said ${missing?.message ?? 'nothing'}`);
+  const plain = await newProject(dir).then(() => null, (e: Error) => e);
+  ok(plain?.name === 'Refusal' && plain.message.includes('git'), `a directory git does not track said ${plain?.message ?? 'nothing'}`);
+
+  await git(dir, 'init', '-q', '-b', 'main');
+  ok((await newProject(dir)).startsWith('typed installed'), 'the install never named the project');
+  ok((await loadProjects()).includes(dir), 'the project never reached ~/.factory/projects');
+  ok(await exists(path.join(dir, '.claude', '.factory-manifest.json')), 'no parts reached the project');
+
+  ok((await uninstallProject(dir)) === 'typed uninstalled', 'the uninstall never named the project');
+  ok(!(await loadProjects()).includes(dir), 'an uninstalled project is still registered');
+  ok(!(await exists(path.join(dir, '.claude', '.factory-manifest.json'))), 'the manifest was left behind');
 });
 
 await rm(TMP, { recursive: true, force: true });

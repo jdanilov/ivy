@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { mkdir, rename } from 'node:fs/promises';
 import { readDaemonEnabled } from './config.js';
-import { existingProjects, factoryHome } from './projects.js';
+import { existingProjects, factoryHome, projectName } from './projects.js';
 
 /** Enablement is per machine, so it is read from the config and never from the project's manifest. */
 export const enabledOf = readDaemonEnabled;
@@ -58,7 +58,7 @@ export interface DaemonState {
   tabFallback?: boolean;
 }
 
-/** `key` is `<project folder>/<name>`, the name Mission Control gives a row; `project` its dir. */
+/** `key` is `<project name>/<name>`, the name Mission Control gives a row; `project` its dir. */
 export interface Row {
   key: string;
   project: string;
@@ -229,9 +229,11 @@ export async function listRows(): Promise<{ rows: Row[]; errors: Record<string, 
 
   for (const project of await existingProjects()) {
     const manifest = await readManifest(project);
-    if (manifest.error) errors[path.basename(project)] = manifest.error;
+    // The project's display name, not its folder's: a renamed project takes its keys with it.
+    const name = await projectName(project);
+    if (manifest.error) errors[name] = manifest.error;
     for (const entry of manifest.entries) {
-      const key = `${path.basename(project)}/${entry.name}`;
+      const key = `${name}/${entry.name}`;
       const state = await readState(key);
       state.enabled = await enabledOf(key);
       rows.push({ key, project, entry, state });

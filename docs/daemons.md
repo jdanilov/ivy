@@ -14,7 +14,10 @@ over anything the manifest says, and a project outside `~/.factory/projects` is 
 ## The manifest
 
 `.factory/daemons.yaml` maps a name to an entry; a `daemon` is periodic, a `service` long-running.
-The name under its project folder is the key every surface uses: `igs/cws-reviews`.
+The name under its project's own is the key every surface uses: `igs/cws-reviews`. The project's
+half is what the Factory calls the project — `names:` in `~/.factory/config.yaml` when Mission
+Control's `R` wrote one there, else the checkout's folder — and a rename carries the keys, the
+config flags and the state folder with it.
 
 | Field         | Kind    | Meaning                                                                       |
 |---------------|---------|-------------------------------------------------------------------------------|

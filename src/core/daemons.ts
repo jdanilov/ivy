@@ -199,15 +199,16 @@ export async function writeRequest(key: string, request: Request): Promise<void>
  * rewrites its progress line with `\r`, and nothing that reads the log back is a terminal: the
  * pane would draw `32m` and jumping columns, and `daemon log` would paste them into a shell.
  * A `\r` rewrite keeps only what was written after the last one, which is what stood on screen.
+ * Colour (SGR, the `m` sequences) stays: a shell renders it, and the pane parses it into cells.
  */
 export function plainLine(line: string): string {
   return line
     .slice(line.lastIndexOf('\r') + 1)
     .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC: window titles and the like
-    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')           // CSI: colour, cursor moves, erases
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, (seq) => (seq.endsWith('m') ? seq : '')) // CSI: cursor moves, erases
     .replace(/\x1b[@-Z\\-_]/g, '')                     // the lone two-byte escapes
     .replace(/\t/g, '  ')
-    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');         // whatever control bytes are left
+    .replace(/[\x00-\x08\x0b-\x1a\x1c-\x1f\x7f]/g, ''); // whatever control bytes are left, ESC kept
 }
 
 /** Only the tail is ever shown and the log runs to 5 MB: read the last 64 KB, not the file.

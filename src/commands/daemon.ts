@@ -11,6 +11,8 @@ import { I, colors } from '../ui/theme.js';
  *  so a key and its CLI twin are the same call and neither surface can drift from the other. */
 
 const KEY = '<project>/<name>';
+/** What `factory daemon log` prints with no `-n`, and what the TUI's `A` reads on its way in. */
+export const LOG_LINES = 30;
 const need = (value: string | undefined, usage: string): string => {
   if (!value) throw new Refusal(usage);
   return value;
@@ -162,7 +164,7 @@ async function show(key: string): Promise<void> {
 /** `-f` and `-n N`, the flags `tail` has: nobody types `--follow` at a log. */
 async function tail(key: string, args: string[]): Promise<void> {
   const n = Number(args[args.indexOf('-n') + 1]);
-  for (const line of await readLog(key, args.includes('-n') && n > 0 ? n : 30)) console.log(`${I}${line}`);
+  for (const line of await readLog(key, args.includes('-n') && n > 0 ? n : LOG_LINES)) console.log(`${I}${line}`);
   if (!args.includes('-f')) return;
 
   // Whatever the supervisor appends, until the human quits; a rotation starts the tail over.

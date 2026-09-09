@@ -68,9 +68,9 @@ Agent-facing except `intent.md`. Short, reasoning-first, format in `docs-format`
 | Events          | `~/.factory/events/<session>.jsonl`, one line per hook event. The bus. No broker: every surface reads the files. |
 | Mission Control | The Factory TUI, `factory` with no arguments. Reads the files the CLI writes, writes through the CLI's own functions. |
 | Inbox           | Every open gate, waiting decision, waiting question and daemon Alert across all projects. Each names the command that answers it. |
-| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row; a death no `restart` policy will retry turns the row off beside it. Answered by `factory daemon log <key>`, or `l` on the row: reading the log is the acknowledgement, and a next success clears it too. |
+| Alert           | A Daemon's failed run or a Service's death, held in its `state.json` and drawn as one Inbox row; a death no `restart` policy will retry turns the row off beside it. Answered by `factory daemon log <key>`, or `A` on the row, which draws the same log in the Foot: reading the log is the acknowledgement, and a next success clears it too. |
 | Messages        | The right pane over the Inbox: the selected item's body and its answering command. Read-only.   |
-| Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, for whatever the left column has selected. |
+| Foot            | The bottom pane: ACTIVITY by default, DECISIONS on `D`, a daemon or service row's log on `A`, for whatever the left column has selected. The drawn tab's own key sizes it: a third of the body, the whole screen, the tab row alone. |
 | Message box     | Under the foot on `↵`: a message to the selected row's session, posted to its inbox socket. One draft per row, kept until sent. |
 | Caffeinate      | Whether the Mac is held awake: `auto` per turn, `on` per session, `off` never. Key `caffeinate` in `~/.factory/config.yaml`. |
 | Changes         | Warp's own diff panel. The Factory does not render diffs.                                       |

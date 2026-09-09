@@ -25,8 +25,8 @@ export function liveFrames(snap: Snapshot): Frame[] {
     ...rows,
     ...[...kinds].map(([kind, left]): Frame => ({ name: `keys-${kind}`, left, focus: 'left' })),
     { name: 'archived', left: 0, focus: 'left', set: (ui) => { ui.showArchived = true; } },
-    { name: 'decisions-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; } },
-    { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },
+    { name: 'decisions-full', left: 0, focus: 'left', set: (ui) => { ui.size = 'full'; } },
+    { name: 'activity-full', left: 0, focus: 'left', set: (ui) => { ui.size = 'full'; ui.foot = 'activity'; } },
     { name: 'help', left: 0, focus: 'right', set: (ui) => { ui.help = true; } },
   ];
 }

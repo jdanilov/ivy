@@ -19,7 +19,9 @@ export interface Ui {
   /** What `↵` would apply: install or not on a project row, the chosen scope on the global one. */
   toggles: Record<string, boolean | ScopeChoice>;
   confirm: boolean;
-  full: boolean;
+  /** How much of the screen the foot has: a third of the body, the whole screen, or its tab row
+   *  alone. The drawn tab's own key walks the three. */
+  size: 'third' | 'full' | 'min';
   /** Rows the full-height foot is scrolled back from its own foot. Zero everywhere else. */
   scroll: number;
   help: boolean;
@@ -35,8 +37,6 @@ export interface Ui {
   /** The keys are the message box's; the drafts stay by row whether or not they are. */
   compose: boolean;
   drafts: Record<string, Draft>;
-  /** `l` on a daemon row: the right pane is that row's log and nothing else, until `Esc` or `←`. */
-  daemonLog: boolean;
   /** The keys are the intent form's. */
   form: boolean;
   /** One intent draft per row, kept like a message draft: a stub row by its own key, a new
@@ -59,9 +59,9 @@ export interface IntentDraft {
 
 export function newUi(): Ui {
   return {
-    focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, full: false,
+    focus: 'left', left: 0, msg: 0, part: 0, toggles: {}, confirm: false, size: 'third',
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
-    showArchived: false, toast: null, input: null, compose: false, drafts: {}, daemonLog: false,
+    showArchived: false, toast: null, input: null, compose: false, drafts: {},
     form: false, intents: {},
   };
 }

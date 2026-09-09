@@ -14,7 +14,7 @@
  *   --focus right|left  starting focus (default left)
  *   --wait <ms>         pause after each key so an action's write lands (default 400)
  *   --quiet             only the last frame
- *   --expect <substr>   the last frame must contain it, else ✗ and exit 1
+ *   --expect <substr>   the last frame must contain it, else ✗ and exit 1; may be given more than once
  *   --spans <substr>    after the last key, print colour + column of every span holding substr ('*' = all)
  *   keys: up down left right tab return escape space backspace delete home end a d e k m s t c l o y r ? q
  *         S-<key> (shifted), C-<key> (control), M-<key> (option)  |  type:<text> (one key per character)  |  sleep:ms  |  reload
@@ -121,8 +121,9 @@ if (want !== undefined) {
   });
 }
 
-const expect = opt('expect');
-if (expect !== undefined && !last.includes(expect)) {
+// One frame answers for several claims — a size, a pane and a word in it — so `--expect` repeats.
+for (const expect of argv.filter((a, i) => argv[i - 1] === '--expect')) {
+  if (last.includes(expect)) continue;
   broken++;
   console.log(`✗ expected ${JSON.stringify(expect)} in the last frame`);
 }

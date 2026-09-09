@@ -5,12 +5,13 @@ import {
   applyParts, applyScopes, archive, killSession, openTab, readLog, renameSession, runNow, saveIntent,
   sendMessage, setAutonomy, setCaffeinate, setLaunch, stopRow,
 } from './actions.js';
+import { LOG_LINES } from '../commands/daemon.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
-import { LOG_LINES, seedTail } from './panes/daemon.js';
+import { seedTail } from './panes/foot.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
 import { AUTONOMY, AUTONOMY_FIELD, FIELDS, SHAPES, SHAPE_FIELD, draftFor, formOf, shapeOf, showsParts, untouched, workflowOf, type Form } from './panes/form.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
@@ -201,11 +202,11 @@ function handleKey(app: App, key: KeyEvent): void {
   if (key.name === '?') { ui.help = true; return draw(app); }
 
   // The foot has the screen to itself: the arrows walk back through it, three keys hand it back.
-  if (ui.full) {
+  if (ui.size === 'full') {
     if (key.name === 'up') ui.scroll += 1;
     else if (key.name === 'down') ui.scroll = Math.max(0, ui.scroll - 1);
-    else if (key.name === 'return' || key.name === 'escape') ui.full = false;
-    // The tab's own key: switch to it, or, pressed on the tab already drawn, hand the screen back.
+    else if (key.name === 'return' || key.name === 'escape') ui.size = 'third';
+    // The tab's own key: switch to it, or, pressed on the tab already drawn, walk the size on.
     else if (key.name === 'a' || key.name === 'd') footKey(ui, key.name === 'a' ? 'activity' : 'decisions');
     else return;
     return draw(app);
@@ -242,11 +243,7 @@ function handleKey(app: App, key: KeyEvent): void {
       if (key.shift && !right) return moveRow(app, here, d);
       if (inMessages) ui.msg = move(ui.msg, snap.inbox.length, d);
       else if (inParts) ui.part = move(ui.part, here.project.parts.length, d);
-      else {
-        // The log view belongs to the row it was opened on, and the selection is leaving it.
-        ui.daemonLog = false;
-        ui.left = move(ui.left, items.length, d);
-      }
+      else ui.left = move(ui.left, items.length, d);
       break;
     }
     case 'right':
@@ -255,16 +252,12 @@ function handleKey(app: App, key: KeyEvent): void {
       ui.focus = 'right';
       break;
     case 'left':
-      ui.daemonLog = false;
       ui.focus = 'left';
       break;
     case 'escape':
       // Esc is the way out of a set of toggles nobody applied; a second one leaves the pane.
       if (inParts && pending(here.project, ui, inGlobal).length > 0) ui.toggles = {};
-      else {
-        ui.daemonLog = false;
-        ui.focus = 'left';
-      }
+      else ui.focus = 'left';
       break;
     case 'space':
       if (inParts) {
@@ -298,6 +291,10 @@ function handleKey(app: App, key: KeyEvent): void {
       break;
     }
     case 'a':
+      // The first tab on a daemon row is its log, and reading the log is what acknowledges the
+      // row's alert: the key that draws it makes the call `factory daemon log` makes, and
+      // selecting the row makes none.
+      if (here.kind === 'daemon') showLog(app, here.daemon.key);
       footKey(ui, 'activity');
       break;
     case 'd':
@@ -330,13 +327,6 @@ function handleKey(app: App, key: KeyEvent): void {
       return act(app, `caffeinate ${mode.toUpperCase()}…`, () => setCaffeinate(mode));
     }
     case 'l': {
-      // On a daemon row `l` is the Log and Launch is not pressed: the key bar there says so.
-      if (here.kind === 'daemon') {
-        ui.daemonLog = true;
-        ui.focus = 'right';
-        showLog(app, here.daemon.key);
-        break;
-      }
       snap.launch = LAUNCH[(LAUNCH.indexOf(snap.launch) + 1) % LAUNCH.length]!;
       const mode = snap.launch;
       return act(app, `launch ${mode.toUpperCase()}…`, () => setLaunch(mode));
@@ -394,8 +384,8 @@ function handleKey(app: App, key: KeyEvent): void {
 }
 
 /**
- * `l`'s CLI twin is `factory daemon log`: the same call, once, as the view opens — which is what
- * acknowledges an alert and drops its Inbox row. The view is opened first and the refusal is
+ * `A`'s CLI twin is `factory daemon log`: the same call, once, as the log is drawn — which is what
+ * acknowledges an alert and drops its Inbox row. The pane is drawn first and the refusal is
  * swallowed, because only a fixture row can refuse: a live one came from `listRows`.
  */
 function showLog(app: App, key: string): void {
@@ -407,11 +397,15 @@ function showLog(app: App, key: string): void {
 
 /** A key must never take the screen down: the toast says what broke, the log says where. */
 
-/** `A` and `D` each name a foot tab: the first press draws it, the second gives it the screen,
- *  the third hands the screen back. */
+/** The sizes the foot walks, in the order the key gives them: what is drawn, then the whole
+ *  screen, then the tab row alone. */
+const SIZES: Ui['size'][] = ['third', 'full', 'min'];
+
+/** `A` and `D` each name a foot tab: pressed on the other tab the key switches to it and the foot
+ *  keeps its size, pressed on the tab already drawn it turns the size dial one step. */
 function footKey(ui: Ui, tab: Ui['foot']): void {
   if (ui.foot !== tab) ui.foot = tab;
-  else ui.full = !ui.full;
+  else ui.size = SIZES[(SIZES.indexOf(ui.size) + 1) % SIZES.length]!;
   ui.scroll = 0;
 }
 

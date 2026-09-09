@@ -1,12 +1,12 @@
 import { C, COMMAND } from '../theme.js';
 import { type Cell, ago, spans, spread, wrap } from '../format.js';
-import { logTail } from './daemon.js';
+import { logTail } from './foot.js';
 import { marker, type Pane, type Ui } from './pane.js';
 import type { InboxItem, Snapshot } from '../model.js';
 
 /** MESSAGES: everything waiting on the human across every project, and how each one is answered. */
 
-/** Enough of a daemon's log to say what went wrong; the whole tail is the DAEMON pane's. */
+/** Enough of a daemon's log to say what went wrong; the whole tail is the foot's, under `A`. */
 const LOG_LINES = 5;
 
 export function messagesPane(p: Pane, snap: Snapshot, ui: Ui, h: number): void {

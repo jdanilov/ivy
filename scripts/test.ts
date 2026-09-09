@@ -1174,6 +1174,21 @@ await check('daemon enablement is one line in the machine config, default off, a
   });
 });
 
+await check('an alert is answered by reading the log and by nothing a redraw does', async () => {
+  await withConfig(BASE_CONFIG, async () => {
+    await writeRow('bots/cws-reviews', { enabled: true, alert: 'run failed: exit 2' });
+
+    // The screen rebuilds its snapshot every second and draws the row every frame: neither may
+    // count as having seen why it is there. Only `daemon log`, the key's own twin, does.
+    const { rows } = await listRows();
+    ok(rows.find((r) => r.key === 'bots/cws-reviews')?.state.alert === 'run failed: exit 2', 'listing the rows lost the alert');
+    ok((await readRow('bots/cws-reviews')).alert !== undefined, 'drawing a row acknowledged its alert');
+
+    await readLog('bots/cws-reviews', 5);
+    ok((await readRow('bots/cws-reviews')).alert === undefined, 'reading the log left the alert standing');
+  });
+});
+
 await check('a row that failed reads warning on both surfaces, off or not', async () => {
   const { daemonColor } = await import('../src/tui/panes/left.js');
   const { C } = await import('../src/tui/theme.js');

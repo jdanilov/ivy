@@ -26,8 +26,8 @@ const frames: Frame[] = [
       ui.part = 3;
     },
   },
-  { name: 'decisions-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; } },
-  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.full = true; ui.foot = 'activity'; } },
+  { name: 'decisions-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.size = 'full'; } },
+  { name: 'activity-full', left: at((i) => i.kind === 'mission' && i.mission.name === 'refit'), focus: 'left', set: (ui) => { ui.size = 'full'; ui.foot = 'activity'; } },
   { name: 'global', left: at((i) => i.kind === 'global'), focus: 'right' },
   {
     name: 'compose',
@@ -40,8 +40,8 @@ const frames: Frame[] = [
   },
   { name: 'help', left: at((i) => i.kind === 'inbox'), focus: 'right', set: (ui) => { ui.help = true; } },
   { name: 'daemon', left: at((i) => i.kind === 'daemon'), focus: 'right' },
-  // What `l` draws: the log alone, filling the pane.
-  { name: 'daemon-log', left: at((i) => i.kind === 'daemon'), focus: 'right', set: (ui) => { ui.daemonLog = true; } },
+  // What `A` draws on a daemon row: its log in the foot, given the whole screen.
+  { name: 'daemon-log', left: at((i) => i.kind === 'daemon'), focus: 'right', set: (ui) => { ui.size = 'full'; } },
   {
     name: 'parts-confirm',
     left: at((i) => i.kind === 'project' && i.project.name === 'ivy'),

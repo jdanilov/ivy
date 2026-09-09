@@ -70,12 +70,13 @@ replaces it with the help panel. Sizes are what `render()` computes, not what a 
 row 0        blank
 row 1        ⌬ FACTORY · status: mission bar or project bar, or the toast that replaces it
 row 2        ───────────────────────────────────────────────────────────────────────
-             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | DAEMON | PARTS (60%)
+             PROJECTS (40%)          │  MESSAGES | MISSION | SESSION | DAEMON | SERVICE | PARTS (60%)
              inbox, Global,          │  a list above a detail block; a gate and a
              projects, missions,     │  decision each end in the command that
              sessions, daemons       │  answers them in the session
              ───────────────────────────────────────────────────────────────────────
-             ACTIVITY  DECISIONS     one third of the body, all of it on a second A or D
+             ACTIVITY | A LOG  DECISIONS   a third of the body; the drawn tab's key sizes it:
+                                           a third → the whole screen → this row alone
              ───────────────────────────────────────────────────────────────────────
              to <session>            the message box, only while there is one
 last row     ───────────────────────────────────────────────────────────────────────
@@ -100,8 +101,13 @@ last row     ──────────────────────�
   wears its alert's own words — and `tab→detached` on the end where the tab could not be opened.
   A manifest that does not parse costs the project its rows and draws one dim
   `daemons.yaml: <error>` line instead.
-- The foot keeps a third of the body, never fewer than 5 rows; `A` or `D` pressed on the tab already drawn gives it all of it. Its header
-  is the two tabs, the drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back.
+- The foot keeps a third of the body, never fewer than 5 rows. Its header is the two tabs, the
+  drawn one bright: ACTIVITY by default, DECISIONS on `D`, `A` back. Pressed on the tab already
+  drawn the key is a size dial instead — the whole screen, then this one row, then a third again —
+  so a foot minimised still counts what came in. On a daemon or service row the first tab is that
+  row's log: a daemon has no session and so no activity, and its log is what its row is read for.
+  The word there is `A LOG`, the key before it, because the bright first letter of a tab is always
+  the key that opens it and `L` is Launch.
 
 ### The status bar
 
@@ -129,11 +135,11 @@ turn's; `spend`, the session's own tokens in and out and `context`, what its las
 the one figure that says how full the window is. Its last word is the log's last row, and the
 pane does not repeat it.
 
-DAEMON is the manifest entry and what the supervisor wrote about it: `cmd`, `cwd`, `env`, then
-`every` with its `atMost`, `when` and `timeout`, or `run` with its restart policy and port; then
-`pid`, `last` as a glyph, its summary and how long ago, `next`, and `alert` in warning. Under a
-`LOG` rule, whatever height is left is the tail, newest at the foot. `l` gives the log the whole
-pane — the header, the line count and the last thirty lines, nothing else — and `←` or `Esc` leaves.
+DAEMON, or SERVICE on a service, is the manifest entry and what the supervisor wrote about it:
+`cmd`, `cwd`, `env`, then `every` with its `atMost`, `when` and `timeout`, or `run` with its
+restart policy and port; then `pid`, `last` as a glyph, its summary and how long ago, `next`, and
+`alert` in warning. The facts and nothing else: the log is the foot's, where it has the width of
+the screen and the sizes every foot pane has.
 
 The bar is also the one line the screen takes a name on. `R` asks for one there — the label, what
 has been typed, a cursor — and while the line is open every key is a character but `↵`, `Esc` and
@@ -213,10 +219,16 @@ most final messages are statements, and a statement rings nobody. A closed missi
 session, if it still runs, is an unbound row that asks once under its own name. A key the last snapshot did not have rings the terminal bell and Warp's own
 `777;notify`. A daemon whose run failed or whose service died is a row here too, under the project
 that declares it, and its command is `factory daemon log <project>/<name>`: reading the log is what
-answers it, so the row goes when the alert is cleared. Messages, the right pane over it, shows the
+answers it, so the row goes when the alert is cleared — `A` on the row is the same call. Messages, the right pane over it, shows the
 selected item's body and that command.
 
-### The foot: DECISIONS
+### The foot: DECISIONS, ACTIVITY, LOG
+
+On a daemon or service row the first tab is the row's log, the tail as the terminal wrote it,
+colours kept and a long line wrapped to two rows, newest at the foot and `↑↓` walking back through
+it while the foot is full. The count on the right is lines and the tab's `+N` what has come in
+since it was last read. Drawing it is the acknowledgement of the row's alert — the same call
+`factory daemon log` makes — so `A` answers an Inbox row and selecting the row does not.
 
 One row per decision of whatever the left column has selected — a mission, a project's open
 missions, or every open mission on the Inbox and Global rows — newest last, the mission column present only
@@ -364,19 +376,19 @@ keys do, and none of these three do the same thing.
 | `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
 | `R`     | daemon row       | run a daemon now past its cadence and idle gates, or start a service, turning the row on — `daemons:` in `~/.factory/config.yaml` |
 | `X`     | daemon row       | stop it, killing the process group, and turn the row off         |
-| `L`     | daemon row       | the log alone in the right pane, the alert cleared; Launch is not turned here |
-| `↵`     | daemon row       | DAEMON: the entry, the last result and the last thirty log lines |
+| `A`     | daemon row       | the foot draws the row's log and acknowledges its alert: the call `factory daemon log` makes |
+| `↵`     | daemon row       | DAEMON, or SERVICE: the entry and what the last run left          |
 | `⇧↑↓`   | left             | move the row past its neighbour of the same kind; the order is kept in `~/.factory/config.yaml` |
-| `L`     | any but a daemon row | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
+| `L`     | any              | launch fg → bg, how `O` runs the next session; kept in `~/.factory/config.yaml` |
 | `C`     | any              | caffeinate auto → on → off                                       |
-| `D`     | any              | the foot draws DECISIONS; on it already, full height on and off  |
-| `A`     | any              | the foot draws ACTIVITY; on it already, full height on and off   |
+| `D`     | any              | the foot draws DECISIONS; on it already, its size: full, the tab row alone, a third |
+| `A`     | any              | the foot draws ACTIVITY, or a daemon row's LOG; on it already, its size, the same three |
 | `?`     | any              | the KEYS panel                                                   |
 | `Q`     | any              | quit                                                             |
 
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
-project `M`, a daemon row `R X L` with `R` reading `Run` on a daemon and `Start` on a
+project `M`, a daemon row `R X` with `R` reading `Run` on a daemon and `Start` on a
 service, the Inbox and `Global` none of them; `↵` reads `Edit` on a stub, `Message` on a row
 with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
 Autonomy` on a stub, whose pane is the form and not MISSION.

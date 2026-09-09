@@ -87,7 +87,8 @@ already go through files, and one written while the supervisor restarts survives
 
 A failed run and a death set `alert`, one Inbox row beside the gates, naming the command that
 answers it: `factory daemon log igs/cws-reviews`. Reading the log is the acknowledgement — the CLI's
-`daemon log` and the TUI's `l` are the same call — and a next success clears it too. `↵` only looks.
+`daemon log` and the TUI's `A`, which draws the log in the foot, are the same call — and a next
+success clears it too. Selecting the row only looks, and so does `↵`.
 
 ## Keys and their twins
 
@@ -97,8 +98,8 @@ Every key is one call into @src/commands/daemon.ts, the same call the subcommand
 |---------|-----------------------------------------------------------|--------------------------------------|
 | `r`     | turn it on and run now, or start a service                | `factory daemon run <key>`           |
 | `x`     | stop the run or the service, and turn it off              | `factory daemon stop <key>`          |
-| `l`     | the log alone in the right pane, the alert cleared        | `factory daemon log <key> [-f] [-n N]` |
-| `↵`     | DAEMON: the entry, the last result, the last 30 log lines | `factory daemon status <key>`        |
+| `A`     | the log in the foot, its alert acknowledged               | `factory daemon log <key> [-f] [-n N]` |
+| `↵`     | DAEMON, or SERVICE: the entry and the last result          | `factory daemon status <key>`        |
 
 `l` is the Log here and nowhere else: every other row still turns Launch, and the key bar says so.
 `factory daemon list [project]` prints the rows themselves.

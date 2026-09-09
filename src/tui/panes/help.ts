@@ -43,8 +43,8 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', '⇧↑↓', 'Move the row up or down; the order is kept'],
   ['Daemons', 'R', 'Run a daemon now, or start a service; the row is turned on'],
   ['', 'X', 'Stop what runs and turn the row off for this machine'],
-  ['', 'L', 'The log alone in the right pane, alert cleared; not Launch here'],
-  ['', '↵', 'The DAEMON pane: the entry, the last result and the log'],
+  ['', 'A', 'Its log in the foot, and the alert acknowledged; not Launch here'],
+  ['', '↵', 'The DAEMON pane: the entry and what the last run left'],
   ['Parts', 'Space', 'Toggle a part; on Global, cycle its scope'],
   ['', 'R', 'Reset the toggles'],
   ['Message', '⇧↵', 'Send it; the session reads it as yours'],
@@ -58,8 +58,9 @@ const HELP: [group: string, key: string, does: string][] = [
   ['', '←→', 'On autonomy, turn the dial; in a field, walk the text'],
   ['', '^U', 'Clear the field'],
   ['', 'Esc', 'Hand the keys back; a draft you changed is kept'],
-  ['Foot', 'A', 'Activity, what its session did; again, full height'],
-  ['', 'D', 'Decisions, the forks this mission took; again, full height'],
+  ['Foot', 'A', 'Activity, what its session did, or a daemon row\'s log'],
+  ['', 'D', 'Decisions, the forks this mission took'],
+  ['', 'A D', 'On the tab drawn: again full height, again the tab row alone'],
 ];
 
 const GROUP_W = 10;

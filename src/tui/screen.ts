@@ -20,7 +20,7 @@ import type { Mission, Session, Snapshot } from './model.js';
 /** Chrome rows: blank, header, rule — rule, key bar. The key bar sits on the last terminal row:
  *  a row left undrawn under it reads as a gap the screen forgot to fill. */
 const CHROME = 5;
-/** Full activity keeps the blank row, the rule and the key bar, and gives the log everything else. */
+/** A full foot keeps the blank row, the rule and the key bar, and gives the pane everything else. */
 const FULL_CHROME = 3;
 /** Factory's own mark. Single-width in a monospace font, unlike most of the geometric glyphs. */
 const BRAND = '⌬';
@@ -132,7 +132,7 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
   inbox: [], global: [], project: ['M'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
-  daemon: ['R', 'X', 'L'],
+  daemon: ['R', 'X'],
 };
 const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission']];
 
@@ -144,12 +144,10 @@ const rowKeys = (here: LeftItem): string[] =>
     : ROW_KEYS[here.kind];
 
 /** A daemon row's own labels: `R` is Run on a daemon and Start on a service — both turn the row
- *  on — `X` is Stop and off, and `L` is the Log here where every other row turns Launch. */
+ *  on — and `X` is Stop and off. The log is the foot's, so `A` carries it and the bar does not. */
 function rowPairs(here: LeftItem): string[][] {
   if (here.kind !== 'daemon') return ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!));
-  const label: Record<string, string> = {
-    R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', L: 'Log',
-  };
+  const label: Record<string, string> = { R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop' };
   return ROW_KEYS.daemon.map((key) => [key, label[key]!]);
 }
 
@@ -166,7 +164,7 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
     ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', ui.intents[formOf(here)?.key ?? '']?.field === SHAPE_FIELD ? 'Shape' : 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
-    ui.full ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
+    ui.size === 'full' ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
     !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
       ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
@@ -188,6 +186,9 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
+
+/** A minimised foot is the rule above it and its tab row: what came in is still counted there. */
+const MIN_FOOT = 2;
 
 /** The left column takes two fifths, never under this. */
 const LEFT_MIN = 30;
@@ -211,14 +212,17 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const { items, here } = select(snap, ui);
 
   // Everything under the status rule and above the key-bar rule. The foot keeps a third of it,
-  // the columns take the rest — and either one takes all of it: `f` gives the foot the screen,
-  // `?` gives the body to the panel, which needs the height to say anything worth reading.
+  // the columns take the rest — and either one takes all of it: the drawn tab's own key gives the
+  // foot the screen or leaves it its tab row alone, `?` gives the body to the panel, which needs
+  // the height to say anything worth reading.
   // The message box takes its rows off the top of the region, and the foot keeps its share of the rest.
-  const composeH = Math.min(composeHeight(ui, here, w), Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - 5));
-  const region = Math.max(0, r.terminalHeight - (ui.full ? FULL_CHROME : CHROME) - composeH);
+  const full = ui.size === 'full';
+  const composeH = Math.min(composeHeight(ui, here, w), Math.max(0, r.terminalHeight - (full ? FULL_CHROME : CHROME) - 5));
+  const region = Math.max(0, r.terminalHeight - (full ? FULL_CHROME : CHROME) - composeH);
   // The panel wants the whole body, on `?` and on an Inbox with nothing in it alike.
   const panel = ui.help || (here.kind === 'inbox' && snap.inbox.length === 0);
-  const actH = ui.full ? region : panel ? 0 : Math.min(region, Math.max(5, Math.floor(region / 3)));
+  const actH = full ? region : panel ? 0 : ui.size === 'min' ? Math.min(region, MIN_FOOT)
+    : Math.min(region, Math.max(5, Math.floor(region / 3)));
   const bodyH = region - actH;
 
   // Two blank columns down the left and none anywhere else: the key bar sits on the last row and
@@ -226,7 +230,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
   const root = column(r, w, { width: r.terminalWidth, height: r.terminalHeight, paddingLeft: 2, paddingRight: 0 });
   root.row([]);
   // A full-height foot is that pane and nothing else: the header and the status bar are rows it can have.
-  if (!ui.full) {
+  if (!full) {
     header(root, snap, here, ui);
     root.rule();
   }
@@ -246,7 +250,7 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     // mission it has a draft for. The body cuts the end of it, the way it cuts a long graph.
     else if (showsForm(ui, here)) formPane(right, ui, here);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global', bodyH);
-    else if (here.kind === 'daemon') daemonPane(right, here.daemon, ui, bodyH);
+    else if (here.kind === 'daemon') daemonPane(right, here.daemon, bodyH);
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');
     else sessionPane(right, here.session);
     body.add(left.box);

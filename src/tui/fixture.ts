@@ -239,6 +239,12 @@ const projects: Project[] = [
         ],
         autonomy: 'partial', tokens: { input: 310_200, cached: 4_100_000, output: 48_000 }, steps: refitSteps,
         decisions: refitDecisions, diff: { added: 412, removed: 96 },
+        // The one human line the MISSION pane carries: long enough to fill both its rows and cut.
+        intent: {
+          goal: 'The screen redrawn as one product: the panes share a grid, every key writes through the CLI\'s own functions, and the frames are checked headless so a look review needs no tty.',
+          done: 'every pane reads at 100 columns\nno key writes a file the CLI cannot write',
+          extra: '',
+        },
       }),
       mission({
         name: 'memory', workflow: 'intent', status: 'stub',

@@ -34,6 +34,15 @@ recipes:
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --rows 20 down down down down down down down down down down down down down down --expect 'closed 4d ago'
       # The selection while the focus is in the right pane: the chevron at the row's right end.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 right --expect '›'
+      # The intent form on a 24-row screen: the body leaves it eleven rows and seven lines are
+      # typed into `done`, so the first of them is drawn only because the pane scrolled and not
+      # the field — `INTENT` is the header that stays put over it.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --rows 24 --row 'p ivy' m type:x return tab type:a1 return type:a2 return type:a3 return type:a4 return type:a5 return type:a6 return type:a7 --expect 'INTENT' --expect 'a1' --expect 'a7'
+      # `↵` on Name walks to the goal — a name that took the break would not be a slug and the
+      # save would refuse — and `⇧↵` walks the four fields after it to the Shape dial, where it
+      # saves. The one `tui-keys` line that writes: the stub lands in this checkout's own
+      # ignored `.factory/missions/`, so the line throws it away on either side of itself.
+      - rm -rf .factory/missions/*-formsave; bun scripts/tui-keys.ts --fixture --quiet --wait 300 --row 'p ivy' m type:formsave return type:a S-return S-return S-return S-return S-return --expect 'stub formsave'; s=$?; rm -rf .factory/missions/*-formsave; exit $s
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

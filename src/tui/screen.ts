@@ -161,7 +161,7 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
-    ui.form ? [['⇥', 'Field'], ['^S', 'Save'], ['←→', ui.intents[formOf(here)?.key ?? '']?.field === SHAPE_FIELD ? 'Shape' : 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
+    ui.form ? [['⇥ ⇧↵', 'Field'], ['^S', 'Save'], ['←→', ui.intents[formOf(here)?.key ?? '']?.field === SHAPE_FIELD ? 'Shape' : 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.size === 'full' ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
@@ -248,8 +248,9 @@ export function render(r: CliRenderer, snap: Snapshot, ui: Ui): void {
     if (panel) helpPane(right, bodyH);
     else if (here.kind === 'inbox') messagesPane(right, snap, ui, bodyH);
     // The form outranks Parts and MISSION: a stub is edited here, and a project row shows the new
-    // mission it has a draft for. The body cuts the end of it, the way it cuts a long graph.
-    else if (showsForm(ui, here)) formPane(right, ui, here);
+    // mission it has a draft for. It scrolls inside the body rather than being cut by it: what is
+    // being typed into has to stay on screen, where a graph only has to be read from the top.
+    else if (showsForm(ui, here)) formPane(right, ui, here, bodyH);
     else if (here.kind === 'project' || here.kind === 'global') partsPane(right, here.project, ui, here.kind === 'global', bodyH);
     else if (here.kind === 'daemon') daemonPane(right, here.daemon, bodyH);
     else if (here.kind === 'mission') missionPane(right, here.mission, ui.focus === 'right');

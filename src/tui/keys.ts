@@ -86,9 +86,10 @@ function composing(app: App, key: KeyEvent): void {
 }
 
 /**
- * The intent form has the keys: `⇥` walks the fields, `↵` breaks a line inside one, `^S` writes
- * the stub, `Esc` hands the keys back and keeps what was typed. Every field is a message-box
- * draft, so the editing below the field level is `editKey`'s and nothing here repeats it.
+ * The intent form has the keys: `⇥` and `⇧↵` walk the fields, `↵` breaks a line inside one and
+ * walks on the name, `^S` — or `⇧↵` on the last stop — writes the stub, `Esc` hands the keys back
+ * and keeps what was typed. Every field is a message-box draft, so the editing below the field
+ * level is `editKey`'s and nothing here repeats it.
  */
 function forming(app: App, key: KeyEvent): void {
   const { ui } = app;
@@ -104,6 +105,11 @@ function forming(app: App, key: KeyEvent): void {
   const first = form.create ? 0 : 1;
   const stops = SHAPE_FIELD + 1 - first;
   const field = FIELDS[d.field];
+  // `⇧↵` walks the fields the way `⇥` does, so the chord that ends a message ends a field too,
+  // and on the last stop it saves — the form is finished where the eye already is. `↵` walks the
+  // name for the same reason it cannot break a line: the name is a folder and a branch.
+  const shifted = key.name === 'return' && key.shift;
+  const walks = key.name === 'tab' || shifted || (key.name === 'return' && d.field === 0);
 
   if (key.name === 'escape') {
     ui.form = false;
@@ -111,8 +117,10 @@ function forming(app: App, key: KeyEvent): void {
     // back to its parts, a stub's pane back to following its file. A changed one is kept, and
     // the pane keeps showing it.
     if (untouched(d, here)) delete ui.intents[form.key];
-  } else if (key.name === 'tab') {
-    d.field = first + (((d.field - first + (key.shift ? -1 : 1)) % stops) + stops) % stops;
+  } else if (shifted && d.field === SHAPE_FIELD) return saveForm(app, form, d);
+  else if (walks) {
+    const back = key.name === 'tab' && key.shift;
+    d.field = first + (((d.field - first + (back ? -1 : 1)) % stops) + stops) % stops;
   } else if (key.ctrl && key.name === 's') return saveForm(app, form, d);
   else if (key.ctrl && key.name === 'u') {
     if (field) d[field[0]] = { text: '', cursor: 0 };
@@ -124,6 +132,14 @@ function forming(app: App, key: KeyEvent): void {
   else if (key.ctrl && key.name === 'v') return pasteClipboard(app, d[field[0]]);
   else if (!editKey(d[field[0]], key, rightWidth(app.r))) return;
   draw(app);
+}
+
+/** The form takes the keys with the cursor on `field` and the pane back at its first row: a
+ *  window left where the last form was scrolled to would open on the middle of this one. */
+function openForm(ui: Ui, here: LeftItem, field: number): void {
+  ui.form = true;
+  ui.formTop = 0;
+  draftFor(ui, here).field = field;
 }
 
 /** The next option on a dial, or the one before; the ends wrap. */
@@ -277,8 +293,7 @@ function handleKey(app: App, key: KeyEvent): void {
       // A stub is not written to, it is written: `↵` gives the intent form the keys, on the goal,
       // because the name is the folder and fixed once the folder is there.
       if (!right && here.kind === 'mission' && here.mission.status === 'stub') {
-        ui.form = true;
-        draftFor(ui, here).field = 1;
+        openForm(ui, here, 1);
         break;
       }
       // A row with a session behind it is written to; the arrows already enter the right pane.
@@ -364,8 +379,7 @@ function handleKey(app: App, key: KeyEvent): void {
       // a new mission's draft is shown by the project row, the way a message draft is by its own.
       const { project } = here;
       ui.left = items.findIndex((item) => item.kind === 'project' && item.project === project);
-      ui.form = true;
-      draftFor(ui, items[ui.left]!).field = 0;
+      openForm(ui, items[ui.left]!, 0);
       break;
     }
     case 'x':

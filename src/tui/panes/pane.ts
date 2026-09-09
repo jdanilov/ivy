@@ -42,6 +42,9 @@ export interface Ui {
   drafts: Record<string, Draft>;
   /** The keys are the intent form's. */
   form: boolean;
+  /** The first row of the form drawn under its fixed header, the way `top` scrolls the left list:
+   *  every field draws all its lines and the pane is what moves to keep the cursor on screen. */
+  formTop: number;
   /** One intent draft per row, kept like a message draft: a stub row by its own key, a new
    *  mission under `new <project>`, so a project row shows what has been typed for it. */
   intents: Record<string, IntentDraft>;
@@ -65,7 +68,7 @@ export function newUi(): Ui {
     focus: 'left', left: 0, top: 0, msg: 0, part: 0, toggles: {}, confirm: false, size: 'third',
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
     showArchived: false, toast: null, input: null, compose: false, drafts: {},
-    form: false, intents: {},
+    form: false, formTop: 0, intents: {},
   };
 }
 
@@ -121,6 +124,22 @@ export function itemKey(item: LeftItem): string {
 
 export function clamp(i: number, n: number): number {
   return n === 0 ? 0 : Math.min(Math.max(i, 0), n - 1);
+}
+
+/** The two cells a scrolling list's row ends in: the chevron the selection keeps while the focus
+ *  is in the other pane, or the room for it, so the right column of every row ends at one place. */
+export const chevron = (selected: boolean, focused: boolean): Cell => [selected && !focused ? ' ›' : '  ', C.accent];
+
+/** The first row a pane draws, moved by the least that keeps row `here` on screen: walking down
+ *  scrolls one row at a time, and a jump lands the row it left the selection on in view. A pane
+ *  with nothing focused passes `here` under zero and keeps the window where it was. */
+export function windowTop(top: number, here: number, rows: number, room: number): number {
+  if (room <= 0) return 0;
+  // The list shrank under the window first, then the selection has the last word.
+  let at = Math.min(top, Math.max(0, rows - room));
+  if (here >= 0 && here < at) at = here;
+  if (here >= at + room) at = here - room + 1;
+  return Math.max(0, at);
 }
 
 /** A column of rows drawn at a fixed width, so a selected row inverts edge to edge. */

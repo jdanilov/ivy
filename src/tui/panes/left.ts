@@ -1,16 +1,12 @@
 import { C, GLYPH, SESSION, stateColor } from '../theme.js';
 import { ago, dur, id, spread, type Cell } from '../format.js';
 import { rowTail } from '../../commands/daemon.js';
-import { type LeftItem, type Pane, type Ui } from './pane.js';
+import { chevron, windowTop, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { DaemonRow, Mission, Session, Snapshot } from '../model.js';
 
 /** The left column: the Inbox, the user's own parts, then every project with its daemons, its
  *  missions and its sessions. A row names itself on the left and says where it stands on the
  *  right, so the two read as columns down the pane. */
-
-/** The two cells every row ends in: the chevron a selection keeps while the focus is in the other
- *  pane, or the room for it, so the state and the times of every row end at one column. */
-const chevron = (selected: boolean, focused: boolean): Cell => [selected && !focused ? ' ›' : '  ', C.accent];
 
 /** One row: what names it left, where it stands right, the chevron's two cells last. The gap
  *  belongs to the right cells, so a row too long to fit keeps it and the edge cuts the tail
@@ -111,17 +107,6 @@ function listRows(width: number, items: LeftItem[], snap: Snapshot, ui: Ui, focu
   return rows;
 }
 
-/** The first row drawn, moved by the least that keeps `here` on screen: walking down scrolls one
- *  row at a time, and a jump — `S`, `M`, a list rebuilt under the selection — lands it in view. */
-function window(top: number, here: number, rows: number, room: number): number {
-  if (room <= 0) return 0;
-  // The list shrank under the window first, then the selection has the last word.
-  let at = Math.min(top, Math.max(0, rows - room));
-  if (here < at) at = here;
-  if (here >= at + room) at = here - room + 1;
-  return Math.max(0, at);
-}
-
 export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui, h: number): void {
   const hidden = ui.showArchived
     ? 0 : snap.projects.reduce((n, project) => n + project.missions.filter((m) => m.archived).length, 0);
@@ -132,6 +117,6 @@ export function leftPane(p: Pane, items: LeftItem[], snap: Snapshot, ui: Ui, h: 
   const rows = listRows(p.width, items, snap, ui, focused);
   // The header and its rule stay put: the list alone scrolls, under them.
   const room = Math.max(0, h - 2);
-  ui.top = window(ui.top, rows.findIndex((line) => line.here), rows.length, room);
+  ui.top = windowTop(ui.top, rows.findIndex((line) => line.here), rows.length, room);
   for (const line of rows.slice(ui.top, ui.top + room)) p.row(line.cells, line.here && focused);
 }

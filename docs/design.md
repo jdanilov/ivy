@@ -140,8 +140,12 @@ A session has no steps to bar and no project to count: `IDLE`, its id, preset an
 long since its last event on the right.
 
 A mission's one human line is the first paragraph of `## Goal` in its `intent.md`, and the MISSION
-pane carries it under the rule, wrapped to two lines with an ellipsis where it cuts and a blank row
-after: what the mission is for deserves whole lines, and a header's tail is where a line gets cut. A stub has no graph and no facts to state, so its right
+pane carries it under the rule at the pane's own edge, wrapped to two lines with an ellipsis where
+it cuts and a blank row after: what the mission is for deserves whole lines, and a header's tail is
+where a line gets cut. Two cells are the pane's unit and nothing in it is one: a step row is
+indented two under the goal, a name too long for the step column still keeps two before the runner,
+and a deviation's wrapped lines sit two in — one cell is not an indent, it is a margin that reads
+as a wobble. A stub has no graph and no facts to state, so its right
 pane is the intent form instead.
 
 The SESSION pane says what ACTIVITY cannot at a glance: `now`, the `bash` or `sub` row still out
@@ -205,7 +209,13 @@ it. Every label ends in a colon behind a `›`, and a blank row follows every in
 reads as a value.
 
 Every field is a message-box draft — the same editor, the same wrap, the same cursor — so `↵` is a
-line break inside a field and the field is changed with `⇥` and `⇧⇥`. `^S` saves: an empty goal or
+line break inside a field and the field is changed with `⇥` and `⇧⇥`. Not on `Name`: a name is one
+line, the folder and later the branch, so `↵` there is `⇥` and walks to the goal. `⇧↵` walks the
+fields too, wherever the cursor is — the same chord that sends a message, so one hand ends both —
+and on the Shape dial, the last stop, it saves the way `^S` does, so the form is finished where
+the eye already is. A terminal that cannot tell `⇧↵` from `↵` still has `⇥` and `^S`. Every field draws every line it holds and nothing
+scrolls inside an input: the pane is what scrolls, under the fixed header and rule, moved by the
+least that keeps the cursor's row on screen, the way the left list moves under its own. `^S` saves: an empty goal or
 a name that is not a slug, taken, or empty is refused with a toast naming the field and the cursor
 put on it, and nothing is written. `Esc` hands the keys back and keeps the draft, one per row, so
 `↑↓` between two stubs keeps what was typed into each; a draft nothing was changed in is dropped
@@ -235,7 +245,9 @@ session, if it still runs, is an unbound row that asks once under its own name. 
 `777;notify`. A daemon whose run failed or whose service died is a row here too, under the project
 that declares it, and its command is `factory daemon log <project>/<name>`: reading the log is what
 answers it, so the row goes when the alert is cleared — `A` on the row is the same call. Messages, the right pane over it, shows the
-selected item's body and that command.
+selected item's body and that command. Its rows read as the left column's do: they start at the
+pane's edge with no marker column, how long each has waited sits against the right edge, and the
+selected row inverts while the pane has the focus and ends in an accent `›` while it does not.
 
 ### The foot: DECISIONS, ACTIVITY, LOG
 
@@ -373,6 +385,8 @@ keys do, and none of these three do the same thing.
 | `Esc`   | message box      | keep the draft, hand the keys back                               |
 | `↵`     | stub row         | edit its intent in the form, on the goal                          |
 | `⇥` `⇧⇥` | intent form     | the next field, the one before; the last stops are the two dials  |
+| `⇧↵`    | intent form      | the next field, wherever the cursor is; on the Shape dial it saves |
+| `↵`     | intent form      | a line break; on `Name` the next field, because a name is one line |
 | `←→`    | intent form      | on a dial, turn it; in a field, walk the text                     |
 | `^S`    | intent form      | save: the stub is made, or its `intent.md`, autonomy and graph rewritten |
 | `^U`    | intent form      | clear the field                                                   |

@@ -1,7 +1,7 @@
 import { C } from '../theme.js';
 import { spread, type Cell } from '../format.js';
-import { draftRows, type Draft } from './compose.js';
-import { itemKey, type IntentDraft, type LeftItem, type Pane, type Ui } from './pane.js';
+import { draftCells, type Draft } from './compose.js';
+import { itemKey, windowTop, type IntentDraft, type LeftItem, type Pane, type Ui } from './pane.js';
 import type { Autonomy, Intent, Project } from '../model.js';
 
 /**
@@ -12,11 +12,11 @@ import type { Autonomy, Intent, Project } from '../model.js';
  */
 
 /** The editable order `field` indexes; the last stop is the autonomy dial, which has no text. */
-export const FIELDS: [key: TextField, label: string, max: number][] = [
-  ['name', 'Name (lowercase slug):', 1],
-  ['goal', 'Mission Goal:', 4],
-  ['done', 'What done looks like (one per line):', 6],
-  ['extra', 'Extra (guardrails, what not to touch, start from, etc.):', 6],
+export const FIELDS: [key: TextField, label: string][] = [
+  ['name', 'Name (lowercase slug):'],
+  ['goal', 'Mission Goal:'],
+  ['done', 'What done looks like (one per line):'],
+  ['extra', 'Extra (guardrails, what not to touch, start from, etc.):'],
 ];
 export type TextField = 'name' | 'goal' | 'done' | 'extra';
 /** In front of every label, so a label never reads as a value. */
@@ -104,7 +104,13 @@ type PartsRow = Extract<LeftItem, { kind: 'global' | 'project' }>;
 export const showsParts = (ui: Ui, here: LeftItem): here is PartsRow =>
   here.kind === 'global' || (here.kind === 'project' && !showsForm(ui, here));
 
-export function formPane(p: Pane, ui: Ui, here: LeftItem): void {
+/**
+ * The form is built whole and then windowed: every field draws every line it holds — a goal is
+ * read by the eye that is writing it, and a field that scrolls inside itself hides what was just
+ * typed — and the pane is what moves, by the least that keeps the cursor's row on screen. The
+ * header and its rule stay put, the way the left list's do.
+ */
+export function formPane(p: Pane, ui: Ui, here: LeftItem, h: number): void {
   const form = formOf(here);
   if (form === null) return;
   // No draft yet: a throwaway of what is on disk, so a hand edit of `intent.md` shows on the next
@@ -116,27 +122,43 @@ export function formPane(p: Pane, ui: Ui, here: LeftItem): void {
     [[stub ? 'stub' : 'new', C.dim]], p.width));
   p.rule();
 
+  const rows: Cell[][] = [];
+  // Where the cursor is, in drawn rows; under zero while the form has not got the keys, and then
+  // the window stays where it was.
+  let at = -1;
+  const add = (cells: Cell[], cursor = false): void => {
+    if (cursor) at = rows.length;
+    rows.push(cells);
+  };
+
   // A stub's name is drawn and never focused — `field` never lands on 0 there — because renaming
   // a stub means renaming its folder, and delete-and-remake is that path.
-  for (const [i, [field, label, max]] of FIELDS.entries()) {
+  for (const [i, [field, label]] of FIELDS.entries()) {
     const active = ui.form && d.field === i;
-    p.row([[MARK + label, active ? C.accent : C.dim]]);
-    draftRows(p, d[field], p.width, active, max);
-    p.row([]); // a blank row between one input and the next label
+    add([[MARK + label, active ? C.accent : C.dim]]);
+    const text = draftCells(d[field], p.width, active, Infinity);
+    text.rows.forEach((cells, row) => { add(cells, active && row === text.at); });
+    add([]); // a blank row between one input and the next label
   }
 
-  dial(p, 'Autonomy:', AUTONOMY, d.autonomy, ui.form && d.field === AUTONOMY_FIELD);
-  p.row([]);
-  p.row([]); // a dial has no input under it, so two blank rows keep the two apart
-  dial(p, 'Shape:', SHAPES, d.shape, ui.form && d.field === SHAPE_FIELD);
+  const onAutonomy = ui.form && d.field === AUTONOMY_FIELD;
+  const onShape = ui.form && d.field === SHAPE_FIELD;
+  add(dial('Autonomy:', AUTONOMY, d.autonomy, onAutonomy), onAutonomy);
+  add([]);
+  add([]); // a dial has no input under it, so two blank rows keep the two apart
+  add(dial('Shape:', SHAPES, d.shape, onShape), onShape);
+
+  const room = Math.max(0, h - 2);
+  ui.formTop = windowTop(ui.formTop, at, rows.length, room);
+  for (const cells of rows.slice(ui.formTop, ui.formTop + room)) p.row(cells);
 }
 
 
 /** One row: the label, then every option with the chosen one bright and, on the dial, the cursor. */
-function dial<T extends string>(p: Pane, label: string, options: readonly T[], value: T, on: boolean): void {
-  p.row([[MARK + label, on ? C.accent : C.dim], ['  ', C.dim],
+function dial<T extends string>(label: string, options: readonly T[], value: T, on: boolean): Cell[] {
+  return [[MARK + label, on ? C.accent : C.dim], ['  ', C.dim],
     ...options.flatMap((option, i): Cell[] => [
       ...(i ? ([[' | ', C.rule]] as Cell[]) : []),
       [option, option === value ? C.bright : C.dim, on && option === value],
-    ])]);
+    ])];
 }

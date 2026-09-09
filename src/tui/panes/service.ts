@@ -1,5 +1,5 @@
 import { C } from '../theme.js';
-import { spread, type Cell } from '../format.js';
+import { spread } from '../format.js';
 import { draft, type Def, type Field, type FormDraft } from './form.js';
 
 /**

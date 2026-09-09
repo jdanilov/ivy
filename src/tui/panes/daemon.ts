@@ -13,7 +13,7 @@ import type { DaemonRow } from '../model.js';
  */
 
 /** What `factory daemon log` prints with no `-n`, so the pane and the shell show one thing. */
-const LOG_LINES = 30;
+export const LOG_LINES = 30;
 /** A long line wraps, but a stack trace must not push the newest lines off the pane. */
 const WRAP_ROWS = 2;
 const LABEL = 9;
@@ -35,6 +35,10 @@ export function logTail(key: string, n: number): string[] {
   }
   return (tails.get(key) ?? []).slice(-n);
 }
+
+/** What `l` already read on its way through the CLI's own `daemon log`: the view's first frame
+ *  has the lines, and the refresh above takes over from there. */
+export const seedTail = (key: string, lines: string[]): void => { tails.set(key, lines); };
 
 /** The fixture has no `~/.factory/daemons/` behind it and carries the lines it wants shown. */
 const linesOf = (row: DaemonRow, n: number): string[] => (row.log ? row.log.slice(-n) : logTail(row.key, n));

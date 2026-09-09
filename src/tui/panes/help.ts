@@ -44,7 +44,7 @@ const HELP: [group: string, key: string, does: string][] = [
   ['Daemons', 'Space', 'Turn the daemon or the service on and off for this machine'],
   ['', 'R', 'Run a daemon now, or start a service; an off row is refused'],
   ['', 'X', 'Stop it: the run is killed, a service holds wanted false'],
-  ['', 'L', 'The log alone in the right pane; here L is not Launch'],
+  ['', 'L', 'The log alone in the right pane, alert cleared; not Launch here'],
   ['', '↵', 'The DAEMON pane: the entry, the last result and the log'],
   ['Parts', 'Space', 'Toggle a part; on Global, cycle its scope'],
   ['', 'R', 'Reset the toggles'],

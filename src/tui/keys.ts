@@ -2,14 +2,15 @@ import path from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { KeyEvent } from '@opentui/core';
 import {
-  applyParts, applyScopes, archive, killSession, openTab, renameSession, runNow, saveIntent, sendMessage,
-  setAutonomy, setCaffeinate, setEnabled, setLaunch, stopRow,
+  applyParts, applyScopes, archive, killSession, openTab, readLog, renameSession, runNow, saveIntent,
+  sendMessage, setAutonomy, setCaffeinate, setEnabled, setLaunch, stopRow,
 } from './actions.js';
 import { writeOrder } from '../core/config.js';
 import { factoryHome } from '../core/projects.js';
 import { id } from './format.js';
 import { clamp, itemKey, leftItems, select, type IntentDraft, type LeftItem, type Ui } from './panes/pane.js';
 import { changes, nextScope, partStatus, pending, scopeChanges } from './panes/parts.js';
+import { LOG_LINES, seedTail } from './panes/daemon.js';
 import { draftOf, editKey, insert, targetOf, type Draft } from './panes/compose.js';
 import { AUTONOMY, AUTONOMY_FIELD, FIELDS, SHAPES, SHAPE_FIELD, draftFor, formOf, shapeOf, showsParts, untouched, workflowOf, type Form } from './panes/form.js';
 import { act, draw, rightWidth, toast, type App } from './screen.js';
@@ -337,6 +338,7 @@ function handleKey(app: App, key: KeyEvent): void {
       if (here.kind === 'daemon') {
         ui.daemonLog = true;
         ui.focus = 'right';
+        showLog(app, here.daemon.key);
         break;
       }
       snap.launch = LAUNCH[(LAUNCH.indexOf(snap.launch) + 1) % LAUNCH.length]!;
@@ -392,6 +394,18 @@ function handleKey(app: App, key: KeyEvent): void {
       return;
   }
   draw(app);
+}
+
+/**
+ * `l`'s CLI twin is `factory daemon log`: the same call, once, as the view opens — which is what
+ * acknowledges an alert and drops its Inbox row. The view is opened first and the refusal is
+ * swallowed, because only a fixture row can refuse: a live one came from `listRows`.
+ */
+function showLog(app: App, key: string): void {
+  void readLog(key, LOG_LINES).then((lines) => {
+    seedTail(key, lines);
+    draw(app);
+  }, () => {});
 }
 
 /** A key must never take the screen down: the toast says what broke, the log says where. */

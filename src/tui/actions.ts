@@ -10,7 +10,7 @@ import { writeIntent, type Intent } from '../core/intent.js';
 import { loadPreset, openSession, stopSession } from '../core/spawn.js';
 import { inboxOf, post } from '../core/peer.js';
 import { renameProjectKeys, resetConfig, writeCaffeinate, writeLaunch, writeName, writePartScope, type Caffeinate, type Launch } from '../core/config.js';
-import { daemonDir } from '../core/daemons.js';
+import { daemonDir, writeEntry, type NewEntry } from '../core/daemons.js';
 import { existingProjects, factoryHome, home, projectName, removeProject, saveProject } from '../core/projects.js';
 import { id } from './format.js';
 import type { Autonomy, ScopeChoice } from './model.js';
@@ -284,6 +284,14 @@ export async function archive(project: string, name: string, back: boolean): Pro
 }
 
 // ── daemons ──────────────────────────────────────────────────────────────────
+
+/** `P`: one block appended to the project's own `.factory/daemons.yaml`, made when it is not
+ *  there. The entry arrives off — nothing is written to this machine's config — because a command
+ *  typed into a form has never run once, and `R` is the key that says it may. */
+export async function addEntry(project: string, entry: NewEntry): Promise<string> {
+  await writeEntry(project, entry);
+  return `${await projectName(project)}/${entry.name} added · R runs it`;
+}
 
 /** `r`, `x` and `l` are their CLI twins and nothing more: the same three functions
  *  `factory daemon run|stop|log` calls, two returning the line the toast shows and `log` the

@@ -239,6 +239,25 @@ keeps it and the pane goes on showing it, so a value the row never gave is never
 The CLI's own `mission open` is not: running it is a deliberate act, and a bare stub is a fair
 thing to open by hand.
 
+### The SERVICE form
+
+`P` on any of a project's rows gives the same pane the other form the engine draws: one entry of
+that project's `.factory/daemons.yaml`, filled in where the rows it makes are read. Adding
+background work was the last common path that still needed an editor and a shell.
+
+The `Kind` dial, `daemon | service`, is the first row because it decides the rest: `Name`, a
+lowercase slug that is half the row's key, `Description`, `Command` and `Working dir` are both
+kinds'; a daemon adds `Every`, a service a `Restart` dial and `Port`. What the other kind uses is
+not drawn — a form with three dead fields in it reads as a form that does not know what is being
+made. The title is the dial's own word, `DAEMON  ivy` or `SERVICE  ivy`.
+
+`^S` refuses a name that is not a slug or that the manifest already has, an empty `cmd` and an
+`every` its own parser will not read, each with the cursor put on the field, the way the intent
+form refuses. What it writes is one block appended: the file is made with a one-line header when
+it is not there, and nothing already in it is rewritten, because the comments, the order and the
+fields in it are a human's. The entry arrives **off** — a command typed into a form has never run
+once — and `R` on its row is what says it may.
+
 ### The Inbox
 
 Every open gate, waiting decision and waiting question across all projects, keyed
@@ -389,13 +408,14 @@ keys do, and none of these three do the same thing.
 | `^V`    | message box      | paste the clipboard; `⌘V` is the terminal's own paste and lands the same |
 | `Esc`   | message box      | keep the draft, hand the keys back                               |
 | `↵`     | stub row         | edit its intent in the form, on the goal                          |
-| `⇥` `⇧⇥` | intent form     | the next field, the one before; the last stops are the two dials  |
-| `⇧↵`    | intent form      | the next field, wherever the cursor is; on the Shape dial it saves |
-| `↵`     | intent form      | a line break; on `Name` the next field, because a name is one line |
-| `←→`    | intent form      | on a dial, turn it; in a field, walk the text                     |
+| `⇥` `⇧⇥` | either form    | the next field, the one before; a field the entry does not use is not a stop |
+| `⇧↵`    | either form      | the next field, wherever the cursor is; on the last stop it saves  |
+| `↵`     | either form      | a line break; on `Name` the next field, because a name is one line |
+| `←→`    | either form      | on a dial, turn it; in a field, walk the text                     |
 | `^S`    | intent form      | save: the stub is made, or its `intent.md`, autonomy and graph rewritten |
-| `^U`    | intent form      | clear the field                                                   |
-| `Esc`   | intent form      | hand the keys back; a draft nothing changed is dropped |
+| `^S`    | SERVICE form     | save: the entry is appended to `.factory/daemons.yaml`, off       |
+| `^U`    | either form      | clear the field                                                   |
+| `Esc`   | either form      | hand the keys back; a draft nothing changed is dropped |
 | `←`     | right            | back to the left pane                                            |
 | `Esc`   | right            | back to the left pane; in Parts it discards the toggles first    |
 | `Space` | Parts            | toggle a part; on `Global` cycle its scope project → global → off |
@@ -409,6 +429,7 @@ keys do, and none of these three do the same thing.
 | `S`     | left             | show the archived missions                                       |
 | `R`     | session          | rename a session; a mission's name is its branch and never moves |
 | `M`     | project's rows   | the intent form for a new stub in that project; `O` promotes it  |
+| `P`     | project's rows   | the SERVICE form for a new entry in that project's `.factory/daemons.yaml`; it arrives off and `R` runs it |
 | `R`     | project row      | rename it on this machine: one line in `names:` in `~/.factory/config.yaml`, and its daemon keys, their state folder and its `order:` keys move with it |
 | `U`     | project row      | uninstall the parts and drop the project from `~/.factory/projects`, after a `Y` on the status bar; the checkout and its own `.factory/` stay |
 | `N`     | left             | a new project: a path typed on the status bar, then what `factory install <path> --yes` does, registered |
@@ -427,10 +448,14 @@ keys do, and none of these three do the same thing.
 The key bar is built from the kind of row selected, so it never offers a key whose whole reply
 would be a toast: a mission row answers `O K T E` and a stub `O K E`, a session row `K R`, a
 project `M R U`, a daemon row `R X` with `R` reading `Run` on a daemon and `Start` on a
-service, the Inbox and `Global` none of them; `N New Project` follows whatever the row itself
-answers, on every left row, because the project it makes is the one the list does not hold yet; `↵` reads `Edit` on a stub, `Message` on a row
-with a session behind it and `Open` on the rest. In the right pane the same rule drops `→ T
-Autonomy` on a stub, whose pane is the form and not MISSION.
+service, the Inbox and `Global` none of them; `P New Service` follows on all four, because the
+manifest it writes belongs to the project every one of those rows hangs under; `N New Project`
+follows whatever the row itself answers, on every left row, because the project it makes is the
+one the list does not hold yet; `↵` reads `Edit` on a stub, `Message` on a row with a session
+behind it and `Open` on the rest. In the right pane the same rule drops `→ T Autonomy` on a stub,
+whose pane is the form and not MISSION. A bar too long for the terminal loses `? Help` first —
+the panel it opens lists every key anyway — then `S Show Archived`, and nothing else: what the row
+answers and what `Launch` and `Caffeinate` are set to are why the bar is there.
 
 A session's name is Claude Code's own `custom-title` record, which nothing else may write, so `R`
 keeps the Factory's word on the session's own events file: one `Rename` line carrying what the
@@ -441,8 +466,9 @@ screen's name outranks the transcript's; it is the later word. The order `⇧↑
 outside it stays. What a list does not name follows it, as it came: a new stub lands last, a
 session that appears lands last.
 
-The panel is HOW FACTORY WORKS, the primer, then TERMS, the words the screen uses, then KEYS, one
-key to a line under its pane. Top down, so what a short terminal loses is the end of the key list,
+The panel is HOW FACTORY WORKS, the primer, then HOW TO USE, the five paths through the screen
+with the keys that walk them — create a project, add parts, start a mission, watch activity and
+decisions, run daemons and services — then KEYS, one key to a line under its pane. Top down, so what a short terminal loses is the end of the key list,
 which the bar repeats. While the Inbox is empty the panel stands where MESSAGES would, so a fresh
 install opens on it.
 

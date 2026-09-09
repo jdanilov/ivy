@@ -42,7 +42,7 @@ const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
-const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeState: writeRow } = await import('../src/core/daemons.js');
+const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeEntry, writeState: writeRow } = await import('../src/core/daemons.js');
 const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
 const { colourOf, readLog, runNow, stopRow } = await import('../src/commands/daemon.js');
 
@@ -1048,6 +1048,43 @@ await check('a manifest reads a daemon and a service, durations in ms and env as
   ok(service?.kind === 'service' && service.cwd === 'inssist-api' && service.run === 'detached' && service.restart === 'always' && service.port === 3061,
     `the service read as ${JSON.stringify(service)}`);
   ok(service?.kind === 'service' && service.env?.PORT === '3061' && service.env.NODE_ENV === 'development', `env read as ${JSON.stringify(service?.env)}`);
+});
+
+await check('P appends an entry to the manifest, keeps what a human wrote and refuses a name twice', async () => {
+  const dir = await repo('added');
+  const file = path.join(dir, '.factory', 'daemons.yaml');
+  await mkdir(path.dirname(file), { recursive: true });
+  // What the form is writing into: a human's own file, comment and all.
+  await writeFile(file, '# the ones we already had\nold:\n  kind: daemon\n  cmd: "true"\n  every: 1h\n');
+
+  await writeEntry(dir, { name: 'nightly', kind: 'daemon', description: 'the build', cmd: 'bun run build', cwd: '', every: '1d' });
+  await writeEntry(dir, { name: 'web', kind: 'service', cmd: 'npm run dev', cwd: 'site', restart: 'always', port: '3000' });
+
+  const text = await Bun.file(file).text();
+  ok(text.startsWith('# the ones we already had\nold:\n'), `the file was rewritten:\n${text}`);
+  ok(!text.includes('cwd: ""'), `an empty field was written anyway:\n${text}`);
+
+  const { entries } = await readDaemons(dir);
+  const [, nightly, web] = entries;
+  ok(entries.length === 3 && nightly?.kind === 'daemon' && nightly.every === 24 * HOUR && nightly.description === 'the build',
+    `the daemon read back as ${JSON.stringify(nightly)}`);
+  ok(web?.kind === 'service' && web.cmd === 'npm run dev' && web.cwd === 'site' && web.restart === 'always' && web.port === 3000,
+    `the service read back as ${JSON.stringify(web)}`);
+
+  // The entry arrives off: `R` is the key that says a command typed into a form may run.
+  const keys = (await listRows()).rows.filter((r) => r.key.startsWith('added/'));
+  ok(keys.length === 3 && keys.every((r) => !r.state.enabled), `the rows listed as ${JSON.stringify(keys.map((r) => [r.key, r.state.enabled]))}`);
+
+  const twice = await writeEntry(dir, { name: 'web', kind: 'service', cmd: 'npm start' }).then(() => null, (e: Error) => e);
+  ok(twice?.name === 'Refusal' && twice.message.includes('web'), `a name the manifest has said ${twice?.message ?? 'nothing'}`);
+});
+
+await check('a manifest the Factory makes gets its header, and the entry lands under it', async () => {
+  const dir = await repo('added-fresh', false);
+  await writeEntry(dir, { name: 'tick', kind: 'daemon', cmd: 'bun x tick', every: '90s' });
+  const text = await Bun.file(path.join(dir, '.factory', 'daemons.yaml')).text();
+  ok(text.startsWith('# ') && text.includes('tick:\n  kind: daemon\n  cmd: "bun x tick"\n  every: 90s\n'), `the new manifest reads\n${text}`);
+  ok((await readDaemons(dir)).entries[0]?.name === 'tick', `it did not read back: ${JSON.stringify(await readDaemons(dir))}`);
 });
 
 await check('a manifest that does not parse is one error line and no entries', async () => {

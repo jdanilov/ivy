@@ -10,7 +10,8 @@ import { partsPane, pending } from './panes/parts.js';
 import { daemonPane } from './panes/daemon.js';
 import { footPane } from './panes/foot.js';
 import { composeHeight, composePane, targetOf } from './panes/compose.js';
-import { SHAPE_FIELD, formOf, formPane, showsForm, showsParts } from './panes/form.js';
+import { focused, formPane, showsForm, showsParts } from './panes/form.js';
+import { intentForm } from './panes/intent.js';
 import { helpPane } from './panes/help.js';
 import { onKey, onPaste } from './keys.js';
 import { rowTail } from '../commands/daemon.js';
@@ -131,10 +132,10 @@ function header(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
 /** What each kind of row answers. The bar lists only these, so it never offers a key whose whole
  *  reply would be a toast saying the row is the wrong kind. */
 const ROW_KEYS: Record<LeftItem['kind'], string[]> = {
-  inbox: [], global: [], project: ['M', 'R', 'U'], mission: ['O', 'K', 'T', 'E'], session: ['K', 'R'],
-  daemon: ['R', 'X'],
+  inbox: [], global: [], project: ['M', 'R', 'U', 'P'], mission: ['O', 'K', 'T', 'E', 'P'], session: ['K', 'R', 'P'],
+  daemon: ['R', 'X', 'P'],
 };
-const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission'], ['U', 'Uninstall']];
+const ROW_PAIRS: string[][] = [['O', 'Open Tab'], ['K', 'Kill'], ['T', 'Autonomy'], ['E', 'Archive'], ['R', 'Rename'], ['M', 'New Mission'], ['U', 'Uninstall'], ['P', 'New Service']];
 
 /** A stub's autonomy is the form's dial, so `T` there answers with a toast and nothing else: the
  *  bar drops it, the way it lists Parts only where Parts is the pane. */
@@ -147,8 +148,14 @@ const rowKeys = (here: LeftItem): string[] =>
  *  on — and `X` is Stop and off. The log is the foot's, so `A` carries it and the bar does not. */
 function rowPairs(here: LeftItem): string[][] {
   if (here.kind !== 'daemon') return ROW_PAIRS.filter(([key]) => rowKeys(here).includes(key!));
-  const label: Record<string, string> = { R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop' };
+  const label: Record<string, string> = { R: here.daemon.entry.kind === 'daemon' ? 'Run' : 'Start', X: 'Stop', P: 'New Service' };
   return ROW_KEYS.daemon.map((key) => [key, label[key]!]);
+}
+
+/** The `←→` pair while a form has the keys: the dial's own word, or nothing on a text field. */
+function dialPair(ui: Ui, here: LeftItem): string[][] {
+  const field = focused(ui, here);
+  return field?.options ? [['←→', field.label.replace(/:$/, '')]] : [];
 }
 
 /** Keys read uppercase and are pressed either way; `?` is the first thing dropped when the
@@ -161,13 +168,15 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
   const pairs: string[][] =
     // The panel and the full foot each take the screen: their bars list what still answers.
     ui.input ? [['↵', 'Done'], ['Esc', 'Cancel']] :
-    ui.form ? [['⇥ ⇧↵', 'Field'], ['^S', 'Save'], ['←→', ui.intents[formOf(here)?.key ?? '']?.field === SHAPE_FIELD ? 'Shape' : 'Autonomy'], ['^U', 'Clear'], ['Esc', 'Leave']] :
+    // `←→` turns the dial the cursor is on and walks the text everywhere else, so the bar offers
+    // it only where it is a dial, and names that dial rather than a key the form may not have.
+    ui.form ? [['⇥ ⇧↵', 'Field'], ['^S', 'Save'], ...dialPair(ui, here), ['^U', 'Clear'], ['Esc', 'Leave']] :
     ui.compose ? [['⇧↵', 'Send'], ['⌥⌫', 'Word'], ['^K', 'Line'], ['^U', 'Clear']] :
     ui.help ? [['? Esc', 'Back'], ['Q', 'Quit']] :
     ui.size === 'full' ? [['↑↓', 'Scroll'], ['↵ Esc', 'Back'], ['Q', 'Quit']] :
     // `N` is on every left row and last of them: it is the one key that answers with a project
     // the list does not hold yet, so it reads after whatever the selected row itself does.
-    !right ? [['↑↓', 'Select'], ['↵', formOf(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
+    !right ? [['↑↓', 'Select'], ['↵', intentForm(here) !== null && here.kind === 'mission' ? 'Edit' : targetOf(here) ? 'Message' : 'Open'], ...rowPairs(here),
       ['N', 'New Project'], ['S', 'Show Archived'], ['Q', 'Quit'], ['?', 'Help']]
     : here.kind === 'inbox' ? [['↑↓', 'Select'], ['← Esc', 'Back'], ['Q', 'Quit'], ['?', 'Help']]
     : parts && ui.confirm ? [['Y', 'Confirm'], ['N', 'Cancel'], ['Esc', 'Back'], ['Q', 'Quit']]
@@ -183,8 +192,13 @@ function keyBar(p: Pane, snap: Snapshot, here: LeftItem, ui: Ui): void {
     list.flatMap(([key, label]) => [[`${key} `, C.bright], [`${label}  `, C.dim]] as Cell[]);
   // The two settings sit at the bar's right end: what `L` and `C` turn, beside the keys that turn it.
   const settings: Cell[] = [...launchCells(snap), ...caffeinateCells(snap)];
-  const full = cells(pairs);
-  p.row(spread(len(full) + len(settings) <= p.width ? full : cells(pairs.filter(([key]) => key !== '?')), settings, p.width));
+  // The bar narrows as a row's own keys grow, and only ever loses the two it can: `?`, whose
+  // panel lists every key anyway, then `S`, which only hides rows. What the row answers and what
+  // the settings say are why the bar is there, so neither is ever the thing that goes.
+  const room = p.width - len(settings);
+  const fit = (drop: string[]): Cell[] => cells(pairs.filter(([key]) => !drop.includes(key!)));
+  const narrow = [[], ['?'], ['?', 'S']].map(fit);
+  p.row(spread(narrow.find((row) => len(row) <= room) ?? narrow.at(-1)!, settings, p.width));
 }
 
 // ── render ────────────────────────────────────────────────────────────────────

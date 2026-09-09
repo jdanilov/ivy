@@ -34,14 +34,16 @@ src/           CLI source (entry: src/cli.ts)
 │              archive), decision (decisions.md table, waits, first answer wins),
 │              spawn (preset, the mission's settings overlay, the Warp tab: `claude` in it, or `claude --bg` and attach),
 │              daemons (the daemons.yaml manifest, durations, cadence, the contract's verdict, state
-│              and log files, rows), supervisor (the one loop per machine: due runs, services,
+│              and log files, rows, the one entry `P` appends), supervisor (the one loop per machine: due runs, services,
 │              requests, adopt, watch, rotate), platform (the two OS adapters: idle time, the unit file)
 ├── ui/        Presentation — theme, prompts, formatters
 ├── tui/       Mission Control — model (Snapshot), live (snapshot from disk), transcript (tail,
 │              activity, tokens), watch (fs.watch + poll), screen (chrome + render + run), keys
 │              (what a keypress does), panes/ (pane scaffolding plus left, messages, mission,
-│              parts, foot, compose, daemon, help — one file each, none over 400 lines), actions (what a key
-│              writes, through the CLI's own functions), notify, frames, format, theme
+│              parts, foot, compose, daemon, help, form — the engine both forms are drawn and
+│              walked by — with intent and service its two field definitions — one file each,
+│              none over 400 lines), actions (what a key writes, through the CLI's own functions),
+│              notify, frames, format, theme
 ├── commands/  install, uninstall, status, update, mission, step, gate, decision, handoff, control,
 │              daemon (list, status, run, stop, log), supervisor (start, stop, status, install, uninstall)
 └── types.ts   Shared type definitions

@@ -2,9 +2,9 @@ import { BoxRenderable, TextRenderable, type CliRenderer } from '@opentui/core';
 import { C } from '../theme.js';
 import { line, type Cell } from '../format.js';
 import { home } from '../../core/projects.js';
-import type { Autonomy, DaemonRow, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
+import type { DaemonRow, Mission, Project, ScopeChoice, Session, Snapshot } from '../model.js';
 import type { Draft } from './compose.js';
-import type { Shape } from './form.js';
+import type { FormDraft, FormKind } from './form.js';
 
 /**
  * What every pane shares: the Ui state it reads, the rows the left column lists — one of which the
@@ -40,27 +40,16 @@ export interface Ui {
   /** The keys are the message box's; the drafts stay by row whether or not they are. */
   compose: boolean;
   drafts: Record<string, Draft>;
-  /** The keys are the intent form's. */
-  form: boolean;
+  /** Which form has the keys — the mission's intent, or a project's new daemon or service —
+   *  and null while neither is being filled in. */
+  form: FormKind | null;
   /** The first row of the form drawn under its fixed header, the way `top` scrolls the left list:
    *  every field draws all its lines and the pane is what moves to keep the cursor on screen. */
   formTop: number;
-  /** One intent draft per row, kept like a message draft: a stub row by its own key, a new
-   *  mission under `new <project>`, so a project row shows what has been typed for it. */
-  intents: Record<string, IntentDraft>;
-}
-
-/** The intent form's own state: a draft per field, the dial, and which field has the cursor. */
-export interface IntentDraft {
-  name: Draft;
-  goal: Draft;
-  done: Draft;
-  extra: Draft;
-  autonomy: Autonomy;
-  /** The Shape dial: `auto` leaves the graph to the Orchestrator, a name is that preset's graph. */
-  shape: Shape;
-  /** Indexes the editable order `name goal done extra autonomy shape`. */
-  field: number;
+  /** One form draft per row, kept like a message draft: a stub row by its own key, a new mission
+   *  under `new <project>` and a new entry under `svc <project>`, so a project row shows what has
+   *  been typed for it. */
+  forms: Record<string, FormDraft>;
 }
 
 export function newUi(): Ui {
@@ -68,7 +57,7 @@ export function newUi(): Ui {
     focus: 'left', left: 0, top: 0, msg: 0, part: 0, toggles: {}, confirm: false, size: 'third',
     scroll: 0, help: false, foot: 'activity', seen: { at: '', foot: null, decisions: 0, activity: 0 },
     showArchived: false, toast: null, input: null, compose: false, drafts: {},
-    form: false, formTop: 0, intents: {},
+    form: null, formTop: 0, forms: {},
   };
 }
 

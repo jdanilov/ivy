@@ -49,6 +49,12 @@ recipes:
       # anything but `y` and the assertion is that nothing happened.
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' --expect 'U Uninstall' --expect 'N New Project'
       - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' u type:n return --expect 'kept'
+      # The service form: `p` opens it on the project row and `^S` refuses the first field that is
+      # empty by name. The refusal is the assertion again — a `cmd` typed here would land in this
+      # checkout's own committed manifest — and `x` in the name is what gets it past the slug rule.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 --row 'p ivy' p type:x C-s --expect 'cmd'
+      # The panel: what a human who has read no doc opens first.
+      - bun scripts/tui-keys.ts --fixture --quiet --wait 20 '?' --expect 'HOW TO USE'
       - bun scripts/hook-inject.ts
     # Its own recipe, not part of `run`: the one check that spends a real model run.
     spawn:

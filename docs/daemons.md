@@ -37,6 +37,14 @@ config flags and the state folder with it.
 A file that does not parse, or an entry missing a field, costs that project its rows and nothing
 else: one error naming the entry and the field, one dim line under the project, never a throw.
 
+**From the screen.** `P` on any of a project's rows opens the SERVICE form — a `Kind` dial and
+that kind's own fields, @docs/design.md — and `^S` appends one entry to this file, made with a
+one-line header when the project has none. Nothing already in it is rewritten: the comments, the
+order and the fields a human put there are theirs, and a round trip through the parser would drop
+every one of them. The entry arrives off, so what a form typed cannot run until `R` says it may;
+a name the file already has is refused rather than merged, because two entries under one name is
+a manifest that no longer parses.
+
 ## The contract
 
 Nothing is asked of a script but its exit code and, if it has something to say, its last stdout
@@ -104,8 +112,9 @@ Every key is one call into @src/commands/daemon.ts, the same call the subcommand
 | `A`     | the log in the foot, its alert acknowledged               | `factory daemon log <key> [-f] [-n N]` |
 | `↵`     | DAEMON, or SERVICE: the entry and the last result          | `factory daemon status <key>`        |
 
-`l` is the Log here and nowhere else: every other row still turns Launch, and the key bar says so.
-`factory daemon list [project]` prints the rows themselves.
+`l` is Launch on every row, this one included: the log is the foot's and `A` is what draws it.
+`factory daemon list [project]` prints the rows themselves. `P` is the one key here with no twin:
+it writes the project's manifest, where the CLI's answer is an editor.
 
 ## The supervisor
 

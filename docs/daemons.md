@@ -28,7 +28,7 @@ config flags and the state folder with it.
 | `env`         | both    | Laid over the supervisor's own environment. Scalars only — quote a port.       |
 | `every`       | daemon  | Required. `90s`, `20m`, `3h`, `1d`.                                           |
 | `atMost`      | daemon  | `N/window`, `1/24h`. Successes only.                                          |
-| `when`        | daemon  | `any` (default), `active`, `idle`. The line is 90 min without input.          |
+| `when`        | daemon  | `any` (default), `active`, `idle`. Active is input in 90 min, display awake.  |
 | `timeout`     | daemon  | Kills the run's process group and files it failed, summary `timeout`.         |
 | `run`         | service | `detached` (default) or `tab`.                                                |
 | `restart`     | service | `never` (default), `on-failure`, `always`.                                    |
@@ -58,7 +58,9 @@ JSON is that text itself, clipped to 80 cells. The rest of what it prints is its
 answer. `every` gates on the last completed run of **any** status: a failure does not retry in a
 tight loop, and a tick missed to sleep or to a downed supervisor is due at once, once, after which
 the cadence resumes. `atMost` is a second window, over successes only; `when` reads idle time
-through one adapter per OS, and an OS with neither is always active; a row with a pid is never due.
+through one adapter per OS, and an OS with neither is always active. On macOS a display asleep
+reads idle whatever the last input was: a dark or a notification wake lasts seconds, and a run it
+started has the Mac sleep under it; a row with a pid is never due.
 `next` is the later of `lastEnd + every` and the window's oldest success plus the window. The loop
 wakes every 30 s and on a file change, so a cadence under 30 s is in practice 30 s. `daemon run`
 and `R` bypass all three gates, and turn the row on: Run is the only way on.

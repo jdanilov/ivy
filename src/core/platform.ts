@@ -18,9 +18,15 @@ async function out(cmd: string[]): Promise<string> {
   }
 }
 
-/** Seconds since the last human input. An OS with no adapter reads 0: always active. */
+/** Asked of the window server, which knows what a dark or a notification wake never does: light a screen. */
+const ASLEEP = 'ObjC.import("CoreGraphics"); $.CGDisplayIsAsleep($.CGMainDisplayID())';
+
+/** Seconds since the last human input at a lit screen. A display asleep is nobody there, whatever
+ *  the last input says: a run started on a 30 s wake has the Mac sleep under it. An OS with no
+ *  adapter reads 0: always active. */
 export async function idleSeconds(): Promise<number> {
   if (process.platform === 'darwin') {
+    if ((await out(['osascript', '-l', 'JavaScript', '-e', ASLEEP])).trim() === '1') return Infinity;
     const ns = /"HIDIdleTime"\s*=\s*(\d+)/.exec(await out(['ioreg', '-c', 'IOHIDSystem', '-d', '4']))?.[1];
     return ns === undefined ? 0 : Number(ns) / 1e9;
   }

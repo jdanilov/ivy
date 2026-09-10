@@ -189,7 +189,7 @@ const ivyDaemons: DaemonRow[] = [
     entry: { kind: 'daemon', name: 'nightly', description: 'nightly build and typecheck', cmd: 'bun run build', every: 1 * D, when: 'any' },
     state: {
       enabled: true, lastStart: iso(9 * H), lastEnd: iso(9 * H - 40 * 1000), lastStatus: 'fail',
-      lastSummary: 'build: exit 2', nextDue: iso(-15 * H), alert: 'run failed: build: exit 2',
+      lastSummary: 'build: exit 2', nextDue: iso(-15 * H), alert: 'last run failed: build: exit 2',
     },
     log: [
       '── 2026-09-09T01:00:00.000Z run',
@@ -342,7 +342,7 @@ const inbox: InboxItem[] = [
   // Stamped from the clock, like the row it belongs to: the two must not read different ages.
   {
     kind: 'daemon', project: 'ivy', origin: 'nightly', label: 'alert', at: Date.now() - 9 * H,
-    answer: 'factory daemon log ivy/nightly', text: 'run failed: build: exit 2',
+    answer: 'factory daemon log ivy/nightly', text: 'last run failed: build: exit 2',
     body: ivyDaemons[1]!.log,
   },
 ];

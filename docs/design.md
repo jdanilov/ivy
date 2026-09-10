@@ -112,11 +112,13 @@ last row     ──────────────────────�
 - A project's daemons and services sit in the same list, over its missions and its sessions, and
   not in a block of their own: what the project runs by itself is what a glance is for, and those
   rows are the ones that never move. The glyph is the kind, `↻` a daemon and `▶` a service, and
-  the colour is the state — warning amber once a run failed or an alert is waiting, read before
-  dim off so a service the supervisor turned off for dying is not a dim row, then bright on and
-  accent orange while a pid is set. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
+  the colour is the state — accent orange while a pid is set, whatever the last run said, the
+  colour a running mission and a busy session wear; then warning amber once a run failed or an
+  alert is waiting, read before dim off so a service the supervisor turned off for dying is not a
+  dim row; bright on otherwise. The tail is `factory daemon list`'s own, so the two surfaces read alike: a daemon
   `every 3h · last ✓ 2h ago · next 1h`, `last ✗ post: exit 2 9h ago`, `last ○ nothing pending 1h
-  ago` or `never`; a service `pid 4123 · up 3h · :3060`, `stopped`, or `✗ died 1` — a stopped row
+  ago` or `never`, and `every 3h · running 4m` alone while a run is in flight — the last run is
+  the pane's to tell; a service `pid 4123 · up 3h · :3060`, `stopped`, or `✗ died 1` — a stopped row
   wears its alert's own words — and `tab→detached` on the end where the tab could not be opened.
   A manifest that does not parse costs the project its rows and draws one dim
   `daemons.yaml: <error>` line instead.
@@ -161,8 +163,9 @@ pane does not repeat it.
 
 DAEMON, or SERVICE on a service, is the manifest entry and what the supervisor wrote about it:
 `cmd`, `cwd`, `env`, then `every` with its `atMost`, `when` and `timeout`, or `run` with its
-restart policy and port; then `pid`, `last` as a glyph, its summary and how long ago, `next`, and
-`alert` in warning. The facts and nothing else: the log is the foot's, where it has the width of
+restart policy and port; then `state`, `running` with its pid and how long, or a service's
+`stopped`; `last run` as a glyph, its summary and how long ago, `next`, and `alert` in warning —
+`last run failed: stopped`, so an alert beside a live pid never reads as the run in flight. The facts and nothing else: the log is the foot's, where it has the width of
 the screen and the sizes every foot pane has.
 
 The bar is also the one line the screen takes a name on. `R` asks for one there — the label, what

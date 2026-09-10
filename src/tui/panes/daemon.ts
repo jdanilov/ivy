@@ -36,13 +36,15 @@ function facts(row: DaemonRow): Cell[][] {
       `when ${e.when}`, e.timeout && `timeout ${short(e.timeout)}`]), C.bright]])
     : fact('run', [[join([e.run, `restart ${e.restart}`, e.port && `port ${e.port}`, s.tabFallback && 'tab→detached']), C.bright]]));
 
+  // What it is doing now, then what the last run did: an alert beside a live pid is about the last.
   if (s.pid !== undefined) {
-    out.push(fact('pid', [[String(s.pid), C.accent], [s.startedAt ? ` · up ${short(Date.now() - Date.parse(s.startedAt))}` : '', C.dim]]));
-  } else if (e.kind === 'service') out.push(fact('pid', [['stopped', C.dim]]));
+    const since = s.startedAt ?? s.lastStart;
+    out.push(fact('state', [['running', C.accent], [` · ${join([`pid ${s.pid}`, since && `up ${short(Date.now() - Date.parse(since))}`])}`, C.dim]]));
+  } else if (e.kind === 'service') out.push(fact('state', [['stopped', C.dim]]));
 
   if (s.lastStatus) {
     const said = join([s.lastSummary, s.lastEnd && ago(Date.parse(s.lastEnd))]);
-    out.push(fact('last', [[`${GLYPH[s.lastStatus]} ${s.lastStatus}`, STATUS[s.lastStatus]], [said && ` · ${said}`, C.dim]]));
+    out.push(fact('last run', [[`${GLYPH[s.lastStatus]} ${s.lastStatus}`, STATUS[s.lastStatus]], [said && ` · ${said}`, C.dim]]));
   }
   if (s.nextDue !== undefined && s.pid === undefined) {
     out.push(fact('next', [[short(Math.max(0, Date.parse(s.nextDue) - Date.now())), C.bright]]));

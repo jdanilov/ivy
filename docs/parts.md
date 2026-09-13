@@ -12,7 +12,7 @@ description: one line
 scope: project       # optional, project | global — the recommendation; config.yaml overrides it
 default: true        # preselected in the install menu
 files:
-  - source: skill.md         # relative to the part folder
+  - source: SKILL.md         # relative to the part folder
   - source: agents/Verifier.md
   - source: sounds/          # a directory, expanded at load to every file under it
   - source: terminology.md   # a template

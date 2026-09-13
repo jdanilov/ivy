@@ -34,6 +34,14 @@ async function ours(targetPath: string, manifestHash?: string, sourcePath?: stri
   return sourcePath !== undefined && hash === (await hashFile(sourcePath));
 }
 
+/** The entry that names targetPath on disk: on a case-insensitive filesystem it may differ from the name asked for. */
+async function storedName(targetPath: string): Promise<string | undefined> {
+  const want = path.basename(targetPath);
+  const entries = await readdir(path.dirname(targetPath)).catch(() => [] as string[]);
+  if (entries.includes(want)) return want;
+  return entries.find((e) => e.toLowerCase() === want.toLowerCase());
+}
+
 /**
  * Puts the part's files in place as copies, so the project stands on its own and the manifest is
  * the only link back to the Factory. Names the files that held something neither the manifest nor
@@ -76,6 +84,12 @@ export async function copyPart(
       // A legacy install left a link into the Factory here, and writing through it edits the source.
       // Only a link is unlinked: any other file Bun.write replaces where it is.
       if (at.isSymbolicLink()) await unlink(targetPath);
+      else {
+        // A case-only rename (skill.md → SKILL.md) on a case-insensitive filesystem would keep the old
+        // name on write, so the old entry goes first.
+        const stored = await storedName(targetPath);
+        if (stored !== undefined && stored !== path.basename(targetPath)) await unlink(path.join(path.dirname(targetPath), stored));
+      }
     }
 
     await Bun.write(targetPath, Bun.file(sourcePath));
@@ -237,6 +251,8 @@ export async function removePartFiles(
     const source = entry.sources?.[file];
 
     if (!(await lstat(targetPath).catch(() => null))) continue;
+    // On a case-insensitive filesystem a dropped skill.md resolves to the SKILL.md that replaced it.
+    if ((await storedName(targetPath)) !== path.basename(targetPath)) continue;
     if (!(await ours(targetPath, entry.hashes[file], source && path.join(factoryRoot, source)))) {
       left.push(file);
       continue;

@@ -122,13 +122,13 @@ const authDecisions = decisions([
 ]);
 
 const partFiles: Record<string, string[]> = {
-  archify: ['.claude/skills/archify/skill.md', '.claude/skills/archify/template.html'],
-  mission: ['.claude/skills/mission/skill.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md'],
+  archify: ['.claude/skills/archify/SKILL.md', '.claude/skills/archify/template.html'],
+  mission: ['.claude/skills/mission/SKILL.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md'],
 };
 
 const part = (name: string, type: string, description: string, status: PartRow['status'] = 'installed',
   scope: ScopeChoice = 'project', recommended: Scope = 'project'): PartRow =>
-  ({ name, type, description, status, scope, recommended, files: partFiles[name] ?? [`.claude/skills/${name}/skill.md`] });
+  ({ name, type, description, status, scope, recommended, files: partFiles[name] ?? [`.claude/skills/${name}/SKILL.md`] });
 
 const ivyParts: PartRow[] = [
   part('archify', 'skill', 'architecture diagrams from a typed spec, html and svg', 'not-installed'),

@@ -3,5 +3,5 @@ description: structured git commits (sonnet)
 scope: global
 default: true
 files:
-  - source: skill.md
+  - source: SKILL.md
   - source: agents/Commit.md

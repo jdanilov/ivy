@@ -3,7 +3,7 @@ description: web research via Grok
 scope: global
 default: true
 files:
-  - source: skill.md
+  - source: SKILL.md
   - source: scripts/research.ts
 envVars:
   - name: XAI_API_KEY

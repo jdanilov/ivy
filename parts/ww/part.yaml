@@ -1,0 +1,6 @@
+type: skill
+description: rephrase the last reply in plain English, no jargon
+scope: global
+default: true
+files:
+  - source: SKILL.md

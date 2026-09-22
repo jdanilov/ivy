@@ -1,0 +1,7 @@
+type: skill
+description: review finished work for DRY, KISS, YAGNI, SoC, bloat and regressions (fable)
+scope: global
+default: true
+files:
+  - source: SKILL.md
+  - source: agents/Check.md

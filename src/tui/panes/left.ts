@@ -55,14 +55,15 @@ function sessionRow(width: number, s: Session, selected: boolean, focused: boole
   return rowCells(width, left, [[state, C.dim]], selected, focused);
 }
 
-/** Warning once something failed, dim while it is off, accent while it runs: the colour is the
- *  state, the glyph the kind — the same reading `factory daemon list` gives the same row. The
- *  failure reads first, so a service the supervisor turned off for dying is not a dim row. */
+/** Accent while it runs, whatever the last run said — the colour a running mission and a busy
+ *  session wear — then warning once something failed, then dim off: the colour is the state, the
+ *  glyph the kind, the same reading `factory daemon list` gives the same row. The failure reads
+ *  before off, so a service the supervisor turned off for dying is not a dim row. */
 export function daemonColor(d: DaemonRow): string {
   const s = d.state;
+  if (s.pid !== undefined) return C.accent;
   if (s.alert !== undefined || s.lastStatus === 'fail') return C.warning;
-  if (!s.enabled) return C.dim;
-  return s.pid === undefined ? C.bright : C.accent;
+  return s.enabled ? C.bright : C.dim;
 }
 
 /** A daemon sits in the project's list above its missions: the kind in the glyph, what it does

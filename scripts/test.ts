@@ -44,7 +44,7 @@ const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
 const { due, enabledOf, listRows, parseAtMost, parseDuration, plainLine, readLogTail, readManifest: readDaemons, readState: readRow, verdict, writeEntry, writeState: writeRow } = await import('../src/core/daemons.js');
 const { startSupervisor, stopSupervisor, supervisorPid } = await import('../src/core/supervisor.js');
-const { colourOf, readLog, runNow, stopRow } = await import('../src/commands/daemon.js');
+const { colourOf, readLog, rowTail, runNow, stopRow } = await import('../src/commands/daemon.js');
 
 let failed = 0;
 const ok = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
@@ -1269,6 +1269,17 @@ await check('a row that failed reads warning on both surfaces, off or not', asyn
 
   const quiet = { ...dead, state: { enabled: false } };
   ok(daemonColor(quiet) === C.dim && colourOf(quiet) === colors.dim, 'an off row with nothing to say is not dim');
+});
+
+await check('a run in flight reads running on both surfaces, whatever the last run said', async () => {
+  const { daemonColor } = await import('../src/tui/panes/left.js');
+  const { C } = await import('../src/tui/theme.js');
+  const { colors } = await import('../src/ui/theme.js');
+  const entry = { kind: 'daemon' as const, name: 'cws', cmd: 'true', every: 3 * 3_600_000, when: 'any' as const };
+  const state = { enabled: true, pid: 4123, lastStart: new Date().toISOString(), lastStatus: 'fail' as const, lastSummary: 'stopped', alert: 'last run failed: stopped' };
+  const row = { key: 'bots/cws', project: '/tmp/bots', entry, state };
+  ok(daemonColor(row) === C.accent && colourOf(row) === colors.cyan, `a running row after a failure drew ${daemonColor(row)}, not accent`);
+  ok(rowTail(row) === 'every 3h · running 0s', `a running row's tail read "${rowTail(row)}"`);
 });
 
 // ── the supervisor, on the scratch HOME and one scratch project ──────────────

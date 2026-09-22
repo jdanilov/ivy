@@ -1,5 +1,5 @@
 export interface PartFile {
-  source: string;   // relative to the Factory root (e.g., "parts/commit/skill.md")
+  source: string;   // relative to the Factory root (e.g., "parts/commit/SKILL.md")
   target: string;   // relative to the target project root
   /** Template file: install it only when the project has nothing there yet. */
   skipIfExists?: boolean;

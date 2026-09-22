@@ -122,13 +122,13 @@ const authDecisions = decisions([
 ]);
 
 const partFiles: Record<string, string[]> = {
-  archify: ['.claude/skills/archify/skill.md', '.claude/skills/archify/template.html'],
-  mission: ['.claude/skills/mission/skill.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md'],
+  archify: ['.claude/skills/archify/SKILL.md', '.claude/skills/archify/template.html'],
+  mission: ['.claude/skills/mission/SKILL.md', '.claude/agents/Worker.md', '.claude/agents/Investigator.md', '.claude/agents/Summarizer.md'],
 };
 
 const part = (name: string, type: string, description: string, status: PartRow['status'] = 'installed',
   scope: ScopeChoice = 'project', recommended: Scope = 'project'): PartRow =>
-  ({ name, type, description, status, scope, recommended, files: partFiles[name] ?? [`.claude/skills/${name}/skill.md`] });
+  ({ name, type, description, status, scope, recommended, files: partFiles[name] ?? [`.claude/skills/${name}/SKILL.md`] });
 
 const ivyParts: PartRow[] = [
   part('archify', 'skill', 'architecture diagrams from a typed spec, html and svg', 'not-installed'),
@@ -189,7 +189,7 @@ const ivyDaemons: DaemonRow[] = [
     entry: { kind: 'daemon', name: 'nightly', description: 'nightly build and typecheck', cmd: 'bun run build', every: 1 * D, when: 'any' },
     state: {
       enabled: true, lastStart: iso(9 * H), lastEnd: iso(9 * H - 40 * 1000), lastStatus: 'fail',
-      lastSummary: 'build: exit 2', nextDue: iso(-15 * H), alert: 'run failed: build: exit 2',
+      lastSummary: 'build: exit 2', nextDue: iso(-15 * H), alert: 'last run failed: build: exit 2',
     },
     log: [
       '── 2026-09-09T01:00:00.000Z run',
@@ -342,7 +342,7 @@ const inbox: InboxItem[] = [
   // Stamped from the clock, like the row it belongs to: the two must not read different ages.
   {
     kind: 'daemon', project: 'ivy', origin: 'nightly', label: 'alert', at: Date.now() - 9 * H,
-    answer: 'factory daemon log ivy/nightly', text: 'run failed: build: exit 2',
+    answer: 'factory daemon log ivy/nightly', text: 'last run failed: build: exit 2',
     body: ivyDaemons[1]!.log,
   },
 ];

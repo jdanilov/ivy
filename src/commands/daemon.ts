@@ -106,23 +106,25 @@ export function rowTail(row: Row): string {
     const up = s.startedAt ? `up ${short(Date.now() - Date.parse(s.startedAt))}` : '';
     return [`pid ${s.pid}`, up, row.entry.port ? `:${row.entry.port}` : '', s.tabFallback ? 'tab→detached' : ''].filter(Boolean).join(' · ');
   }
+  const every = `every ${short(row.entry.every)}`;
+  // A run in flight is the row's whole news: what the last one did is the pane's to say.
+  if (s.pid !== undefined) return `${every} · running${s.lastStart ? ` ${short(Date.now() - Date.parse(s.lastStart))}` : ''}`;
   const last = s.lastStatus === undefined || s.lastEnd === undefined ? 'never'
     : `last ${GLYPH[s.lastStatus]} ${s.lastStatus === 'ok' ? '' : `${s.lastSummary ?? ''} `}${short(Date.now() - Date.parse(s.lastEnd))} ago`;
-  const next = s.pid !== undefined ? 'running'
-    : s.nextDue === undefined ? '' : `next ${short(Math.max(0, Date.parse(s.nextDue) - Date.now()))}`;
-  return [`every ${short(row.entry.every)}`, last, next].filter(Boolean).join(' · ');
+  const next = s.nextDue === undefined ? '' : `next ${short(Math.max(0, Date.parse(s.nextDue) - Date.now()))}`;
+  return [every, last, next].filter(Boolean).join(' · ');
 }
 
 const glyphOf = (row: Row): string => (row.entry.kind === 'daemon' ? '↻' : '▶');
 
-/** Warning after a failure, then dim off, accent while it runs: the colours the TUI row uses.
- *  The failure reads first because a service the supervisor turned off for dying is an off row
- *  the human still has to look at, and a dim one says nothing happened. */
+/** Running first, whatever the last run said, then warning after a failure, then dim off: the
+ *  colours the TUI row uses. The failure reads before off because a service the supervisor turned
+ *  off for dying is an off row the human still has to look at, and a dim one says nothing happened. */
 export function colourOf(row: Row): string {
   const s = row.state;
+  if (s.pid !== undefined) return colors.cyan;
   if (s.alert !== undefined || s.lastStatus === 'fail') return colors.yellow;
-  if (!s.enabled) return colors.dim;
-  return s.pid === undefined ? colors.green : colors.cyan;
+  return s.enabled ? colors.green : colors.dim;
 }
 
 async function list(project?: string): Promise<void> {

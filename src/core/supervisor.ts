@@ -215,7 +215,7 @@ async function runDaemon(row: Row & { entry: Daemon }): Promise<void> {
     const successes = (result.status === 'ok' ? [...(state.successes ?? []), iso()] : state.successes ?? []).slice(-20);
     const settled = { ...state, pid: undefined, lastEnd: iso(), successes };
     await writeState(key, { ...settled, lastStatus: result.status, lastSummary: result.summary,
-      nextDue: iso(due(entry, settled, Date.now(), 0).next), alert: result.status === 'fail' ? `run failed: ${result.summary}` : undefined });
+      nextDue: iso(due(entry, settled, Date.now(), 0).next), alert: result.status === 'fail' ? `last run failed: ${result.summary}` : undefined });
   } finally {
     if (timer) clearTimeout(timer);
     runs.delete(key);

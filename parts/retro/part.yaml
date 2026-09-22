@@ -2,6 +2,6 @@ type: skill
 description: sweep closed missions' retro.md into one table the human answers (opus)
 default: true
 files:
-  - source: skill.md
+  - source: SKILL.md
 requires:
   - mission

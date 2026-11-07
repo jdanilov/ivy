@@ -63,8 +63,8 @@ List the entities, their fields and states, and who owns each. Then look for:
 Terse. Fragments fine, facts exact. No preamble.
 
 `Domain model`: indented glyph diagram (`●` entity, `≋` store, `→` owns/calls), current state with
-`✗` on smells, then the proposed model with `±` on changes. Then a `Terms` table: term, meaning,
-avoid-words.
+`✗` on smells, then the proposed model with `±` on changes. Then `Terms`, one bullet each:
+`**term**: meaning. _Avoid_: synonyms.`
 
 `Cuts`, ranked by (lines saved + coupling removed) ÷ risk:
 

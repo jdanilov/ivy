@@ -47,9 +47,11 @@ One cut at a time, `safe` first:
 
 ## 5. Terms
 
-Write the agreed terms to the project terminology: `docs/terminology.md`, else `GLOSSARY.md`.
-Neither exists: ask before creating `docs/terminology.md` as a `Term | Meaning | Avoid` table, and
-link it from the agent file's `## Important Files`. Terms only, no implementation notes.
+Write the agreed terms to the project terminology: `docs/terminology.md`, else `GLOSSARY.md`. One
+section per feature or area, one bullet per term: `**term**: what it is. _Avoid_: synonyms.` Terms
+only, no implementation notes. Neither file exists: ask before creating `docs/terminology.md`, open
+it with a line saying it is maintained ad hoc (sections added as features settle, not a full
+glossary), fill only the reviewed area, and link it from the agent file's `## Important Files`.
 
 ## 6. Report
 

@@ -118,10 +118,10 @@ const main = await repo('main');
 
 await check('install --yes copies, snippets and records every source', async () => {
   await install(main, true);
-  ok(await exists(path.join(main, '.claude/skills/mission/skill.md')), 'no mission skill');
+  ok(await exists(path.join(main, '.claude/skills/mission/SKILL.md')), 'no mission skill');
   ok((await Bun.file(path.join(main, 'AGENTS.md')).text()).includes('@.claude/docs-format.md'), 'no snippet');
   const manifest = await readManifest(main);
-  ok(manifest?.parts.mission?.sources?.['.claude/skills/mission/skill.md'] === 'parts/mission/skill.md', 'no source recorded');
+  ok(manifest?.parts.mission?.sources?.['.claude/skills/mission/SKILL.md'] === 'parts/mission/SKILL.md', 'no source recorded');
   ok(!manifest?.parts.commit, 'a global part landed in a project');
 
   // Nothing the project keeps may point back at this checkout: a plain file is the whole contract.
@@ -475,9 +475,9 @@ await check('writeSnippet and removeSnippet round trip', async () => {
 });
 
 await check('update replaces a link into the Factory with a copy and leaves the source alone', async () => {
-  const file = '.claude/skills/mission/skill.md';
+  const file = '.claude/skills/mission/SKILL.md';
   const target = path.join(main, file);
-  const source = path.join(FACTORY_ROOT, 'parts/mission/skill.md');
+  const source = path.join(FACTORY_ROOT, 'parts/mission/SKILL.md');
   const before = await hashFile(source);
 
   await unlink(target);
@@ -490,7 +490,7 @@ await check('update replaces a link into the Factory with a copy and leaves the 
 });
 
 await check('an edited copy reads modified and update restores it by name', async () => {
-  const file = '.claude/skills/mission/skill.md';
+  const file = '.claude/skills/mission/SKILL.md';
   const target = path.join(main, file);
   const source = await Bun.file(target).text();
   await writeFile(target, source + '\nedited by the project\n');
@@ -506,21 +506,21 @@ await check('an edited copy reads modified and update restores it by name', asyn
 await check('uninstall leaves an edited copy, names it and removes the rest', async () => {
   const dir = await repo('edited');
   await install(dir, false, ['verify']);
-  const mine = path.join(dir, '.claude/skills/verify/skill.md');
+  const mine = path.join(dir, '.claude/skills/verify/SKILL.md');
   await writeFile(mine, 'mine now\n');
 
   // The report's removal block only: the listing above it names every file the part ships.
   const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
   ok(await exists(mine), 'uninstall took a copy the project had edited');
-  ok(report.includes('left in place: .claude/skills/verify/skill.md'), `uninstall did not name it: ${report}`);
-  ok(report.split('.claude/skills/verify/skill.md').length === 2, `a file was named both removed and left: ${report}`);
+  ok(report.includes('left in place: .claude/skills/verify/SKILL.md'), `uninstall did not name it: ${report}`);
+  ok(report.split('.claude/skills/verify/SKILL.md').length === 2, `a file was named both removed and left: ${report}`);
   ok(!(await exists(path.join(dir, '.claude/agents/Verifier.md'))), 'an untouched copy was left behind');
 });
 
 await check('uninstall takes no credit for a part it left where it was', async () => {
   const dir = await repo('kept');
   await install(dir, false, ['verify']);
-  const files = ['.claude/skills/verify/skill.md', '.claude/agents/Verifier.md'];
+  const files = ['.claude/skills/verify/SKILL.md', '.claude/agents/Verifier.md'];
   for (const file of files) await writeFile(path.join(dir, file), 'mine now\n');
 
   const report = (await printed(() => uninstall(dir, true))).split('Uninstalling')[1]!;
@@ -548,7 +548,7 @@ await check('a directory at a target is the project\'s: refused on the way in, n
 await check('install names an edited copy it had to restore when nobody was asked', async () => {
   const dir = await repo('clobber');
   await install(dir, false, ['verify']);
-  const file = '.claude/skills/verify/skill.md';
+  const file = '.claude/skills/verify/SKILL.md';
   await writeFile(path.join(dir, file), 'mine now\n');
 
   const report = await printed(() => install(dir, false, ['verify']));
@@ -917,11 +917,12 @@ await check('update --all walks every registered project and then the home dir',
 
 await check('global parts install into the home dir and come back out', async () => {
   const home = process.env.HOME!;
+  const globals = 'check,commit,explain,hook-safe-bash,permissions,research,trim,ww';
   await install(home, true);
   const manifest = await readManifest(home);
-  ok(Object.keys(manifest!.parts).sort().join() === 'commit,explain,hook-safe-bash,permissions,research',
+  ok(Object.keys(manifest!.parts).sort().join() === globals,
     `the home manifest holds ${Object.keys(manifest?.parts ?? {}).join()}`);
-  ok(await exists(path.join(home, '.claude/skills/commit/skill.md')), 'no commit skill under the home dir');
+  ok(await exists(path.join(home, '.claude/skills/commit/SKILL.md')), 'no commit skill under the home dir');
 
   const settings = (await Bun.file(path.join(home, '.claude/settings.json')).json()) as Record<string, any>;
   ok(JSON.stringify(settings.hooks).includes('$HOME/.claude/scripts/safe-bash.sh'), '${root} did not resolve to $HOME');
@@ -947,7 +948,7 @@ await check('global parts install into the home dir and come back out', async ()
 
   // `update --global` refreshes the home dir without ever reaching for a project part.
   await update(home);
-  ok(Object.keys((await readManifest(home))!.parts).length === 5, 'update --global changed the home manifest');
+  ok(Object.keys((await readManifest(home))!.parts).sort().join() === globals, 'update --global changed the home manifest');
 
   await uninstall(home, true);
   ok(!(await exists(path.join(home, '.claude'))), 'uninstall left the home .claude behind');
@@ -1012,7 +1013,7 @@ await check('a snippet or recipes keeps a part out of global, whatever the confi
 await check('update drops a part the config turned off', async () => {
   const home = process.env.HOME!;
   await install(home, false, ['research']);
-  const skill = path.join(home, '.claude/skills/research/skill.md');
+  const skill = path.join(home, '.claude/skills/research/SKILL.md');
   ok(await exists(skill), 'research never reached the home dir');
 
   await withConfig(`${BASE_CONFIG}parts:\n  research: "off"\n`, async () => {
@@ -1447,13 +1448,13 @@ await check('applyScopes moves a part, updates the project that held it and name
   const home = process.env.HOME!;
   const dir = await repo('mover');
   await install(dir, false, ['browse']);
-  ok(await exists(path.join(dir, '.claude/skills/browse/skill.md')), 'browse never reached the project');
+  ok(await exists(path.join(dir, '.claude/skills/browse/SKILL.md')), 'browse never reached the project');
 
   try {
     const said = await applyScopes([{ name: 'browse', choice: 'global' }]);
     ok((await loadConfig()).parts?.browse === 'global', 'the choice never reached the config');
     ok(!(await readManifest(dir))?.parts.browse, 'the project kept a part that went global');
-    ok(await exists(path.join(home, '.claude/skills/browse/skill.md')), 'browse never reached the home dir');
+    ok(await exists(path.join(home, '.claude/skills/browse/SKILL.md')), 'browse never reached the home dir');
     ok(said.includes('mover −browse') && said.includes('~/.claude +browse') && !said.includes('updated'), `the toast said ${JSON.stringify(said)}`);
   } finally {
     await writeFile(CONFIG, BASE_CONFIG);
@@ -1478,7 +1479,7 @@ await check('install --parts takes exactly the named parts', async () => {
 
 await check('uninstall --yes leaves nothing behind', async () => {
   await uninstall(main, true);
-  ok(!(await exists(path.join(main, '.claude/skills/mission/skill.md'))), 'a skill was left behind');
+  ok(!(await exists(path.join(main, '.claude/skills/mission/SKILL.md'))), 'a skill was left behind');
   ok(!(await exists(path.join(main, '.claude/.factory-manifest.json'))), 'the manifest was left behind');
   ok(!(await exists(path.join(main, '.mcp.json'))), 'an empty .mcp.json was left behind');
 });

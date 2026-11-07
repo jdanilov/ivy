@@ -45,8 +45,8 @@ printf 'caffeinate: "off"\n' > "$HOME/.factory/config.yaml"
 repo "$REPO"
 
 f install "$REPO" --yes
-[ -f "$REPO/.claude/skills/mission/skill.md" ] || die 'install left no file'
-[ ! -L "$REPO/.claude/skills/mission/skill.md" ] || die 'install left a link into the Factory'
+[ -f "$REPO/.claude/skills/mission/SKILL.md" ] || die 'install left no file'
+[ ! -L "$REPO/.claude/skills/mission/SKILL.md" ] || die 'install left a link into the Factory'
 [ ! -e "$REPO/.claude/skills/commit" ] || die 'a global part landed in a project'
 grep -q 'Docs format: @.claude/docs-format.md' "$REPO/AGENTS.md" || die 'install wrote no snippet'
 # Plain untracked files: what a repo without the Factory on the machine would see committed.
@@ -148,13 +148,13 @@ rm "$REPO/.factory/daemons.yaml"
 
 # The user's own parts: home dir, one settings.json for hooks and allow list, no project involved.
 fin "$TMP" install --global --yes
-[ -f "$HOME/.claude/skills/commit/skill.md" ] || die 'install --global left no file'
-[ ! -L "$HOME/.claude/skills/commit/skill.md" ] || die 'install --global left a link into the Factory'
+[ -f "$HOME/.claude/skills/commit/SKILL.md" ] || die 'install --global left no file'
+[ ! -L "$HOME/.claude/skills/commit/SKILL.md" ] || die 'install --global left a link into the Factory'
 [ -e "$HOME/.claude/.factory-manifest.json" ] || die 'install --global wrote no manifest'
 grep -q '\$HOME/.claude/scripts/safe-bash.sh' "$HOME/.claude/settings.json" || die '${root} did not resolve to $HOME'
 [ ! -e "$HOME/.claude/settings.local.json" ] || die 'a settings.local.json at user level'
 ! grep -q "$HOME" "$HOME/.factory/projects" || die 'the home dir landed in the projects list'
-says "$TMP" status --global | grep -q '5 installed' || die 'status --global does not read the parts back'
+says "$TMP" status --global | grep -q '8 installed' || die 'status --global does not read the parts back'
 # One run over every registered project and then the home dir, with no positional and no picker.
 says "$TMP" update --all | grep -q 'All done' || die 'update --all did not walk the projects and the home dir'
 # The daemon's records under ~/.claude are Claude Code's own, never the Factory's to remove.

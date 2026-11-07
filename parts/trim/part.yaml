@@ -1,0 +1,7 @@
+type: skill
+description: architecture review that proposes cuts, keeps behavior, sharpens the domain model (opus)
+scope: global
+default: true
+files:
+  - source: SKILL.md
+  - source: agents/Trimmer.md

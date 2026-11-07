@@ -1,0 +1,14 @@
+type: skill
+description: runtime UX and design review; fixes small defects, proposes design changes to pick (fable)
+scope: project
+default: false
+files:
+  - source: SKILL.md
+  - source: agents/UxCheck.md
+  - source: design.md
+  - source: ux.md
+    target: docs/ux.md
+    skipIfExists: true
+snippet:
+  section: "## Important Files"
+  line: "- UX: `docs/ux.md` — how to drive the app, safety, design rules (`/ux-check`)"

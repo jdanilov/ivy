@@ -11,3 +11,6 @@ Spawn the @Check sub-agent. Pass it the scope and the task context:
 - Context: a few sentences on what the task was and its goal, so the agent can judge what is in scope and what is not.
 
 Relay the agent's findings in a bullet point list, ranked by criticality x blast radius, then the verdict line: what you think worth doing. Do not fix anything unless asked.
+
+A problem the user or another agent reports later that this review should have caught: add it to
+the Factory's `parts/check/` (one line, project-agnostic), then `factory update --all`.

@@ -59,4 +59,7 @@ Per cut `✓` applied, `✗` undone with the reason, `○` skipped. Net line del
 (`git diff --shortstat` plus `wc -l` of untracked files). Checks status. Anything left for the
 user to verify by hand. Never commit.
 
+A problem the user or another agent reports later that this review should have caught: add it to
+the Factory's `parts/trim/` (one line, project-agnostic), then `factory update --all`.
+
 $ARGUMENTS

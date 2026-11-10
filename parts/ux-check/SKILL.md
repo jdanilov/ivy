@@ -38,7 +38,7 @@ The agent never edits; you apply. Each `Fix` item, as written, without asking:
 Relay terse, no preamble: the applied Fix items one line each, then the numbered `Propose` list as
 the agent drew it, sketches included, then your own pick, one reason per item.
 
-Then `AskUserQuestion`, `multiSelect`: one option per proposal, label `N · title`, description the
+Proposals tagged `auto` go straight to step 5, listed as applied. Then `AskUserQuestion`, `multiSelect`: one option per proposal, label `N · title`, description the
 saving and the `safe|check|risky` tag. Up to 4 options per question and 4 questions; more
 proposals than that, ask for numbers instead (`1,3`, `safe`, `all`, `none`). Stop and wait.
 
@@ -57,5 +57,8 @@ failed proposal: report it. No third round.
 
 Per item `✓` applied and re-checked, `✗` failed with the reason, `○` skipped. Then the agent's
 `Unchecked` and `Restored` lines, checks status, and its verdict line. Never commit.
+
+A problem the user or another agent reports later that a check here should have caught: add it to
+the Factory's `parts/ux-check/` (one row or line, project-agnostic), then `factory update --all`.
 
 $ARGUMENTS

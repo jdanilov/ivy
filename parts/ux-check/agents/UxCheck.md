@@ -40,7 +40,8 @@ Run each row that applies. Each check comes from a bug that shipped.
 |-----------------|--------------------------------------------------------------------------|-----|
 | Layout shift    | hover controls re-truncating a title, a toggle growing a row, a spinner widening its button | shift probe on every hover-revealed control, toggle, loading button, expanding row; any move or display toggle is a finding |
 | States x themes | active segment missing a border side, invisible bar on hover bg          | screenshot rest / hover / focus / loading / empty / error / disabled in every theme |
-| Contrast        | dark chips same as bg, a pale icon that reads as disabled                | contrast probe on the whole screen in every theme: text 4.5, icons 3, chip / badge / bar fills visibly distinct |
+| Contrast        | dark chips same as bg, a pale icon that reads as disabled, grey subtext left on a blue hovered row | contrast probe on the whole screen in every theme, on every ground an element sits on (rest, hover, selected): text 4.5, icons 3, chip / badge / bar fills visibly distinct |
+| Fit             | model names cut to "GPT…" while the meta beside them shows in full      | every label: `scrollWidth > clientWidth` or an ellipsis is a finding when the primary text loses to secondary text, at the narrowest width the screen supports |
 | Input fuzz      | negatives accepted, first invalid resets to 0 and the second does not    | each input: `-1`, empty, `0`, huge, paste, the same invalid twice, whitespace; read back value and state |
 | Reversible      | "Mark done" with no undo                                                 | every action has a visible undo or toggle; destructive ones confirm or undo |
 | Persists        | read state lost on refresh                                               | change state, reload, reopen, confirm it survived |
@@ -53,14 +54,17 @@ Run each row that applies. Each check comes from a bug that shipped.
 | Smaller form    | "OPEN ON INSTAGRAM" link beside an empty status-icon slot; error lines under items nobody reads | per new line or control, design.md's ladder: nothing, an existing row, an existing slot, icon + tooltip, inline text, own row; say it once |
 | Consistency     | a centred grey tooltip among the screen's standard ones; items in one state missing the status icon their siblings show | per new element name the component, slot, colour and alignment its neighbours use (same screen, then the masters); compare computed styles |
 | Hierarchy       | everything one weight, the eye lands on chrome, two primary buttons      | screenshot at full and thumbnail size: the first thing the eye lands on is what the screen is for |
+| Alignment       | an icon at the top of a two-line title, an icon tile with 4px beside it and 12px above | measure, not eyeball: icon centre vs its text line's centre, and a tile's gap to the hover or selected ground on all four sides; a 2px gap is a finding |
 | Polish          | controls glued to a panel bottom, near-tangent edges, mixed icon sets, tracked caps | design.md Polish on the screenshot: insets, shared columns, one icon set, fit, borders, dividers |
+| Interaction     | a title renamed only through a dialog, a list reordered by edit and save, a key feature three menus deep | per object: rename in place, drag to reorder or move, hide rare settings behind an Advanced toggle, surface what users came for; each one is a `Propose` |
 
 ## Fix or Propose
 
 - `Fix`, applied unasked: breaks a written rule, or departs from a neighbour that already shows the
   right way; one place, a few lines; no copy, layout or behaviour choice.
 - `Propose`, the user picks: merge rows, text to icon, remove UI, restructure, new copy, behaviour.
-  Doubt is `Propose`. Fewer, stronger proposals: at most seven.
+  Doubt is `Propose`. Fewer, stronger proposals: at most seven. Mark one `auto` when the project's
+  design rules pre-approve its kind (e.g. rename in place): the caller may apply it unasked.
 
 ## Output
 
@@ -71,7 +75,7 @@ the change did not touch unless broken on the same screen and cheap. Clean is on
 N. **<check> · <title>** · `<file>:<line>` — Sees: <one sentence>. Fix: <exact change>. Evidence: <path or numbers>
 
 `Propose`, ranked by space or complexity saved ÷ risk:
-N. **<check> · <title>** · `<file>:<line>` · `-<px | rows | elements>` · `safe|check|risky`
+N. **<check> · <title>** · `<file>:<line>` · `-<px | rows | elements>` · `auto|safe|check|risky`
    Now / After: the region as width-true ASCII rows, e.g. `● 1 post offline · Retry ▾` over `synced 9 h ago` → `● 1 offline · Retry ▾ · 9 h [↻]`
    Why: <the rule or neighbour>. Cost: <files, behaviour change; omit when none>
 

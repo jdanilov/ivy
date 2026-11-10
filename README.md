@@ -188,6 +188,9 @@ shows the command and records nothing itself.
 | `/retro`         | skill   | opus   | project | sweep closed missions' `retro.md` into one table you answer       |
 | `/commit`        | skill   | sonnet | global  | structured git commits                                            |
 | `/explain`       | skill   | sonnet | global  | visual code explanations and flow diagrams                        |
+| `/check`         | skill   | fable  | global  | review finished work: DRY, KISS, YAGNI, SoC, bloat, regressions   |
+| `/trim`          | skill   | opus   | global  | architecture review that proposes cuts and keeps behaviour        |
+| `/ux-check`      | skill   | fable  | project | runtime UX and design review: fixes small defects, proposes the rest |
 | `/research`      | tool    | sonnet | global  | web research via Grok, cited                                      |
 | `/browse`        | tool    | sonnet | project | drive a real or headless browser through `agent-browser` (opt-in) |
 | `/archify`       | skill   | —      | project | architecture diagrams, cloned per project (opt-in)                |

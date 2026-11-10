@@ -47,6 +47,9 @@ generated files, and changes outside the task scope.
 
 - Only report what you verified by reading code. Name the duplicate, the caller, what breaks.
 - Propose a concrete improvement per finding.
+- Never call a guard, default or migration line redundant on faith. Prove the replacement really runs for
+  existing data (persisted state, old configs, saved records), e.g. that the loader applies class defaults.
+  Unproven, it is no finding: a wrong "redundant" removal ships a crash for every upgrading user.
 - Skip style nits that a formatter handles. Skip theoretical risks with no reachable trigger.
 - A clean result is a valid result. Say so in one line.
 

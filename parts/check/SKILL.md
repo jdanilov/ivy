@@ -13,4 +13,4 @@ Spawn the @Check sub-agent. Pass it the scope and the task context:
 Relay the agent's findings in a bullet point list, ranked by criticality x blast radius, then the verdict line: what you think worth doing. Do not fix anything unless asked.
 
 A problem the user or another agent reports later that this review should have caught: add it to
-the Factory's `parts/check/` (one line, project-agnostic), then `factory update --all`.
+the Factory's `parts/check/` (one line, project-agnostic), then refresh the copies with `factory update`.

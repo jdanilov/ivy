@@ -59,6 +59,6 @@ Per item `✓` applied and re-checked, `✗` failed with the reason, `○` skipp
 `Unchecked` and `Restored` lines, checks status, and its verdict line. Never commit.
 
 A problem the user or another agent reports later that a check here should have caught: add it to
-the Factory's `parts/ux-check/` (one row or line, project-agnostic), then `factory update --all`.
+the Factory's `parts/ux-check/` (one row or line, project-agnostic), then refresh the copies with `factory update`.
 
 $ARGUMENTS

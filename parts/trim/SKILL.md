@@ -60,6 +60,6 @@ Per cut `✓` applied, `✗` undone with the reason, `○` skipped. Net line del
 user to verify by hand. Never commit.
 
 A problem the user or another agent reports later that this review should have caught: add it to
-the Factory's `parts/trim/` (one line, project-agnostic), then `factory update --all`.
+the Factory's `parts/trim/` (one line, project-agnostic), then refresh the copies with `factory update`.
 
 $ARGUMENTS

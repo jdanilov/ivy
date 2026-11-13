@@ -13,7 +13,8 @@ finding names the rule or the neighbour it departs from, never a taste.
 - The smaller-form ladder, first rung that keeps the meaning wins: nothing → part of an existing row
   → an icon in an existing slot → icon + tooltip → inline text → its own row.
 - Text nobody reads (an error paragraph per item, an explanation of a rare state) goes behind an
-  icon + tooltip. A line that asks for an action stays visible, with its action on it.
+  icon + tooltip; a help line under a field is one of them: a (?) beside its label. A line that asks for an action
+  stays visible, with its action on it.
 - Say it once: one signal in the header, a row and a toast is two too many.
 - Whitespace groups: a title sits closer to its meta than to the next record. A one-line row three
   times taller than its words is a fat row; rows spaced wider than they are tall is a loose list.
@@ -25,6 +26,10 @@ finding names the rule or the neighbour it departs from, never a taste.
 - Siblings match: cards in a row share one height; every state of a list item fills the same slots.
 - A control that looks foreign (another tooltip style, a centred grey popover) is a finding even
   when it works.
+- One kind of choice, one control: every one-of-N choice on a screen uses the same control (a segmented bar, or a menu
+  when options don't fit); loose pills beside a segmented bar for the same job is a finding.
+- One radius per control kind, from the project's scale; full round only for dots, avatars, switches and count badges.
+- Labels name what they change in the user's words; a term the user can't explain is a finding.
 - Status colours mean status; one accent; a new colour needs a reason.
 - One icon set, one size, one stroke per screen; filled at 14px and under. Never a hand-drawn glyph,
   never an emoji as an icon, no sparkle or purple to mean AI.

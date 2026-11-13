@@ -30,6 +30,10 @@ finding names the rule or the neighbour it departs from, never a taste.
   when options don't fit); loose pills beside a segmented bar for the same job is a finding.
 - One radius per control kind, from the project's scale; full round only for dots, avatars, switches and count badges.
 - Labels name what they change in the user's words; a term the user can't explain is a finding.
+- One tooltip component: no bare `title` attributes where the project has its own; a mode or option whose effect isn't
+  obvious from its label explains itself in one.
+- A list's current item uses the project's one selection marker, in the same slot; no slot reserved on every row.
+- A note about one item sits on that item; a name that means two things (the product and a model) gets disambiguated.
 - Status colours mean status; one accent; a new colour needs a reason.
 - One icon set, one size, one stroke per screen; filled at 14px and under. Never a hand-drawn glyph,
   never an emoji as an icon, no sparkle or purple to mean AI.

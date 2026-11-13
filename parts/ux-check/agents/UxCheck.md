@@ -46,6 +46,7 @@ Run each row that applies. Each check comes from a bug that shipped.
 | Reversible      | "Mark done" with no undo                                                 | every action has a visible undo or toggle; destructive ones confirm or undo |
 | Persists        | read state lost on refresh                                               | change state, reload, reopen, confirm it survived |
 | Copy & toasts   | vague toast, toast over an upsell, sticky error, a bare media id as "Source" | what happened and what to do; no toast when the UI shows it; errors auto-hide unless they carry an action; no raw ids or enum keys |
+| Ambiguous name  | "Only on HARPA AI" read as the product, meant as one model, far from that model's row | names that mean two things in the product; a note about one item sits on that item |
 | Keyboard        | menus without arrows, Enter or Esc                                       | menus and lists: ↑↓ Enter Esc, type-to-filter when lists grow, Enter never does two things |
 | Discoverable    | credits buyable only when out; Save disabled until a far-away test passes | paid resources have an entry outside the out-of-credits path; dependent controls sit together |
 | Edge data       | "Instagram's" from "Instagram's design"                                  | long names, emoji, possessives, RTL, empty and huge lists |
@@ -56,9 +57,13 @@ Run each row that applies. Each check comes from a bug that shipped.
 | Consistency     | a centred grey tooltip among the screen's standard ones; items in one state missing the status icon their siblings show | per new element name the component, slot, colour and alignment its neighbours use (same screen, then the masters); compare computed styles |
 | One control kind | Value · Text · Page as a segmented bar, Changes · Drops · Rises as loose pills, on one form | per screen, list every one-of-N choice and its control; one kind for all (segmented bar or menu), never a mix |
 | Radius          | pill-round chips and buttons beside 6px-round ones                        | computed `border-radius` of every control on the screen: one radius per control kind; full round only for dots, avatars, switches, count badges |
+| Native tooltip  | a browser `title` box ("coming soon") beside the app's styled tooltips      | every hover and focus hint on the screen: the project's tooltip component, never a bare `title` attribute |
+| Selection mark  | a ✓ at the row's end in one list, a left bar in the chat list beside it    | per list, how its current item shows: the same marker and slot as the project's master lists |
 | Jargon          | a "Find it" label nobody can explain                                    | read every label cold: can a first-time user say what it changes? Unclear is a `Propose` with a plain rename |
+| Explain modes   | Memory Auto · Manual · Off with no word on what each does                 | every option set whose effect isn't obvious from its label: a tooltip per option or a (?) on the control |
 | Hierarchy       | everything one weight, the eye lands on chrome, two primary buttons      | screenshot at full and thumbnail size: the first thing the eye lands on is what the screen is for |
 | Alignment       | an icon at the top of a two-line title, an icon tile with 4px beside it and 12px above | measure, not eyeball: icon centre vs its text line's centre, and a tile's gap to the hover or selected ground on all four sides; a 2px gap is a finding |
+| Right edge      | icons stop short of the edge because a ✓ column is reserved on every row  | trailing elements across sibling rows end on the container's inset; an empty reserved slot is a finding |
 | Label edge      | section labels 6px left of the controls they head                        | measure each section label's text x against its first control's box x (or the shared text column); one column per screen |
 | Polish          | controls glued to a panel bottom, near-tangent edges, mixed icon sets, tracked caps | design.md Polish on the screenshot: insets, shared columns, one icon set, fit, borders, dividers |
 | Interaction     | a title renamed only through a dialog, a list reordered by edit and save, a key feature three menus deep | per object: rename in place, drag to reorder or move, hide rare settings behind an Advanced toggle, surface what users came for; each one is a `Propose` |

@@ -30,7 +30,7 @@ runtime rows `Unchecked`, design rows from the code and any images given.
 
 `docs/ux.md` Safety first. Never write to a real account, reach a third party or spend money (send,
 publish, delete, follow, pay, generate); unsure: skip it, list it `Unchecked`. Restore every value
-you change (theme, settings, inputs, open screen); cancel or Esc over Save.
+you change (theme, settings, inputs, open screen, a held hover); cancel or Esc over Save.
 
 ## Checklist
 
@@ -38,7 +38,7 @@ Run each row that applies. Each check comes from a bug that shipped.
 
 | Check           | Catches                                                                  | How |
 |-----------------|--------------------------------------------------------------------------|-----|
-| Layout shift    | hover controls re-truncating a title, a toggle growing a row, a spinner widening its button | shift probe on every hover-revealed control, toggle, loading button, expanding row; any move or display toggle is a finding |
+| Layout shift    | hover controls re-truncating a title, a toggle growing a row, a spinner widening its button | shift probe on every hover-revealed control, toggle, loading button, expanding row; any move, display, visibility or opacity toggle is a finding |
 | States x themes | active segment missing a border side, invisible bar on hover bg          | screenshot rest / hover / focus / loading / empty / error / disabled in every theme |
 | Contrast        | dark chips same as bg, a pale icon that reads as disabled, grey subtext left on a blue hovered row | contrast probe on the whole screen in every theme, on every ground an element sits on (rest, hover, selected): text 4.5, icons 3, chip / badge / bar fills visibly distinct |
 | Fit             | model names cut to "GPT…" while the meta beside them shows in full      | every label: `scrollWidth > clientWidth` or an ellipsis is a finding when the primary text loses to secondary text, at the narrowest width the screen supports |

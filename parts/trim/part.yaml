@@ -1,5 +1,5 @@
 type: skill
-description: architecture review that proposes cuts, keeps behavior, sharpens the domain model (opus)
+description: architecture review that proposes cuts (code, tests, comments), keeps behavior, sharpens the domain model (opus)
 scope: global
 default: true
 files:

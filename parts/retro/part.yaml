@@ -1,7 +1,7 @@
 type: skill
-description: sweep closed missions' retro.md into one table the human answers (opus)
+description: review recent sessions and closed missions' retro.md into one table the human answers (opus)
+scope: global
 default: true
 files:
   - source: SKILL.md
-requires:
-  - mission
+  - source: scripts/digest.ts

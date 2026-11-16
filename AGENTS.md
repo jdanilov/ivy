@@ -88,10 +88,10 @@ there, and `update --all` runs it on every registered project and then the home 
 `skipIfExists` is copied in as a template only when the project has nothing there.
 
 Roles ship as parts: `/mission` carries the Orchestrator's manual plus `Worker`, `Investigator`
-and `Summarizer`; `/verify` carries `Verifier`; `/validate` carries `Validator`; `/retro` sweeps
-closed missions' retros back into work. Shared context reaches every agent through the
+and `Summarizer`; `/verify` carries `Verifier`; `/validate` carries `Validator`; `/retro` reviews
+recent session transcripts and closed missions' retros, and turns them into harness changes. Shared context reaches every agent through the
 `## Important Files` snippets, never through a sentence repeated in each prompt. The `mission`
-skill stays under 120 lines, `Worker` under 40, `/retro` under 60, every other prompt under 80.
+skill stays under 120 lines, `Worker` under 40, every other prompt at most 100.
 
 ### Command families
 

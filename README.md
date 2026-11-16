@@ -185,7 +185,7 @@ shows the command and records nothing itself.
 | `/mission`       | skill   | fable  | project | run a mission through its workflow, gates and triage              |
 | `/verify`        | skill   | opus   | project | verifier gatekeeper over the diff and the contract                |
 | `/validate`      | skill   | opus   | project | validator gatekeeper driving the running system                   |
-| `/retro`         | skill   | opus   | project | sweep closed missions' `retro.md` into one table you answer       |
+| `/retro`         | skill   | opus   | global  | review recent sessions and missions' `retro.md`, one table you answer |
 | `/commit`        | skill   | sonnet | global  | structured git commits                                            |
 | `/explain`       | skill   | sonnet | global  | visual code explanations and flow diagrams                        |
 | `/check`         | skill   | fable  | global  | review finished work: DRY, KISS, YAGNI, SoC, bloat, regressions   |

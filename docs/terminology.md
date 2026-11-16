@@ -43,7 +43,7 @@ The rules behind each name live in `docs/parts.md`, `docs/missions.md` and `docs
 | Investigator | Sonnet read-only sub-agent for code search, codegraph, web and transcript research. Runs in parallel. |
 | Summarizer   | Headless Sonnet run over a whole mission. Condenses artefacts, writes `retro.md`, proposes memories. |
 | Question     | A sub-agent request for human input, raised by returning blocked with the question. The Orchestrator asks and re-spawns with the answer. |
-| Retro sweep  | `/retro` over every closed mission's `retro.md`: one item at a time, applied, stubbed, roadmapped or dropped. |
+| Retro        | `/retro` over the sessions since the last one (digested transcripts, sub-agents included) and every closed mission's `retro.md`: one table of harness fixes, each applied, stubbed, roadmapped or dropped. |
 
 ## Docs a mission produces
 

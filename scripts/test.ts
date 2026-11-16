@@ -4,6 +4,7 @@
 import path from 'node:path';
 import { lstat, mkdir, mkdtemp, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import type { Part } from '../src/types.js';
 
 // The scratch HOME lands before any module that reads it loads. `$TMPDIR` is honoured, so a caller
 // with a slow temp folder can point the whole run somewhere small. Resolved, because macOS hands
@@ -38,7 +39,7 @@ const { mission } = await import('../src/commands/mission.js');
 const { archiveMission, closeMission, createMission, currentBranch, ensureIgnored, git, listArchived, listMissions, missionWorkflow, promoteMission, reshapeStub, resolveMission, writeState } = await import('../src/core/mission.js');
 const { dropCreated, removeSnippet, writeSnippet } = await import('../src/core/linker.js');
 const { resolvePart } = await import('../src/core/recipes.js');
-const { dependants, ignoredScopes, loadParts, FACTORY_ROOT } = await import('../src/core/registry.js');
+const { dependants, ignoredScopes, loadParts, withRequires, FACTORY_ROOT } = await import('../src/core/registry.js');
 const { readManifest, writeManifest } = await import('../src/core/manifest.js');
 const { parseIntent, renderIntent } = await import('../src/core/intent.js');
 const { loadConfig, resetConfig, writeDaemonEnabled, writePartScope } = await import('../src/core/config.js');
@@ -558,13 +559,11 @@ await check('install names an edited copy it had to restore when nobody was aske
   ok(rows.length === 1, `install named the part it restored on more than one row: ${rows.join(' | ')}`);
 });
 
-await check('update reinstalls a part its dependant requires', async () => {
-  const manifest = (await readManifest(main))!;
-  delete manifest.parts.mission;
-  await writeManifest(main, manifest);
-  await update(main);
-  ok((await readManifest(main))?.parts.mission, '/mission was not reinstalled');
-  ok(dependants(await loadParts(), 'mission', ['mission']).includes('retro'), '/retro does not require /mission');
+await check('a requirement comes along with its dependant and stays while it does', async () => {
+  // No shipped part requires another today, so the pair is made up.
+  const parts = [{ name: 'a', requires: ['b'] }, { name: 'b' }] as Part[];
+  ok(withRequires(parts, ['a']).added.includes('b'), 'selecting a did not pull in b');
+  ok(dependants(parts, 'b', ['b']).includes('a'), 'b was removable under a');
 });
 
 await git(main, 'add', '-A'); await git(main, 'commit', '-qm', 'install factory');
@@ -917,7 +916,7 @@ await check('update --all walks every registered project and then the home dir',
 
 await check('global parts install into the home dir and come back out', async () => {
   const home = process.env.HOME!;
-  const globals = 'check,commit,explain,hook-safe-bash,permissions,research,trim,ww';
+  const globals = 'check,commit,explain,hook-safe-bash,permissions,research,retro,trim,ww';
   await install(home, true);
   const manifest = await readManifest(home);
   ok(Object.keys(manifest!.parts).sort().join() === globals,

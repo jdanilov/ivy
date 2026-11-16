@@ -1,6 +1,6 @@
 ---
 name: check
-description: ⌬ Review finished work for DRY, KISS, YAGNI, SoC, bloat, blast radius and regressions via @Check sub-agent
+description: ⌬ Review finished work for regressions, shortcuts, DRY, KISS, YAGNI, SoC, bloat and blast radius via @Check sub-agent
 ---
 
 # Check via Sub-Agent

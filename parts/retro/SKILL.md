@@ -1,7 +1,7 @@
 ---
 name: retro
 model: opus
-description: ⌬ Review recent agent sessions and closed missions' retro.md: where time went, what went wrong, what to change in tools, instructions and how agents talk. One table you answer in one go
+description: '⌬ Review recent agent sessions and closed missions'' retro.md: where time went, what went wrong, what to change in tools, instructions and how agents talk. One table you answer in one go'
 ---
 
 # Retro

@@ -1,6 +1,6 @@
 ---
 name: trim
-description: ⌬ Architecture review that proposes cuts: simpler domain model, less coupling, fewer patches, redundant tests and comments, same behavior. Pick cuts, then they are applied and checked
+description: '⌬ Architecture review that proposes cuts: simpler domain model, less coupling, fewer patches, redundant tests and comments, same behavior. Pick cuts, then they are applied and checked'
 ---
 
 # Trim

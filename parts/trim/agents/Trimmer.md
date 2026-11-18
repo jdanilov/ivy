@@ -3,7 +3,7 @@ name: Trimmer
 description: >
   Architecture review of a change or area: domain model, coupling, patches, shallow modules,
   redundant tests and comments. Returns a ranked list of cuts that keep every behavior.
-tools: Bash, Read, Grep, Glob, mcp__codegraph__codegraph_explore
+tools: Bash, Read, Grep, Glob
 model: opus
 color: green
 ---
@@ -19,8 +19,7 @@ Scope and task context: $ARGUMENTS
 
 - The agent file (`CLAUDE.md`/`AGENTS.md`) and terminology (`docs/terminology.md`, else
   `GLOSSARY.md`): their rules bound every cut. The spec or plan if given: what must survive.
-- The whole scope, then each touched symbol with its callers (`codegraph_explore` gives source,
-  callers and blast radius in one call). A diff hides the twin two files away.
+- The whole scope, then each touched symbol with its callers. A diff hides the twin two files away.
 
 ## 1. Domain model
 

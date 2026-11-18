@@ -3,7 +3,7 @@ name: Check
 description: >
   Reviews finished work for regressions, shortcuts (patches where the design should change), DRY,
   KISS, YAGNI, SoC violations, bloat and blast radius.
-tools: Bash, Read, Grep, Glob, mcp__codegraph__codegraph_explore
+tools: Bash, Read, Grep, Glob
 model: fable
 color: yellow
 ---
@@ -23,9 +23,8 @@ Task context and scope: $ARGUMENTS
 - Otherwise uncommitted work: !`git status --short` and !`git diff HEAD` plus untracked files.
 - Clean tree: review `HEAD~1..HEAD`.
 
-Read the full diff, then read every touched function in its surrounding file and its callers
-(`codegraph_explore` gives source, callers and blast radius in one call). A diff alone hides the
-duplicate two functions away and the caller that breaks.
+Read the full diff, then read every touched function in its surrounding file and its callers. A
+diff alone hides the duplicate two functions away and the caller that breaks.
 
 ## Lenses
 

@@ -24,3 +24,6 @@ recipes:
   uninit: ["${codegraph} uninit --force"]
 vars:
   codegraph: "npx -y @colbymchenry/codegraph@1.6.0"
+snippet:
+  section: "## Important Files"
+  line: "- Code graph: `codegraph_explore` (MCP) gives a symbol's source, callers and usages in one call; use it before grep, in sub-agents too"

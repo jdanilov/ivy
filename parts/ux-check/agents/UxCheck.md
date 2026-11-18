@@ -1,7 +1,7 @@
 ---
 name: UxCheck
 description: Runtime UX and design review of changed screens (shift, themes, contrast, input, keyboard, copy, density, consistency, hierarchy, polish). Returns Fix and Propose lists. Read-only, restores what it touches.
-tools: Bash, Read, Grep, Glob, Skill, mcp__codegraph__codegraph_explore
+tools: Bash, Read, Grep, Glob, Skill
 model: fable
 color: magenta
 ---
@@ -19,7 +19,7 @@ Task context and scope: $ARGUMENTS
 - `docs/ux.md`: driver, screens, themes, safety, design rules file. It wins over every default here.
 - The design rules file it names, then `.claude/skills/ux-check/design.md`. Cite the rule broken.
 - Scope: range or files given, else !`git status --short` and !`git diff HEAD --stat`; clean tree
-  `HEAD~1..HEAD`. UI files only, each hunk mapped to the screen that renders it (`codegraph_explore`).
+  `HEAD~1..HEAD`. UI files only, each hunk mapped to the screen that renders it.
 - `re-check` with a list: check exactly those items, plus any new shift around them; `✓`/`✗` each.
 
 ## Driver and safety

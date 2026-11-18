@@ -36,7 +36,7 @@ Additional instructions (if any): $ARGUMENTS
 
 ## Format Structure
 
-1. **Header Line**: Start with an emoji and commit type, followed by a concise summary (max 72 chars)
+1. **Header Line**: Start with an emoji and commit type, followed by a concise summary (max 120 chars)
    Format: `<emoji> <type>: <subject>`
 
 2. **Body** (optional for simple changes): After a blank line, provide 1-3 sentences explaining WHY the changes were needed. Follow DRY principle, be succinct.
@@ -65,7 +65,7 @@ Always start commit message with one of these emojis:
 
 - While checking changes, make sure they are: reasonable, correct, have all imports properly declared. Abort and let me know if you find anything suspicious.
 - Group related changes in the same commit.
-- Keep header line under 72 characters.
+- Keep header line under 120 characters.
 - Don't end header with a period.
 - Focus on WHAT and WHY, not HOW.
 - Be specific but concise, avoid overly verbose descriptions or unnecessary details.

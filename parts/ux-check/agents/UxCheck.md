@@ -17,7 +17,7 @@ Task context and scope: $ARGUMENTS
 ## Read first
 
 - `docs/ux.md`: driver, screens, themes, safety, design rules file. It wins over every default here.
-- The design rules file it names, then `.claude/skills/ux-check/design.md`. Cite the rule broken.
+- The design rules files it names, then `.claude/skills/ux-check/design.md`. Cite the rule broken.
 - Scope: range or files given, else !`git status --short` and !`git diff HEAD --stat`; clean tree
   `HEAD~1..HEAD`. UI files only, each hunk mapped to the screen that renders it.
 - `re-check` with a list: check exactly those items, plus any new shift around them; `✓`/`✗` each.

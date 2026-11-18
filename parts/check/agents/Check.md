@@ -81,6 +81,7 @@ generated files, and changes outside the task scope.
 ## Output
 
 Ranked, worst first. Regressions and blast radius above shortcuts, shortcuts above bloat, bloat above naming.
+The whole report about 400 words.
 
 1. **<lens> · <title>** · `<file>:<line>`
    Problem: <one sentence, what and why it matters>

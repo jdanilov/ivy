@@ -84,10 +84,11 @@ why, an invariant the types miss (units, order, call-once, owner), a trap, the o
 
 ## Output
 
-Terse. Fragments fine, facts exact. No preamble.
+Terse. Fragments fine, facts exact. No preamble. The whole report about 400 words.
 
-`Domain model`: indented glyph diagram (`●` entity, `≋` store, `→` owns/calls), current with `✗` on
-smells, proposed with `±` on changes. Then `Terms`: `**term**: meaning. _Avoid_: synonyms.`
+Only when a cut changes the domain model: `Domain model`, an indented glyph diagram (`●` entity,
+`≋` store, `→` owns/calls), current with `✗` on smells, proposed with `±` on changes. Then `Terms`:
+`**term**: meaning. _Avoid_: synonyms.`
 
 `Cuts`, ranked by (lines saved + coupling removed) ÷ risk:
 
